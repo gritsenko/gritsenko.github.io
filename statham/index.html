@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Цитата Джейсона Стэтхэма на каждый день</title>
+    <!-- Open Graph -->
+    <!-- TODO: Укажите абсолютный URL вашего сайта в og:url и для og:image, чтобы превью корректно работало в соцсетях. -->
+    <meta property="og:title" content="Цитата Джейсона Стэтхэма на каждый день">
+    <meta property="og:description" content="Открой страницу — получи случайную цитату от Джейсона Стэтхэма. Каждый раз — новая.">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:site_name" content="Цитаты Стэтхэма">
+    <meta property="og:url" content="https://gritsenko.biz/statham/">
+    <meta property="og:image" content="https://gritsenko.biz/statham/staham.jpeg">
+    <meta property="og:image:alt" content="Джейсон Стэтхэм">
+    <meta property="og:image:type" content="image/jpeg">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Цитата Джейсона Стэтхэма на каждый день">
+    <meta name="twitter:description" content="Открой страницу — получи случайную цитату от Джейсона Стэтхэма. Каждый раз — новая.">
+    <meta name="twitter:image" content="https://gritsenko.biz/statham/staham.jpeg">
+
+    <!-- Canonical & PWA basics -->
+    <link rel="canonical" href="https://gritsenko.biz/statham/">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" type="image/jpeg" href="https://gritsenko.biz/statham/staham.jpeg">
+    <meta name="theme-color" content="#f5f5dc">
+
+    <!-- SEO -->
+    <meta name="description" content="Случайные цитаты Джейсона Стэтхэма — вдохновляйся и улыбайся каждый день.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&display=swap');
+        
+        body {
+            font-family: 'Lora', serif;
+            background-color: #f5f5dc; /* Beige background */
+            color: #3a2d2d; /* Dark brown text */
+        }
+
+        .card {
+            background-color: #fffaf0; /* Floral white */
+            border: 2px solid #cdaa7d; /* Gilded border */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2), 0 6px 6px rgba(0,0,0,0.23);
+            transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        }
+        
+        .card:hover {
+            box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+        }
+
+        .quote-text {
+            font-style: italic;
+            font-size: 1.5rem;
+            line-height: 2rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .author-name {
+            font-weight: bold;
+            font-size: 1.25rem;
+            color: #8b4513; /* Saddle brown */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="card max-w-2xl w-full rounded-lg overflow-hidden p-8 text-center">
+        <!-- Изображение Джейсона Стэтхэма -->
+        <div class="flex justify-center mb-6">
+            <img id="statham-image" src="./staham.jpeg" alt="Изображение Джейсона Стэтхэма" class="w-48 h-48 md:w-64 md:h-64 rounded-full object-cover border-4 border-[#cdaa7d]" loading="lazy" onerror="this.onerror=null; this.src='staham.jpeg';">
+        </div>
+
+        <!-- Контейнер для цитаты -->
+        <div class="quote-container">
+            <blockquote class="quote-text mb-4">
+                <p id="quote-display">Загрузка цитаты...</p>
+            </blockquote>
+            <cite id="author-display" class="author-name block"></cite>
+            <!-- Кнопка Поделиться -->
+            <div class="mt-6 flex justify-center">
+                <button id="share-btn" type="button" aria-label="Поделиться цитатой" class="px-4 py-2 rounded-md bg-[#cdaa7d] text-[#3a2d2d] hover:bg-[#b38a5c] focus:outline-none focus:ring-2 focus:ring-[#cdaa7d] focus:ring-offset-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11A2.99 2.99 0 0 0 18 7.91a3 3 0 1 0-2.83-3.91 3 3 0 0 0 .17 1.96L8.32 9.96a3.003 3.003 0 1 0 0 4.08l7.02 4.11c-.11.29-.17.6-.17.93a3 3 0 1 0 3-3z"/>
+                    </svg>
+                    Поделиться
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Функция для загрузки и отображения случайной цитаты
+        async function displayRandomQuote() {
+            try {
+                // Загружаем JSON файл с цитатами
+                const response = await fetch('data.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                // Получаем массив цитат
+                const quotes = data.quotes;
+                
+                // Выбираем случайную цитату
+                const randomIndex = Math.floor(Math.random() * quotes.length);
+                const randomQuote = quotes[randomIndex];
+                
+                // Отображаем цитату и автора на странице
+                document.getElementById('quote-display').textContent = `"${randomQuote.text}"`;
+                document.getElementById('author-display').textContent = `— ${data.author}`;
+
+                // Сохраняем текущую цитату и автора глобально для кнопки Поделиться
+                window.currentQuote = randomQuote.text;
+                window.currentAuthor = data.author;
+
+                // Обновляем OG/Twitter description для некоторых клиентов, учитывающих изменения через JS
+                const ogDesc = document.querySelector('meta[property="og:description"]');
+                const twDesc = document.querySelector('meta[name="twitter:description"]');
+                const descText = `"${randomQuote.text}" — ${data.author}`;
+                if (ogDesc) ogDesc.setAttribute('content', descText);
+                if (twDesc) twDesc.setAttribute('content', descText);
+
+                // Также подставим текущие абсолютные URL, если сайт открыт по http(s)
+                const origin = window.location.origin;
+                if (origin && origin.startsWith('http')) {
+                    const ogUrl = document.querySelector('meta[property="og:url"]');
+                    const ogImg = document.querySelector('meta[property="og:image"]');
+                    const twImg = document.querySelector('meta[name="twitter:image"]');
+                    if (ogUrl) ogUrl.setAttribute('content', window.location.href);
+                    // Строим абсолютный путь к картинке с учётом подкаталога
+                    const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+                    const absImg = (base.endsWith('/') ? base : base + '/') + 'staham.jpeg';
+                    if (ogImg) ogImg.setAttribute('content', absImg);
+                    if (twImg) twImg.setAttribute('content', absImg);
+                }
+
+            } catch (error) {
+                console.error("Не удалось загрузить цитаты:", error);
+                document.getElementById('quote-display').textContent = "Не удалось загрузить цитату. Попробуйте обновить страницу.";
+            }
+        }
+
+        // Вызываем функцию при загрузке страницы
+        window.onload = displayRandomQuote;
+
+        // Поделиться цитатой: Web Share API с фолбеком на копирование
+        function getShareText() {
+            const q = window.currentQuote || (document.getElementById('quote-display').textContent || '').replace(/^"|"$/g, '');
+            const a = window.currentAuthor || (document.getElementById('author-display').textContent || '').replace(/^—\s*/, '');
+            return `"${q}" — ${a}`;
+        }
+
+        async function shareQuote() {
+            const text = getShareText();
+            const url = window.location.href;
+            try {
+                if (navigator.share) {
+                    await navigator.share({
+                        title: 'Цитата Джейсона Стэтхэма',
+                        text,
+                        url
+                    });
+                } else if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(`${text}\n${url}`);
+                    alert('Цитата и ссылка скопированы в буфер обмена');
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = `${text}\n${url}`;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    alert('Цитата и ссылка скопированы в буфер обмена');
+                }
+            } catch (e) {
+                console.error('Не удалось поделиться:', e);
+            }
+        }
+
+        // Навешиваем обработчик на кнопку
+        const shareBtn = document.getElementById('share-btn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', shareQuote);
+        }
+    </script>
+
+</body>
+</html>

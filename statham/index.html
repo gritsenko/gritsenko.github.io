@@ -139,8 +139,11 @@
                 <p id="quote-display">Загрузка цитаты...</p>
             </blockquote>
             <cite id="author-display" class="author-name block"></cite>
-            <!-- Кнопка Поделиться -->
-            <div class="mt-6 flex justify-center">
+            <!-- Кнопки действий: новая цитата и поделиться -->
+            <div class="mt-6 flex justify-center gap-3">
+                <button id="new-quote-btn" type="button" aria-label="Новая цитата" class="px-4 py-2 rounded-md bg-white text-[#3a2d2d] border border-[#cdaa7d] hover:bg-[#fffaf0] focus:outline-none focus:ring-2 focus:ring-[#cdaa7d] focus:ring-offset-2">
+                    Ещё цитата
+                </button>
                 <button id="share-btn" type="button" aria-label="Поделиться цитатой" class="px-4 py-2 rounded-md bg-[#cdaa7d] text-[#3a2d2d] hover:bg-[#b38a5c] focus:outline-none focus:ring-2 focus:ring-[#cdaa7d] focus:ring-offset-2 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
                         <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11A2.99 2.99 0 0 0 18 7.91a3 3 0 1 0-2.83-3.91 3 3 0 0 0 .17 1.96L8.32 9.96a3.003 3.003 0 1 0 0 4.08l7.02 4.11c-.11.29-.17.6-.17.93a3 3 0 1 0 3-3z"/>
@@ -153,12 +156,17 @@
 
     <script>
         // Инициализация цитаты: использует quoteId из URL или выбирает случайную
-        async function initQuote() {
+    // Store quotes and author for reuse
+    window._stathamQuotes = null;
+
+    async function initQuote() {
             try {
                 const response = await fetch('data.json');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
-                const quotes = data.quotes || [];
+        const quotes = data.quotes || [];
+        // cache for later
+        window._stathamQuotes = { quotes, author: data.author };
 
                 // Попробуем прочитать quoteId из query
                 const params = new URLSearchParams(window.location.search);
@@ -181,8 +189,12 @@
                 // Обновляем URL, чтобы в нём был quoteId текущей цитаты (без добавления в историю)
                 try {
                     const newUrl = new URL(window.location.href);
-                    newUrl.searchParams.set('quoteId', selectedQuote.id);
-                    history.replaceState(null, '', newUrl.toString());
+                        // avoid showing 'index.html' in the address bar
+                        newUrl.pathname = newUrl.pathname.replace(/index\.html$/i, '');
+                        newUrl.searchParams.set('quoteId', selectedQuote.id);
+                        // ensure trailing slash for directory URLs
+                        if (!newUrl.pathname.endsWith('/')) newUrl.pathname += '/';
+                        history.replaceState(null, '', newUrl.toString());
                 } catch (e) {
                     // ignore if URL can't be constructed (file:// etc.)
                 }
@@ -194,6 +206,36 @@
                 console.error('Не удалось загрузить цитаты:', error);
                 document.getElementById('quote-display').textContent = 'Не удалось загрузить цитату. Попробуйте обновить страницу.';
             }
+        }
+
+        // Pick a different random quote and display it (used by the New Quote button)
+        function loadRandomQuote() {
+            const cache = window._stathamQuotes;
+            if (!cache || !Array.isArray(cache.quotes) || cache.quotes.length === 0) return;
+            const quotes = cache.quotes;
+            // pick a random quote different from current if possible
+            let idx = Math.floor(Math.random() * quotes.length);
+            if (quotes.length > 1 && window.currentQuoteId) {
+                // try up to 6 times to get a different id
+                let attempts = 0;
+                while (quotes[idx].id === window.currentQuoteId && attempts < 6) {
+                    idx = Math.floor(Math.random() * quotes.length);
+                    attempts++;
+                }
+            }
+            const q = quotes[idx];
+            try {
+                const newUrl = new URL(window.location.href);
+                // avoid showing 'index.html' in the address bar
+                newUrl.pathname = newUrl.pathname.replace(/index\.html$/i, '');
+                newUrl.searchParams.set('quoteId', q.id);
+                if (!newUrl.pathname.endsWith('/')) newUrl.pathname += '/';
+                // create a new history entry when user requests a new quote
+                history.pushState({ quoteId: q.id }, '', newUrl.toString());
+            } catch (e) {
+                // ignore
+            }
+            displayQuote(q, cache.author);
         }
 
         // Отдельная функция для отображения цитаты и обновления метаданных
@@ -230,6 +272,12 @@
 
         // Запускаем инициализацию при загрузке
         window.onload = initQuote;
+
+        // Wire up New Quote button
+        document.addEventListener('DOMContentLoaded', function () {
+            const btn = document.getElementById('new-quote-btn');
+            if (btn) btn.addEventListener('click', loadRandomQuote);
+        });
 
         // Prevent pinch-to-zoom and double-tap zoom on touch devices
         (function preventTouchZoom() {

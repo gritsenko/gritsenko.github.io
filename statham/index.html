@@ -65,6 +65,31 @@
         }
     </style>
 
+    <style>
+        /* toast for copy feedback */
+        #copy-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(58,45,45,0.95);
+            color: #fffaf0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            font-size: 0.95rem;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 180ms ease-in-out, transform 180ms ease-in-out;
+            pointer-events: none;
+        }
+        #copy-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+    </style>
+
       <!-- Yandex.Metrika counter -->
   <script type="text/javascript">
     (function (m, e, t, r, i, k, a) {
@@ -113,60 +138,84 @@
     </div>
 
     <script>
-        // Функция для загрузки и отображения случайной цитаты
-        async function displayRandomQuote() {
+        // Инициализация цитаты: использует quoteId из URL или выбирает случайную
+        async function initQuote() {
             try {
-                // Загружаем JSON файл с цитатами
                 const response = await fetch('data.json');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
-                
-                // Получаем массив цитат
-                const quotes = data.quotes;
-                
-                // Выбираем случайную цитату
-                const randomIndex = Math.floor(Math.random() * quotes.length);
-                const randomQuote = quotes[randomIndex];
-                
-                // Отображаем цитату и автора на странице
-                document.getElementById('quote-display').textContent = `"${randomQuote.text}"`;
-                document.getElementById('author-display').textContent = `— ${data.author}`;
+                const quotes = data.quotes || [];
 
-                // Сохраняем текущую цитату и автора глобально для кнопки Поделиться
-                window.currentQuote = randomQuote.text;
-                window.currentAuthor = data.author;
+                // Попробуем прочитать quoteId из query
+                const params = new URLSearchParams(window.location.search);
+                const qidParam = params.get('quoteId');
+                let selectedQuote = null;
 
-                // Обновляем OG/Twitter description для некоторых клиентов, учитывающих изменения через JS
-                const ogDesc = document.querySelector('meta[property="og:description"]');
-                const twDesc = document.querySelector('meta[name="twitter:description"]');
-                const descText = `"${randomQuote.text}" — ${data.author}`;
-                if (ogDesc) ogDesc.setAttribute('content', descText);
-                if (twDesc) twDesc.setAttribute('content', descText);
-
-                // Также подставим текущие абсолютные URL, если сайт открыт по http(s)
-                const origin = window.location.origin;
-                if (origin && origin.startsWith('http')) {
-                    const ogUrl = document.querySelector('meta[property="og:url"]');
-                    const ogImg = document.querySelector('meta[property="og:image"]');
-                    const twImg = document.querySelector('meta[name="twitter:image"]');
-                    if (ogUrl) ogUrl.setAttribute('content', window.location.href);
-                    // Строим абсолютный путь к картинке с учётом подкаталога
-                    const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
-                    const absImg = (base.endsWith('/') ? base : base + '/') + 'staham.jpeg';
-                    if (ogImg) ogImg.setAttribute('content', absImg);
-                    if (twImg) twImg.setAttribute('content', absImg);
+                if (qidParam) {
+                    const id = parseInt(qidParam, 10);
+                    if (!Number.isNaN(id)) {
+                        selectedQuote = quotes.find(q => Number(q.id) === id) || null;
+                    }
                 }
+
+                // Если цитата не найдена по id, выбираем случайную
+                if (!selectedQuote) {
+                    if (quotes.length === 0) throw new Error('No quotes available');
+                    selectedQuote = quotes[Math.floor(Math.random() * quotes.length)];
+                }
+
+                // Обновляем URL, чтобы в нём был quoteId текущей цитаты (без добавления в историю)
+                try {
+                    const newUrl = new URL(window.location.href);
+                    newUrl.searchParams.set('quoteId', selectedQuote.id);
+                    history.replaceState(null, '', newUrl.toString());
+                } catch (e) {
+                    // ignore if URL can't be constructed (file:// etc.)
+                }
+
+                // Отображаем цитату
+                displayQuote(selectedQuote, data.author);
 
             } catch (error) {
-                console.error("Не удалось загрузить цитаты:", error);
-                document.getElementById('quote-display').textContent = "Не удалось загрузить цитату. Попробуйте обновить страницу.";
+                console.error('Не удалось загрузить цитаты:', error);
+                document.getElementById('quote-display').textContent = 'Не удалось загрузить цитату. Попробуйте обновить страницу.';
             }
         }
 
-        // Вызываем функцию при загрузке страницы
-        window.onload = displayRandomQuote;
+        // Отдельная функция для отображения цитаты и обновления метаданных
+        function displayQuote(quoteObj, author) {
+            const text = quoteObj && quoteObj.text ? quoteObj.text : '';
+            document.getElementById('quote-display').textContent = `"${text}"`;
+            document.getElementById('author-display').textContent = `— ${author || ''}`;
+
+            // Сохраняем для шаринга
+            window.currentQuote = text;
+            window.currentAuthor = author;
+            // Сохраняем текущий id, если есть
+            window.currentQuoteId = quoteObj && (quoteObj.id || quoteObj.ID || quoteObj.Id) ? quoteObj.id : null;
+
+            // Обновляем OG/Twitter description и url/img если возможно
+            const descText = `"${text}" — ${author || ''}`;
+            const ogDesc = document.querySelector('meta[property="og:description"]');
+            const twDesc = document.querySelector('meta[name="twitter:description"]');
+            if (ogDesc) ogDesc.setAttribute('content', descText);
+            if (twDesc) twDesc.setAttribute('content', descText);
+
+            const origin = window.location.origin;
+            if (origin && origin.startsWith('http')) {
+                const ogUrl = document.querySelector('meta[property="og:url"]');
+                const ogImg = document.querySelector('meta[property="og:image"]');
+                const twImg = document.querySelector('meta[name="twitter:image"]');
+                if (ogUrl) ogUrl.setAttribute('content', window.location.href);
+                const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+                const absImg = (base.endsWith('/') ? base : base + '/') + 'staham.jpeg';
+                if (ogImg) ogImg.setAttribute('content', absImg);
+                if (twImg) twImg.setAttribute('content', absImg);
+            }
+        }
+
+        // Запускаем инициализацию при загрузке
+        window.onload = initQuote;
 
         // Поделиться цитатой: Web Share API с фолбеком на копирование
         function getShareText() {
@@ -177,9 +226,22 @@
 
         async function shareQuote() {
             const text = getShareText();
-            const url = window.location.href;
+            // Ensure URL contains current quoteId
+            let url;
             try {
-                if (navigator.share) {
+                const u = new URL(window.location.href);
+                if (window.currentQuoteId) u.searchParams.set('quoteId', window.currentQuoteId);
+                url = u.toString();
+            } catch (e) {
+                // fallback to location.href with naive append
+                url = window.location.href.split('?')[0] + (window.currentQuoteId ? `?quoteId=${window.currentQuoteId}` : '');
+            }
+            try {
+                // Prefer copying to clipboard on desktop browsers (non-mobile); use navigator.share on mobile when available
+                const ua = navigator.userAgent || '';
+                const isMobile = /Mobile|Android|iPhone|iPad|iPod|Mobi/.test(ua);
+                const isDesktop = !isMobile;
+                if (navigator.share && !isDesktop) {
                     await navigator.share({
                         title: 'Цитата Джейсона Стэтхэма',
                         text,
@@ -187,7 +249,7 @@
                     });
                 } else if (navigator.clipboard && window.isSecureContext) {
                     await navigator.clipboard.writeText(`${text}\n${url}`);
-                    alert('Цитата и ссылка скопированы в буфер обмена');
+                    showCopyToast('Ссылка скопирована в буфер обмена');
                 } else {
                     const ta = document.createElement('textarea');
                     ta.value = `${text}\n${url}`;
@@ -195,11 +257,21 @@
                     ta.select();
                     document.execCommand('copy');
                     document.body.removeChild(ta);
-                    alert('Цитата и ссылка скопированы в буфер обмена');
+                    showCopyToast('Ссылка скопирована в буфер обмена');
                 }
             } catch (e) {
                 console.error('Не удалось поделиться:', e);
             }
+        }
+
+        // Toast helper
+        function showCopyToast(msg, duration = 2200) {
+            let t = document.getElementById('copy-toast');
+            if (!t) return;
+            t.textContent = msg;
+            t.classList.add('show');
+            clearTimeout(t._timeout);
+            t._timeout = setTimeout(() => t.classList.remove('show'), duration);
         }
 
         // Навешиваем обработчик на кнопку
@@ -208,6 +280,9 @@
             shareBtn.addEventListener('click', shareQuote);
         }
     </script>
+</script>
 
+    <!-- Copy feedback toast -->
+    <div id="copy-toast" role="status" aria-live="polite"></div>
 </body>
 </html>

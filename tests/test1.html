@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Психологический тест: Кто вы?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        .answer-btn {
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+        .answer-btn:hover {
+            transform: translateY(-2px);
+            background-color: #4f46e5; /* indigo-700 */
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <div id="app" class="max-w-2xl w-full mx-auto text-center">
+
+        <!-- Начальный экран -->
+        <div id="start-screen" class="card">
+            <h1 class="text-4xl font-bold mb-4 text-slate-900">Какой вы тип личности?</h1>
+            <p class="text-lg text-slate-600 mb-8">Пройдите короткий тест и узнайте, кто вы: решительный Тигр, общительная Обезьяна, надежный Слон или дотошный Муравей.</p>
+            <button id="start-btn" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-indigo-700 transition-colors">
+                Начать тест
+            </button>
+        </div>
+
+        <!-- Экран с вопросами -->
+        <div id="quiz-screen" class="card hidden">
+            <div id="progress-bar" class="w-full bg-slate-200 rounded-full h-2.5 mb-6">
+                <div id="progress-bar-inner" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <h2 id="question-text" class="text-2xl font-semibold mb-8 min-h-[6rem]"></h2>
+            <div id="answers-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Кнопки с ответами будут вставлены сюда -->
+            </div>
+        </div>
+
+        <!-- Экран с результатами -->
+        <div id="result-screen" class="card hidden">
+            <p class="text-lg text-slate-600 mb-2">Ваш результат:</p>
+            <div id="result-emoji" class="text-8xl mb-4"></div>
+            <h2 id="result-title" class="text-4xl font-bold mb-4 text-indigo-600"></h2>
+            <p id="result-description" class="text-md text-slate-700 mb-8 text-left"></p>
+            <button id="restart-btn" class="w-full sm:w-auto bg-slate-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-slate-700 transition-colors">
+                Пройти еще раз
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- ЭЛЕМЕНТЫ DOM ---
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const questionText = document.getElementById('question-text');
+        const answersContainer = document.getElementById('answers-container');
+        const progressBarInner = document.getElementById('progress-bar-inner');
+
+        const resultEmoji = document.getElementById('result-emoji');
+        const resultTitle = document.getElementById('result-title');
+        const resultDescription = document.getElementById('result-description');
+
+        // --- ДАННЫЕ ТЕСТА ---
+        const questions = [
+            {
+                text: "Когда вы сталкиваетесь с новой сложной задачей, ваша первая реакция?",
+                answers: [
+                    { text: "Берусь за дело немедленно, люблю вызовы.", type: "D" },
+                    { text: "Обсуждаю с коллегами, ищу вдохновение и поддержку.", type: "I" },
+                    { text: "Сначала наблюдаю и помогаю другим, прежде чем действовать.", type: "S" },
+                    { text: "Тщательно планирую шаги, создаю систему для ее решения.", type: "C" }
+                ]
+            },
+            {
+                text: "На вечеринке вы, скорее всего:",
+                answers: [
+                    { text: "Инициируете разговор, знакомитесь с новыми людьми.", type: "I" },
+                    { text: "Спокойно общаетесь с небольшой группой знакомых.", type: "S" },
+                    { text: "Анализируете ситуацию, прежде чем к кому-то подойти.", type: "C" },
+                    { text: "Обсуждаете амбициозные цели и проекты.", type: "D" }
+                ]
+            },
+            {
+                text: "Какой стиль работы вам ближе?",
+                answers: [
+                    { text: "Стабильный и предсказуемый, без спешки.", type: "S" },
+                    { text: "Структурированный, с четкими правилами и стандартами.", type: "C" },
+                    { text: "Быстрый, динамичный, с фокусом на результат.", type: "D" },
+                    { text: "Гибкий, творческий, с большим количеством общения.", type: "I" }
+                ]
+            },
+            {
+                text: "В командном проекте ваша главная роль — это...",
+                answers: [
+                    { text: "Лидер, который ведет команду к цели.", type: "D" },
+                    { text: "Мотиватор, который всех подбадривает и создает атмосферу.", type: "I" },
+                    { text: "Исполнитель, который поддерживает и помогает другим.", type: "S" },
+                    { text: "Аналитик, который следит за качеством и деталями.", type: "C" }
+                ]
+            },
+            {
+                text: "Как вы принимаете важные решения?",
+                answers: [
+                    { text: "Быстро и решительно, доверяя своей интуиции.", type: "D" },
+                    { text: "Советуясь с друзьями и коллегами, ценя их мнение.", type: "I" },
+                    { text: "Не спеша, обдумывая, как это повлияет на других.", type: "S" },
+                    { text: "На основе фактов, логики и тщательного анализа.", type: "C" }
+                ]
+            },
+            {
+                text: "Что вас больше всего раздражает в других людях?",
+                answers: [
+                    { text: "Нерешительность и медлительность.", type: "D" },
+                    { text: "Пессимизм и отсутствие энтузиазма.", type: "I" },
+                    { text: "Резкость, эгоизм и невнимание к чувствам.", type: "S" },
+                    { text: "Неорганизованность и небрежность в деталях.", type: "C" }
+                ]
+            },
+            {
+                text: "Выберите девиз, который вам ближе всего:",
+                answers: [
+                    { text: "Просто сделай это!", type: "D" },
+                    { text: "Главное — участие, а не победа!", type: "I" },
+                    { text: "Тише едешь — дальше будешь.", type: "S" },
+                    { text: "Семь раз отмерь, один раз отрежь.", type: "C" }
+                ]
+            }
+        ];
+
+        const results = {
+            D: {
+                emoji: "🐅",
+                title: "Тигр (Доминирование)",
+                description: "Вы — прирожденный лидер, решительный и целеустремленный. Вы ориентированы на результат, не боитесь трудностей и быстро принимаете решения. Ваша уверенность и энергия ведут за собой других. Для вас важны вызовы и возможность побеждать. Однако иногда ваша прямолинейность может быть воспринята как резкость. Старайтесь быть более терпимыми к чужому мнению."
+            },
+            I: {
+                emoji: "🐒",
+                title: "Обезьяна (Влияние)",
+                description: "Вы — яркая, общительная и оптимистичная личность. Вы легко находите общий язык с людьми, вдохновляете их и создаете позитивную атмосферу. Для вас важны социальные связи и признание. Вы полны идей и энтузиазма. Иногда вы можете быть неорганизованны и увлекаться, забывая о деталях. Постарайтесь доводить начатое до конца."
+            },
+            S: {
+                emoji: "🐘",
+                title: "Слон (Постоянство)",
+                description: "Вы — надежный, спокойный и дружелюбный человек. Вы цените стабильность, гармонию и безопасность. Вы прекрасный командный игрок, всегда готовый выслушать и поддержать. Ваша лояльность и терпение делают вас незаменимым другом и коллегой. Однако вы можете сопротивляться переменам и избегать конфликтов. Не бойтесь выходить из зоны комфорта."
+            },
+            C: {
+                emoji: "🐜",
+                title: "Муравей (Соответствие)",
+                description: "Вы — точный, аналитичный и внимательный к деталям человек. Вы стремитесь к качеству и порядку во всем. Ваша системность, ответственность и дисциплина вызывают уважение. Вы предпочитаете работать с фактами и логикой. Иногда ваш перфекционизм может замедлять работу. Учитесь доверять не только анализу, но и интуиции."
+            }
+        };
+
+        // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
+        let currentQuestionIndex = 0;
+        let scores = { D: 0, I: 0, S: 0, C: 0 };
+
+        // --- ФУНКЦИИ ---
+
+        // Функция для начала теста
+        function startTest() {
+            currentQuestionIndex = 0;
+            scores = { D: 0, I: 0, S: 0, C: 0 };
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            showQuestion();
+        }
+
+        // Функция для отображения текущего вопроса
+        function showQuestion() {
+            const question = questions[currentQuestionIndex];
+            questionText.textContent = question.text;
+            answersContainer.innerHTML = '';
+
+            // Обновляем прогресс-бар
+            const progress = ((currentQuestionIndex) / questions.length) * 100;
+            progressBarInner.style.width = `${progress}%`;
+
+            question.answers.forEach(answer => {
+                const button = document.createElement('button');
+                button.textContent = answer.text;
+                button.className = 'answer-btn w-full bg-indigo-600 text-white font-semibold p-4 rounded-lg text-left';
+                button.onclick = () => selectAnswer(answer.type);
+                answersContainer.appendChild(button);
+            });
+        }
+
+        // Функция для обработки выбора ответа
+        function selectAnswer(type) {
+            scores[type]++;
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < questions.length) {
+                showQuestion();
+            } else {
+                showResult();
+            }
+        }
+
+        // Функция для подсчета и отображения результата
+        function showResult() {
+            // Обновляем прогресс-бар до 100%
+            progressBarInner.style.width = '100%';
+
+            let maxScore = -1;
+            let resultType = '';
+
+            // Находим тип с максимальным количеством баллов
+            for (const type in scores) {
+                if (scores[type] > maxScore) {
+                    maxScore = scores[type];
+                    resultType = type;
+                }
+            }
+            
+            // В случае ничьей, можно выбрать первый попавшийся, так как логика проста.
+            // Для более сложных тестов можно было бы определить приоритеты.
+
+            const resultData = results[resultType];
+            resultEmoji.textContent = resultData.emoji;
+            resultTitle.textContent = resultData.title;
+            resultDescription.textContent = resultData.description;
+
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+        }
+
+        // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+        startBtn.addEventListener('click', startTest);
+        restartBtn.addEventListener('click', startTest);
+
+    </script>
+</body>
+</html>

@@ -140,7 +140,7 @@
             </blockquote>
             <cite id="author-display" class="author-name block"></cite>
             <!-- Кнопки действий: новая цитата и поделиться -->
-            <div class="mt-6 flex justify-center gap-3">
+            <div class="mt-6 flex justify-center gap-3 flex-wrap">
                 <button id="new-quote-btn" type="button" aria-label="Новая цитата" class="px-4 py-2 rounded-md bg-white text-[#3a2d2d] border border-[#cdaa7d] hover:bg-[#fffaf0] focus:outline-none focus:ring-2 focus:ring-[#cdaa7d] focus:ring-offset-2">
                     Ещё цитата
                 </button>
@@ -149,6 +149,12 @@
                         <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11A2.99 2.99 0 0 0 18 7.91a3 3 0 1 0-2.83-3.91 3 3 0 0 0 .17 1.96L8.32 9.96a3.003 3.003 0 1 0 0 4.08l7.02 4.11c-.11.29-.17.6-.17.93a3 3 0 1 0 3-3z"/>
                     </svg>
                     Поделиться
+                </button>
+                <button id="copy-link-btn" type="button" aria-label="Скопировать ссылку" class="px-4 py-2 rounded-md bg-white text-[#3a2d2d] border border-[#cdaa7d] hover:bg-[#fffaf0] focus:outline-none focus:ring-2 focus:ring-[#cdaa7d] focus:ring-offset-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                    Копировать ссылку
                 </button>
             </div>
         </div>
@@ -318,23 +324,72 @@
                 url = window.location.href.split('?')[0] + (window.currentQuoteId ? `?quoteId=${window.currentQuoteId}` : '');
             }
             try {
-                // Prefer copying to clipboard on desktop browsers (non-mobile); use navigator.share on mobile when available
+                // Check if Web Share API is available and we're on mobile
                 const ua = navigator.userAgent || '';
                 const isMobile = /Mobile|Android|iPhone|iPad|iPod|Mobi/.test(ua);
-                const isDesktop = !isMobile;
-                if (navigator.share && !isDesktop) {
-                    // Include quote text and URL in the shared message for mobile
+                
+                if (navigator.share && isMobile) {
+                    // For mobile sharing (Telegram, WhatsApp, etc.)
+                    // Some apps prefer text only, others work better with text + url separately
                     await navigator.share({
                         title: 'Цитата Джейсона Стэтхэма',
-                        text: `${text}\n${url}`,
-                        url
+                        text: text,
+                        url: url
                     });
-                } else if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(`${text}\n${url}`);
+                } else {
+                    // For desktop or when Web Share API is not available
+                    // Copy text with URL for broader compatibility
+                    const textWithUrl = `${text}\n\n${url}`;
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(textWithUrl);
+                        showCopyToast('Цитата и ссылка скопированы в буфер обмена');
+                    } else {
+                        // Fallback for older browsers
+                        const ta = document.createElement('textarea');
+                        ta.value = textWithUrl;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        showCopyToast('Цитата и ссылка скопированы в буфер обмена');
+                    }
+                }
+            } catch (e) {
+                console.error('Не удалось поделиться:', e);
+                // Fallback to copy if share fails
+                try {
+                    const textWithUrl = `${text}\n\n${url}`;
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(textWithUrl);
+                        showCopyToast('Цитата и ссылка скопированы в буфер обмена');
+                    }
+                } catch (e2) {
+                    showCopyToast('Ошибка при попытке поделиться');
+                }
+            }
+        }
+
+        // Функция для копирования только ссылки
+        async function copyLinkOnly() {
+            // Ensure URL contains current quoteId
+            let url;
+            try {
+                const u = new URL(window.location.href);
+                if (window.currentQuoteId) u.searchParams.set('quoteId', window.currentQuoteId);
+                url = u.toString();
+            } catch (e) {
+                // fallback to location.href with naive append
+                url = window.location.href.split('?')[0] + (window.currentQuoteId ? `?quoteId=${window.currentQuoteId}` : '');
+            }
+            
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(url);
                     showCopyToast('Ссылка скопирована в буфер обмена');
                 } else {
+                    // Fallback for older browsers
                     const ta = document.createElement('textarea');
-                    ta.value = `${text}\n${url}`;
+                    ta.value = url;
                     document.body.appendChild(ta);
                     ta.select();
                     document.execCommand('copy');
@@ -342,7 +397,8 @@
                     showCopyToast('Ссылка скопирована в буфер обмена');
                 }
             } catch (e) {
-                console.error('Не удалось поделиться:', e);
+                console.error('Не удалось скопировать ссылку:', e);
+                showCopyToast('Ошибка при копировании ссылки');
             }
         }
 
@@ -356,10 +412,15 @@
             t._timeout = setTimeout(() => t.classList.remove('show'), duration);
         }
 
-        // Навешиваем обработчик на кнопку
+        // Навешиваем обработчики на кнопки
         const shareBtn = document.getElementById('share-btn');
         if (shareBtn) {
             shareBtn.addEventListener('click', shareQuote);
+        }
+        
+        const copyLinkBtn = document.getElementById('copy-link-btn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', copyLinkOnly);
         }
     </script>
 </script>

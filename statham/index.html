@@ -2,7 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Disable pinch/double-tap zoom on touch devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <title>Цитата Джейсона Стэтхэма на каждый день</title>
     <!-- Open Graph -->
     <!-- TODO: Укажите абсолютный URL вашего сайта в og:url и для og:image, чтобы превью корректно работало в соцсетях. -->
@@ -12,15 +14,15 @@
     <meta property="og:locale" content="ru_RU">
     <meta property="og:site_name" content="Цитаты Стэтхэма">
     <meta property="og:url" content="https://gritsenko.biz/statham/">
-    <meta property="og:image" content="https://gritsenko.biz/statham/staham.jpeg">
+    <meta property="og:image" content="og.png">
     <meta property="og:image:alt" content="Джейсон Стэтхэм">
-    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:type" content="image/png">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Цитата Джейсона Стэтхэма на каждый день">
     <meta name="twitter:description" content="Открой страницу — получи случайную цитату от Джейсона Стэтхэма. Каждый раз — новая.">
-    <meta name="twitter:image" content="https://gritsenko.biz/statham/staham.jpeg">
+    <meta name="twitter:image" content="og.png">
 
     <!-- Canonical & PWA basics -->
     <link rel="canonical" href="https://gritsenko.biz/statham/">
@@ -62,6 +64,18 @@
             font-weight: bold;
             font-size: 1.25rem;
             color: #8b4513; /* Saddle brown */
+        }
+    </style>
+
+    <style>
+        /* Prefer no pinch-zoom on touch devices and control double-tap behavior */
+        html, body {
+            touch-action: manipulation;
+            -ms-touch-action: manipulation;
+        }
+        /* Allow scrolling but avoid double-tap zoom on buttons and links */
+        button, a {
+            touch-action: manipulation;
         }
     </style>
 
@@ -208,7 +222,7 @@
                 const twImg = document.querySelector('meta[name="twitter:image"]');
                 if (ogUrl) ogUrl.setAttribute('content', window.location.href);
                 const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
-                const absImg = (base.endsWith('/') ? base : base + '/') + 'staham.jpeg';
+                const absImg = (base.endsWith('/') ? base : base + '/') + 'og.png';
                 if (ogImg) ogImg.setAttribute('content', absImg);
                 if (twImg) twImg.setAttribute('content', absImg);
             }
@@ -216,6 +230,25 @@
 
         // Запускаем инициализацию при загрузке
         window.onload = initQuote;
+
+        // Prevent pinch-to-zoom and double-tap zoom on touch devices
+        (function preventTouchZoom() {
+            // gesturestart is fired on iOS Safari during pinch gestures
+            window.addEventListener('gesturestart', function (e) {
+                e.preventDefault();
+            }, { passive: false });
+
+            // Prevent double-tap zoom
+            let lastTouch = 0;
+            window.addEventListener('touchend', function (e) {
+                const now = Date.now();
+                if (now - lastTouch <= 300) {
+                    // prevent the double-tap zoom
+                    e.preventDefault();
+                }
+                lastTouch = now;
+            }, { passive: false });
+        })();
 
         // Поделиться цитатой: Web Share API с фолбеком на копирование
         function getShareText() {

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расширенный психологический тест: Кто вы?</title>
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Расширенный психологический тест: Кто вы?">
+    <meta property="og:description" content="Пройдите тест и узнайте, кто вы: решительный Тигр, общительная Обезьяна, надежный Слон или дотошный Муравей.">
+    <meta property="og:url" content="https://gritsenko.biz/tests/beast_test.html">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://placehold.co/1200x630/6366f1/ffffff?text=Какой+вы+тип+личности%3F&font=inter">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        .answer-btn {
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+        .answer-btn:hover {
+            transform: translateY(-2px);
+            background-color: #4338ca; /* indigo-700 */
+        }
+        #result-screen h2 {
+             background: -webkit-linear-gradient(45deg, #4f46e5, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #copy-notification {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+    </style>
+          <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+      k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+    })
+      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+    ym(98653129, "init", {
+      clickmap: true,
+      trackLinks: true,
+      accurateTrackBounce: true
+    });
+  </script>
+  <noscript>
+    <div><img src="https://mc.yandex.ru/watch/98653129" style="position:absolute; left:-9999px;" alt="" /></div>
+  </noscript>
+  <!-- /Yandex.Metrika counter -->
+</head>
+<body class="bg-slate-50 text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <div id="app" class="max-w-2xl w-full mx-auto text-center">
+
+        <!-- Начальный экран -->
+        <div id="start-screen" class="card">
+            <h1 class="text-4xl font-bold mb-4 text-slate-900">Какой вы тип личности?</h1>
+            <p class="text-lg text-slate-600 mb-8">Пройдите расширенный тест из 23 вопросов и узнайте, кто вы: решительный Тигр, общительная Обезьяна, надежный Слон или дотошный Муравей.</p>
+            <button id="start-btn" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/50">
+                Начать тест
+            </button>
+        </div>
+
+        <!-- Экран с вопросами -->
+        <div id="quiz-screen" class="card hidden">
+            <div class="flex justify-between items-center mb-4">
+                 <p id="question-counter" class="text-sm font-medium text-slate-500"></p>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-2.5 mb-6">
+                <div id="progress-bar-inner" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-in-out" style="width: 0%"></div>
+            </div>
+            <h2 id="question-text" class="text-2xl font-semibold mb-8 min-h-[6rem] flex items-center justify-center"></h2>
+            <div id="answers-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Кнопки с ответами будут вставлены сюда -->
+            </div>
+        </div>
+
+        <!-- Экран с результатами -->
+        <div id="result-screen" class="card hidden">
+            <p class="text-lg text-slate-600 mb-2">Ваш доминирующий тип:</p>
+            <div id="result-emoji" class="text-8xl mb-4"></div>
+            <h2 id="result-title" class="text-5xl font-bold mb-6"></h2>
+            
+            <div class="grid md:grid-cols-2 gap-8 items-center">
+                <div class="text-left">
+                    <p id="result-description" class="text-md text-slate-700 mb-6"></p>
+                </div>
+                <div>
+                     <h3 class="text-xl font-semibold mb-4 text-slate-800">Ваш профиль личности:</h3>
+                     <canvas id="result-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="mt-8 flex flex-col sm:flex-row justify-center gap-4">
+                <button id="restart-btn" class="w-full sm:w-auto bg-slate-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-slate-700 transition-colors">
+                    Пройти еще раз
+                </button>
+                <button id="share-btn" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-indigo-700 transition-colors">
+                    Поделиться
+                </button>
+            </div>
+        </div>
+
+    </div>
+    
+    <!-- Уведомление о копировании -->
+    <div id="copy-notification" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white py-2 px-4 rounded-lg opacity-0 transform translate-y-2">
+        Ссылка скопирована!
+    </div>
+
+
+    <script>
+        // --- ЭЛЕМЕНТЫ DOM ---
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const shareBtn = document.getElementById('share-btn');
+        const copyNotification = document.getElementById('copy-notification');
+
+        const questionText = document.getElementById('question-text');
+        const answersContainer = document.getElementById('answers-container');
+        const progressBarInner = document.getElementById('progress-bar-inner');
+        const questionCounter = document.getElementById('question-counter');
+
+        const resultEmoji = document.getElementById('result-emoji');
+        const resultTitle = document.getElementById('result-title');
+        const resultDescription = document.getElementById('result-description');
+        const resultChartCanvas = document.getElementById('result-chart');
+        
+        let resultChart = null;
+        let shareText = ''; // Переменная для хранения текста для репоста
+
+        // --- ДАННЫЕ ТЕСТА ---
+        const questions = [
+            { text: "Когда вы сталкиваетесь с новой сложной задачей, ваша первая реакция?", answers: [{ text: "Берусь за дело немедленно, люблю вызовы.", type: "D" }, { text: "Обсуждаю с коллегами, ищу вдохновение.", type: "I" }, { text: "Сначала наблюдаю, помогаю другим.", type: "S" }, { text: "Тщательно планирую шаги, создаю систему.", type: "C" }] },
+            { text: "На вечеринке вы, скорее всего:", answers: [{ text: "Инициируете разговор, знакомитесь с новыми людьми.", type: "I" }, { text: "Спокойно общаетесь с небольшой группой знакомых.", type: "S" }, { text: "Анализируете ситуацию, прежде чем подойти.", type: "C" }, { text: "Обсуждаете амбициозные цели и проекты.", type: "D" }] },
+            { text: "Какой стиль работы вам ближе?", answers: [{ text: "Стабильный и предсказуемый, без спешки.", type: "S" }, { text: "Структурированный, с четкими правилами.", type: "C" }, { text: "Быстрый, динамичный, с фокусом на результат.", type: "D" }, { text: "Гибкий, творческий, с большим количеством общения.", type: "I" }] },
+            { text: "В командном проекте ваша главная роль — это...", answers: [{ text: "Лидер, который ведет команду к цели.", type: "D" }, { text: "Мотиватор, который всех подбадривает.", type: "I" }, { text: "Исполнитель, который поддерживает и помогает.", type: "S" }, { text: "Аналитик, который следит за качеством.", type: "C" }] },
+            { text: "Как вы принимаете важные решения?", answers: [{ text: "Быстро и решительно, доверяя интуиции.", type: "D" }, { text: "Советуясь с друзьями, ценя их мнение.", type: "I" }, { text: "Не спеша, обдумывая, как это повлияет на других.", type: "S" }, { text: "На основе фактов, логики и анализа.", type: "C" }] },
+            { text: "Что вас больше всего раздражает в других людях?", answers: [{ text: "Нерешительность и медлительность.", type: "D" }, { text: "Пессимизм и отсутствие энтузиазма.", type: "I" }, { text: "Резкость, эгоизм и невнимание к чувствам.", type: "S" }, { text: "Неорганизованность и небрежность в деталях.", type: "C" }] },
+            { text: "Выберите девиз, который вам ближе всего:", answers: [{ text: "Просто сделай это!", type: "D" }, { text: "Главное — участие, а не победа!", type: "I" }, { text: "Тише едешь — дальше будешь.", type: "S" }, { text: "Семь раз отмерь, один раз отрежь.", type: "C" }] },
+            { text: "Когда нужно высказать критику, вы:", answers: [{ text: "Говорите прямо и по делу.", type: "D" }, { text: "Смягчаете слова, чтобы не обидеть.", type: "I" }, { text: "Долго готовитесь, подбирая нужные слова.", type: "S" }, { text: "Подкрепляете критику фактами и данными.", type: "C" }] },
+            { text: "Ваше идеальное рабочее место:", answers: [{ text: "Конкурентная среда, где можно проявить себя.", type: "D" }, { text: "Дружный коллектив, где все общаются.", type: "I" }, { text: "Спокойное, стабильное, без резких перемен.", type: "S" }, { text: "Тихое, где можно сосредоточиться на деталях.", type: "C" }] },
+            { text: "Как вы относитесь к риску?", answers: [{ text: "Люблю рисковать, это ведет к большим победам.", type: "D" }, { text: "Рискую, если это весело и интересно.", type: "I" }, { text: "Предпочитаю избегать риска.", type: "S" }, { text: "Рискую только после тщательной оценки.", type: "C" }] },
+            { text: "Что для вас важнее в работе?", answers: [{ text: "Достижение амбициозных целей.", type: "D" }, { text: "Признание и хорошие отношения с коллегами.", type: "I" }, { text: "Стабильность и чувство безопасности.", type: "S" }, { text: "Качество и правильность выполнения.", type: "C" }] },
+            { text: "Ваша реакция на неожиданные изменения в планах:", answers: [{ text: "Быстро адаптируюсь и нахожу новое решение.", type: "D" }, { text: "Воспринимаю как новое приключение.", type: "I" }, { text: "Чувствую дискомфорт, мне нужно время привыкнуть.", type: "S" }, { text: "Начинаю анализировать новые вводные.", type: "C" }] },
+            { text: "Как вы обычно проводите свободное время?", answers: [{ text: "Активно, занимаясь спортом или соревнуясь.", type: "D" }, { text: "В компании друзей, на мероприятиях.", type: "I" }, { text: "Дома с семьей или за спокойным хобби.", type: "S" }, { text: "Читая, изучая что-то новое, упорядочивая.", type: "C" }] },
+            { text: "Какой подарок вы бы предпочли получить?", answers: [{ text: "Что-то, что подчеркивает статус.", type: "D" }, { text: "Впечатление: билет на концерт, путешествие.", type: "I" }, { text: "Что-то уютное и полезное для дома.", type: "S" }, { text: "Книгу, головоломку, технический гаджет.", type: "C" }] },
+            { text: "В споре вы чаще всего:", answers: [{ text: "Настаиваете на своем до победного.", type: "D" }, { text: "Пытаетесь обаять и убедить собеседника.", type: "I" }, { text: "Ищете компромисс, чтобы сохранить мир.", type: "S" }, { text: "Апеллируете к логике и фактам.", type: "C" }] },
+            { text: "Как вы относитесь к правилам и инструкциям?", answers: [{ text: "Правила для того, чтобы их нарушать, если это ведет к цели.", type: "D" }, { text: "Отношусь гибко, главное — человеческие отношения.", type: "I" }, { text: "Предпочитаю следовать проверенным путем.", type: "S" }, { text: "Считаю, что правила необходимы для порядка.", type: "C" }] },
+            { text: "Ваш подход к планированию будущего:", answers: [{ text: "Ставлю большие, амбициозные цели.", type: "D" }, { text: "Мечтаю и представляю себе яркое будущее.", type: "I" }, { text: "Планирую ближайшие шаги для стабильности.", type: "S" }, { text: "Составляю детальный пошаговый план.", type: "C" }] },
+            { text: "Что вас мотивирует больше всего?", answers: [{ text: "Победа и достижение результата.", type: "D" }, { text: "Одобрение и восхищение окружающих.", type: "I" }, { text: "Гармония и благодарность близких.", type: "S" }, { text: "Возможность сделать работу идеально.", type: "C" }] },
+            { text: "Как вы справляетесь со стрессом?", answers: [{ text: "Действую, решаю проблему, которая его вызвала.", type: "D" }, { text: "Общаюсь с друзьями, выговариваюсь.", type: "I" }, { text: "Замыкаюсь в себе, ищу уединения.", type: "S" }, { text: "Анализирую причину стресса, чтобы устранить ее.", type: "C" }] },
+            { text: "Ваше отношение к деталям:", answers: [{ text: "Смотрю на картину в целом, детали — для других.", type: "D" }, { text: "Часто упускаю детали, увлекаясь идеей.", type: "I" }, { text: "Замечаю детали, касающиеся комфорта людей.", type: "S" }, { text: "Детали — это самое важное.", type: "C" }] },
+            { text: "Если бы вы были руководителем, какой стиль управления вы бы выбрали?", answers: [{ text: "Авторитарный, ориентированный на результат.", type: "D" }, { text: "Демократичный, вдохновляющий команду.", type: "I" }, { text: "Патерналистский, заботящийся о подчиненных.", type: "S" }, { text: "Экспертный, основанный на знаниях и правилах.", type: "C" }] },
+            { text: "Как вы учитесь новому?", answers: [{ text: "Через практику и метод проб и ошибок.", type: "D" }, { text: "В группе, обсуждая и обмениваясь идеями.", type: "I" }, { text: "Медленно и последовательно, шаг за шагом.", type: "S" }, { text: "Изучая теорию и структурируя информацию.", type: "C" }] },
+            { text: "Что для вас означает успех?", answers: [{ text: "Быть первым и лучшим в своем деле.", type: "D" }, { text: "Быть популярным и любимым.", type: "I" }, { text: "Иметь стабильную и счастливую жизнь.", type: "S" }, { text: "Достичь мастерства и быть экспертом.", type: "C" }] }
+        ];
+
+        const results = {
+            D: { emoji: "🐅", title: "Тигр", description: "Вы — прирожденный лидер, решительный и целеустремленный. Вы ориентированы на результат, не боитесь трудностей и быстро принимаете решения. Ваша уверенность и энергия ведут за собой других. Для вас важны вызовы и возможность побеждать. Однако иногда ваша прямолинейность может быть воспринята как резкость. Старайтесь быть более терпимыми к чужому мнению." },
+            I: { emoji: "🐒", title: "Обезьяна", description: "Вы — яркая, общительная и оптимистичная личность. Вы легко находите общий язык с людьми, вдохновляете их и создаете позитивную атмосферу. Для вас важны социальные связи и признание. Вы полны идей и энтузиазма. Иногда вы можете быть неорганизованны и увлекаться, забывая о деталях. Постарайтесь доводить начатое до конца." },
+            S: { emoji: "🐘", title: "Слон", description: "Вы — надежный, спокойный и дружелюбный человек. Вы цените стабильность, гармонию и безопасность. Вы прекрасный командный игрок, всегда готовый выслушать и поддержать. Ваша лояльность и терпение делают вас незаменимым другом и коллегой. Однако вы можете сопротивляться переменам и избегать конфликтов. Не бойтесь выходить из зоны комфорта." },
+            C: { emoji: "🐜", title: "Муравей", description: "Вы — точный, аналитичный и внимательный к деталям человек. Вы стремитесь к качеству и порядку во всем. Ваша системность, ответственность и дисциплина вызывают уважение. Вы предпочитаете работать с фактами и логикой. Иногда ваш перфекционизм может замедлять работу. Учитесь доверять не только анализу, но и интуиции." }
+        };
+
+        // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
+        let currentQuestionIndex = 0;
+        let scores = { D: 0, I: 0, S: 0, C: 0 };
+
+        // --- ФУНКЦИИ ---
+        function startTest() {
+            currentQuestionIndex = 0;
+            scores = { D: 0, I: 0, S: 0, C: 0 };
+            shareText = '';
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            if(resultChart) {
+                resultChart.destroy();
+            }
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const question = questions[currentQuestionIndex];
+            questionText.textContent = question.text;
+            answersContainer.innerHTML = '';
+            questionCounter.textContent = `Вопрос ${currentQuestionIndex + 1} из ${questions.length}`;
+
+            const progress = ((currentQuestionIndex) / questions.length) * 100;
+            progressBarInner.style.width = `${progress}%`;
+
+            question.answers.forEach(answer => {
+                const button = document.createElement('button');
+                button.textContent = answer.text;
+                button.className = 'answer-btn w-full bg-indigo-600 text-white font-semibold p-4 rounded-lg text-left';
+                button.onclick = () => selectAnswer(answer.type);
+                answersContainer.appendChild(button);
+            });
+        }
+
+        function selectAnswer(type) {
+            scores[type]++;
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < questions.length) {
+                showQuestion();
+            } else {
+                showResult();
+            }
+        }
+
+        function showResult() {
+            progressBarInner.style.width = '100%';
+            questionCounter.textContent = `Тест завершен!`;
+
+            let maxScore = -1;
+            let resultType = '';
+            for (const type in scores) {
+                if (scores[type] > maxScore) {
+                    maxScore = scores[type];
+                    resultType = type;
+                }
+            }
+            
+            const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
+            const percentages = {
+                D: totalScore > 0 ? Math.round((scores.D / totalScore) * 100) : 0,
+                I: totalScore > 0 ? Math.round((scores.I / totalScore) * 100) : 0,
+                S: totalScore > 0 ? Math.round((scores.S / totalScore) * 100) : 0,
+                C: totalScore > 0 ? Math.round((scores.C / totalScore) * 100) : 0,
+            };
+
+            const resultData = results[resultType];
+            resultEmoji.textContent = resultData.emoji;
+            resultTitle.textContent = resultData.title;
+            resultDescription.textContent = resultData.description;
+            
+            // Сохраняем текст для репоста
+            shareText = `Я прошел тест и мой результат - ${resultData.title}! ${resultData.emoji} Узнайте и вы свой тип.`;
+            
+            renderChart(percentages);
+
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+        }
+        
+        function renderChart(percentages) {
+            const ctx = resultChartCanvas.getContext('2d');
+            resultChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Тигр (D)', 'Обезьяна (I)', 'Слон (S)', 'Муравей (C)'],
+                    datasets: [{
+                        label: '% соответствия',
+                        data: [percentages.D, percentages.I, percentages.S, percentages.C],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.6)', // red-500
+                            'rgba(249, 115, 22, 0.6)', // orange-500
+                            'rgba(34, 197, 94, 0.6)', // green-500
+                            'rgba(59, 130, 246, 0.6)' // blue-500
+                        ],
+                        borderColor: [
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(34, 197, 94, 1)',
+                            'rgba(59, 130, 246, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + "%"
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        function shareResult() {
+            const shareData = {
+                title: 'Какой вы тип личности?',
+                text: shareText,
+                url: 'https://gritsenko.biz/tests/beast_test.html'
+            };
+
+            if (navigator.share) {
+                navigator.share(shareData).catch(console.error);
+            } else {
+                // Fallback for desktop: copy to clipboard
+                const textArea = document.createElement("textarea");
+                textArea.value = shareData.url;
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopyNotification();
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showCopyNotification() {
+            copyNotification.classList.remove('opacity-0', 'translate-y-2');
+            setTimeout(() => {
+                copyNotification.classList.add('opacity-0', 'translate-y-2');
+            }, 2000);
+        }
+
+        // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+        startBtn.addEventListener('click', startTest);
+        restartBtn.addEventListener('click', startTest);
+        shareBtn.addEventListener('click', shareResult);
+
+    </script>
+</body>
+</html>

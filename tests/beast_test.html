@@ -46,6 +46,7 @@
             transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
         }
     </style>
+
           <!-- Yandex.Metrika counter -->
   <script type="text/javascript">
     (function (m, e, t, r, i, k, a) {
@@ -106,7 +107,10 @@
                 </div>
                 <div>
                      <h3 class="text-xl font-semibold mb-4 text-slate-800">Ваш профиль личности:</h3>
-                     <canvas id="result-chart"></canvas>
+                     <!-- ИЗМЕНЕНИЕ: Добавлен контейнер с относительным позиционированием и фиксированной высотой -->
+                     <div class="relative h-64">
+                        <canvas id="result-chart"></canvas>
+                     </div>
                 </div>
             </div>
             

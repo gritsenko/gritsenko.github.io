@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Самый серьезный психологический тест: Кто вы?</title>
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Серьезный психологический тест: Кто вы?">
+    <meta property="og:description" content="Пройдите тест и узнайте, кто вы: Тигр-начальник, Обезьяна-душа компании, Слон-хранитель уюта или Муравей-перфекционист.">
+    <meta property="og:url" content="https://gritsenko.biz/tests/beast_test.html">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://placehold.co/1200x630/a855f7/ffffff?text=Какой+вы+зверь%3F&font=inter">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        .answer-btn {
+            transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+        .answer-btn:hover {
+            transform: translateY(-2px);
+            background-color: #4338ca; /* indigo-700 */
+        }
+        #result-screen h2 {
+             background: -webkit-linear-gradient(45deg, #4f46e5, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #copy-notification {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+    </style>
+          <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+      k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+    })
+      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+    ym(98653129, "init", {
+      clickmap: true,
+      trackLinks: true,
+      accurateTrackBounce: true
+    });
+  </script>
+  <noscript>
+    <div><img src="https://mc.yandex.ru/watch/98653129" style="position:absolute; left:-9999px;" alt="" /></div>
+  </noscript>
+  <!-- /Yandex.Metrika counter -->
+</head>
+<body class="bg-slate-50 text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <div id="app" class="max-w-2xl w-full mx-auto text-center">
+
+        <!-- Начальный экран -->
+        <div id="start-screen" class="card">
+            <h1 class="text-4xl font-bold mb-4 text-slate-900">Какой вы офисный зверь?</h1>
+            <p class="text-lg text-slate-600 mb-8">Пройдите этот (не)серьезный тест и узнайте, кто вы на самом деле, когда никто не видит. Результат может вас удивить!</p>
+            <button id="start-btn" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/50">
+                Узнать страшную правду
+            </button>
+        </div>
+
+        <!-- Экран с вопросами -->
+        <div id="quiz-screen" class="card hidden">
+            <div class="flex justify-between items-center mb-4">
+                 <p id="question-counter" class="text-sm font-medium text-slate-500"></p>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-2.5 mb-6">
+                <div id="progress-bar-inner" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-in-out" style="width: 0%"></div>
+            </div>
+            <h2 id="question-text" class="text-2xl font-semibold mb-8 min-h-[6rem] flex items-center justify-center"></h2>
+            <div id="answers-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Кнопки с ответами будут вставлены сюда -->
+            </div>
+        </div>
+
+        <!-- Экран с результатами -->
+        <div id="result-screen" class="card hidden">
+            <p class="text-lg text-slate-600 mb-2">Поздравляем! Вы — ...</p>
+            <div id="result-emoji" class="text-8xl mb-4"></div>
+            <h2 id="result-title" class="text-5xl font-bold mb-6"></h2>
+            
+            <div class="grid md:grid-cols-2 gap-8 items-center">
+                <div class="text-left">
+                    <p id="result-description" class="text-md text-slate-700 mb-6"></p>
+                </div>
+                <div>
+                     <h3 class="text-xl font-semibold mb-4 text-slate-800">Ваш профиль личности:</h3>
+                     <div class="relative h-64">
+                        <canvas id="result-chart"></canvas>
+                     </div>
+                </div>
+            </div>
+            
+            <div class="mt-8 flex flex-col sm:flex-row justify-center gap-4">
+                <button id="restart-btn" class="w-full sm:w-auto bg-slate-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-slate-700 transition-colors">
+                    Пройти еще раз
+                </button>
+                <button id="share-btn" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-indigo-700 transition-colors">
+                    Поделиться
+                </button>
+            </div>
+        </div>
+
+    </div>
+    
+    <!-- Уведомление о копировании -->
+    <div id="copy-notification" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white py-2 px-4 rounded-lg opacity-0 transform translate-y-2">
+        Ссылка скопирована!
+    </div>
+
+
+    <script>
+        // --- ЭЛЕМЕНТЫ DOM ---
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const shareBtn = document.getElementById('share-btn');
+        const copyNotification = document.getElementById('copy-notification');
+
+        const questionText = document.getElementById('question-text');
+        const answersContainer = document.getElementById('answers-container');
+        const progressBarInner = document.getElementById('progress-bar-inner');
+        const questionCounter = document.getElementById('question-counter');
+
+        const resultEmoji = document.getElementById('result-emoji');
+        const resultTitle = document.getElementById('result-title');
+        const resultDescription = document.getElementById('result-description');
+        const resultChartCanvas = document.getElementById('result-chart');
+        
+        let resultChart = null;
+        let shareText = ''; 
+
+        // --- ДАННЫЕ ТЕСТА ---
+        const questions = [
+            { text: "Вам дали новую задачу. Ваши действия?", answers: [{ text: "Уже делаю! Потом разберемся.", type: "D" }, { text: "Собираю всех на мозговой штурм! И заказываю пиццу.", type: "I" }, { text: "Сначала налью чаю и понаблюдаю, как делают другие.", type: "S" }, { text: "Создам Excel-таблицу с планом, подпланом и графиком.", type: "C" }] },
+            { text: "Вы на корпоративе. Где вас искать?", answers: [{ text: "В центре внимания, рассказываю анекдот.", type: "I" }, { text: "В уютном уголке с проверенными коллегами.", type: "S" }, { text: "Возле стены, анализирую танцевальные стили.", type: "C" }, { text: "Обсуждаю с шефом план по захвату мира.", type: "D" }] },
+            { text: "Ваш идеальный рабочий ритм:", answers: [{ text: "Спокойный, как черепаха в отпуске.", type: "S" }, { text: "Четкий, как швейцарские часы (которые я настроил).", type: "C" }, { text: "Быстрый, как гепард, выпивший эспрессо.", type: "D" }, { text: "Хаотичный, как полет шмеля в ураган.", type: "I" }] },
+            { text: "В командном проекте вы – ...", answers: [{ text: "Капитан, который кричит 'На абордаж!'", type: "D" }, { text: "Талисман, который всех обнимает и вдохновляет.", type: "I" }, { text: "Клей, который не дает команде развалиться.", type: "S" }, { text: "Человек, который заметил опечатку на 34-й странице.", type: "C" }] },
+            { text: "Как вы выбираете, что посмотреть вечером?", answers: [{ text: "Быстро. Пульт в моих руках, решаю я.", type: "D" }, { text: "Спрашиваю у 10 друзей и создаю опрос в чате.", type: "I" }, { text: "Соглашаюсь на то, что выбрали другие, лишь бы без споров.", type: "S" }, { text: "Изучаю рейтинги на 5 сайтах и читаю 20 рецензий.", type: "C" }] },
+            { text: "Что вас бесит?", answers: [{ text: "Когда кто-то тормозит в левом ряду.", type: "D" }, { text: "Скучные люди, которые не смеются над моими шутками.", type: "I" }, { text: "Когда кто-то кричит и нарушает всеобщее спокойствие.", type: "S" }, { text: "Когда картина на стене висит криво на 1 градус.", type: "C" }] },
+            { text: "Ваш девиз по жизни:", answers: [{ text: "Вижу цель – не вижу препятствий!", type: "D" }, { text: "Давайте жить дружно и весело!", type: "I" }, { text: "Главное, чтобы всем было хорошо.", type: "S" }, { text: "Все должно быть по полочкам.", type: "C" }] },
+            { text: "Вам нужно сделать замечание коллеге. Как вы это сделаете?", answers: [{ text: "Так, садись, слушай. Ты не прав.", type: "D" }, { text: "Слушай, такая история смешная... Кстати, о твоем отчете...", type: "I" }, { text: "Я, конечно, извиняюсь, но может, посмотрим вот тут...?", type: "S" }, { text: "Я составил список из 12 пунктов для улучшения...", type: "C" }] },
+            { text: "Ваше рабочее место – это...", answers: [{ text: "Командный пункт. На столе только ноутбук и трофеи.", type: "D" }, { text: "Фан-клуб. Фотографии, мемы, конфеты для всех.", type: "I" }, { text: "Островок уюта. Плед, любимая кружка, цветок.", type: "S" }, { text: "Лаборатория. Все разложено по линейке.", type: "C" }] },
+            { text: "GPS говорит 'направо', а интуиция – 'налево'. Ваши действия?", answers: [{ text: "Интуиция – мой второй пилот. Сворачиваю налево!", type: "D" }, { text: "Звоню другу спросить, куда бы он поехал.", type: "I" }, { text: "Останавливаюсь и жду, пока кто-нибудь еще поедет.", type: "S" }, { text: "Проверяю три разных навигатора.", type: "C" }] },
+            { text: "Что для вас работа?", answers: [{ text: "Поле битвы, где я – генерал.", type: "D" }, { text: "Сцена, где я – главная звезда.", type: "I" }, { text: "Вторая семья, где нужно обо всех заботиться.", type: "S" }, { text: "Огромная головоломка, которую нужно решить.", type: "C" }] },
+            { text: "В офисе внезапно отключили интернет.", answers: [{ text: "Иду к начальству требовать интернет обратно.", type: "D" }, { text: "Ура! Время для общения и кофе-брейка!", type: "I" }, { text: "Тихо паникую, но внешне сохраняю спокойствие.", type: "S" }, { text: "Наконец-то! Время навести порядок на рабочем столе.", type: "C" }] },
+            { text: "Как вы проводите отпуск?", answers: [{ text: "Покоряю горы, ныряю с акулами, ставлю рекорды.", type: "D" }, { text: "Еду туда, где много людей, новые знакомства и вечеринки.", type: "I" }, { text: "В том самом отеле, где был в прошлом году. Там так хорошо.", type: "S" }, { text: "По заранее составленному маршруту с точностью до минуты.", type: "C" }] },
+            { text: "Лучший подарок для вас:", answers: [{ text: "Что-то дорогое, статусное. Или просто деньги.", type: "D" }, { text: "Билет на концерт или вечеринка-сюрприз.", type: "I" }, { text: "Теплый плед, хорошая книга, сертификат в спа.", type: "S" }, { text: "Набор отверток, умные часы или органайзер.", type: "C" }] },
+            { text: "В споре ваша главная тактика:", answers: [{ text: "Переспорить. Любой ценой.", type: "D" }, { text: "Очаровать и убедить, что моя идея самая лучшая.", type: "I" }, { text: "Сказать 'ты прав', лишь бы все закончилось.", type: "S" }, { text: "Привести 3 железных аргумента и 5 графиков.", type: "C" }] },
+            { text: "Инструкция по сборке мебели для вас – это...", answers: [{ text: "Для слабаков. Начну собирать, а там посмотрим.", type: "D" }, { text: "Повод позвать друзей на 'вечеринку по сборке'.", type: "I" }, { text: "Важный документ, но если что, попрошу помощи.", type: "S" }, { text: "Священный текст. Читаю от корки до корки.", type: "C" }] },
+            { text: "Планы на следующий год:", answers: [{ text: "Захватить мир. Ну, или хотя бы свой отдел.", type: "D" }, { text: "Найти новых друзей, посетить 100 мероприятий, завести блог.", type: "I" }, { text: "Надеюсь, все будет так же, как и в этом году.", type: "S" }, { text: "У меня есть диаграмма Ганта до 2030 года.", type: "C" }] },
+            { text: "Что вас заводит?", answers: [{ text: "Дух соревнования. Я должен быть первым!", type: "D" }, { text: "Аплодисменты и комплименты.", type: "I" }, { text: "Когда всех обнял и все счастливы.", type: "S" }, { text: "Идеально выполненная задача.", type: "C" }] },
+            { text: "Как вы боретесь со стрессом?", answers: [{ text: "Иду в спортзал и бью грушу.", type: "D" }, { text: "Звоню всем подряд и жалуюсь.", type: "I" }, { text: "Заворачиваюсь в одеяло и смотрю сериалы.", type: "S" }, { text: "Составляю план по устранению источника стресса.", type: "C" }] },
+            { text: "Ваше отношение к деталям:", answers: [{ text: "Детали? Это что-то для микроскопа.", type: "D" }, { text: "Ой, какая бабочка полетела! Что вы говорили?", type: "I" }, { text: "Замечаю, если кому-то неудобно или грустно.", type: "S" }, { text: "Я и есть ходячая деталь.", type: "C" }] },
+            { text: "Вы – начальник. Ваш стиль:", answers: [{ text: "Я сказал – вы сделали. Вопросы?", type: "D" }, { text: "Ребята, мы команда! Давайте зажжем!", type: "I" }, { text: "Вы не голодны? Может, чаю? Как ваши дела?", type: "S" }, { text: "Работаем по регламенту, пункт 3.4.2.", type: "C" }] },
+            { text: "Как вы осваиваете новый гаджет?", answers: [{ text: "Нажимаю на все кнопки подряд.", type: "D" }, { text: "Снимаю распаковку для сторис.", type: "I" }, { text: "Прошу кого-нибудь настроить.", type: "S" }, { text: "Сначала читаю инструкцию. Дважды.", type: "C" }] },
+            { text: "Успех – это...", answers: [{ text: "Когда все знают, что я лучший.", type: "D" }, { text: "Когда у меня 1000 лайков и полная записная книжка.", type: "I" }, { text: "Когда на душе спокойно и все близкие рядом.", type: "S" }, { text: "Когда все файлы отсортированы, а в коде нет ошибок.", type: "C" }] }
+        ];
+
+        const results = {
+            D: { emoji: "🐅", title: "Тигр", description: "Вы не входите в комнату, вы врываетесь. Светофоры для вас — просто цветная гирлянда. Ваше кредо: сначала сделать, потом (может быть) подумать. Вы прирожденный лидер, даже если ведете только кота к миске. Люди вас либо обожают, либо боятся. Чаще второе, но вас это не волнует." },
+            I: { emoji: "🐒", title: "Обезьяна", description: "Список ваших дел длиннее, чем... ну, он очень длинный, и вы его потеряли. Зато у вас миллион друзей и 17 незаконченных гениальных проектов. Вы — душа любой компании и генератор идей, которые вы сами же и забываете через 5 минут. Скучно с вами не бывает. Стабильно — тоже." },
+            S: { emoji: "🐘", title: "Слон", description: "Ваша суперсила — превращать любой хаос в уютное болотце. Перемены? Нет, спасибо, у меня тут плед и какао. Вы — клей, который держит команду вместе, и тот, кто помнит все дни рождения. Если бы комфорт был человеком, это были бы вы. Только не просите вас быстро принять решение, рискуете дождаться пенсии." },
+            C: { emoji: "🐜", title: "Муравей", description: "Ваша любимая книга — инструкция к стиральной машине. Вы раскладываете носки по цвету и дате покупки. Хаос видит вас и плачет в углу. Вы не просто делаете работу хорошо, вы делаете ее ИДЕАЛЬНО, даже если на это уйдет вечность. Да, вы немного зануда, но без вас все бы давно развалилось." }
+        };
+
+        // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
+        let currentQuestionIndex = 0;
+        let scores = { D: 0, I: 0, S: 0, C: 0 };
+
+        // --- ФУНКЦИИ ---
+        function startTest() {
+            currentQuestionIndex = 0;
+            scores = { D: 0, I: 0, S: 0, C: 0 };
+            shareText = '';
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            if(resultChart) {
+                resultChart.destroy();
+            }
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const question = questions[currentQuestionIndex];
+            questionText.textContent = question.text;
+            answersContainer.innerHTML = '';
+            questionCounter.textContent = `Вопрос ${currentQuestionIndex + 1} из ${questions.length}`;
+
+            const progress = ((currentQuestionIndex) / questions.length) * 100;
+            progressBarInner.style.width = `${progress}%`;
+
+            question.answers.forEach(answer => {
+                const button = document.createElement('button');
+                button.textContent = answer.text;
+                button.className = 'answer-btn w-full bg-indigo-600 text-white font-semibold p-4 rounded-lg text-left';
+                button.onclick = () => selectAnswer(answer.type);
+                answersContainer.appendChild(button);
+            });
+        }
+
+        function selectAnswer(type) {
+            scores[type]++;
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < questions.length) {
+                showQuestion();
+            } else {
+                showResult();
+            }
+        }
+
+        function showResult() {
+            progressBarInner.style.width = '100%';
+            questionCounter.textContent = `Тест завершен!`;
+
+            let maxScore = -1;
+            let resultType = '';
+            for (const type in scores) {
+                if (scores[type] > maxScore) {
+                    maxScore = scores[type];
+                    resultType = type;
+                }
+            }
+            
+            const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
+            const percentages = {
+                D: totalScore > 0 ? Math.round((scores.D / totalScore) * 100) : 0,
+                I: totalScore > 0 ? Math.round((scores.I / totalScore) * 100) : 0,
+                S: totalScore > 0 ? Math.round((scores.S / totalScore) * 100) : 0,
+                C: totalScore > 0 ? Math.round((scores.C / totalScore) * 100) : 0,
+            };
+
+            const resultData = results[resultType];
+            resultEmoji.textContent = resultData.emoji;
+            resultTitle.textContent = resultData.title;
+            resultDescription.textContent = resultData.description;
+            
+            shareText = `Я прошел уморительный тест и мой результат - ${resultData.title}! ${resultData.emoji} Узнайте и вы, какой вы зверь.`;
+            
+            renderChart(percentages);
+
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+        }
+        
+        function renderChart(percentages) {
+            const ctx = resultChartCanvas.getContext('2d');
+            resultChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Тигр (D)', 'Обезьяна (I)', 'Слон (S)', 'Муравей (C)'],
+                    datasets: [{
+                        label: '% соответствия',
+                        data: [percentages.D, percentages.I, percentages.S, percentages.C],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.6)', // red-500
+                            'rgba(249, 115, 22, 0.6)', // orange-500
+                            'rgba(34, 197, 94, 0.6)', // green-500
+                            'rgba(59, 130, 246, 0.6)' // blue-500
+                        ],
+                        borderColor: [
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(34, 197, 94, 1)',
+                            'rgba(59, 130, 246, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + "%"
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        function shareResult() {
+            const shareData = {
+                title: 'Какой вы офисный зверь?',
+                text: shareText,
+                url: 'https://gritsenko.biz/tests/beast_test.html'
+            };
+
+            if (navigator.share) {
+                navigator.share(shareData).catch(console.error);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = shareData.url;
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopyNotification();
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showCopyNotification() {
+            copyNotification.classList.remove('opacity-0', 'translate-y-2');
+            setTimeout(() => {
+                copyNotification.classList.add('opacity-0', 'translate-y-2');
+            }, 2000);
+        }
+
+        // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+        startBtn.addEventListener('click', startTest);
+        restartBtn.addEventListener('click', startTest);
+        shareBtn.addEventListener('click', shareResult);
+
+    </script>
+</body>
+</html>

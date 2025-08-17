@@ -323,9 +323,10 @@
                 const isMobile = /Mobile|Android|iPhone|iPad|iPod|Mobi/.test(ua);
                 const isDesktop = !isMobile;
                 if (navigator.share && !isDesktop) {
+                    // Include quote text and URL in the shared message for mobile
                     await navigator.share({
                         title: 'Цитата Джейсона Стэтхэма',
-                        text,
+                        text: `${text}\n${url}`,
                         url
                     });
                 } else if (navigator.clipboard && window.isSecureContext) {

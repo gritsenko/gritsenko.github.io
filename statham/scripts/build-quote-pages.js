@@ -30,7 +30,18 @@ function loadTemplate() {
 
 function rewriteForQuote(html, { id, text, author, baseRel }) {
   // baseRel is relative path prefix from quote folder to statham root, e.g., '../'
-  const desc = `"${text}" — ${author}`;
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  const titleRaw = text || '';
+  const titleEsc = escapeHtml(titleRaw);
+  const desc = `"${titleRaw}" — ${author}`;
+  const descEsc = escapeHtml(desc);
   const ogImg = `og.jpg`;
   const absUrl = `https://gritsenko.biz/statham/quotes/${id}/`;
   const relCss = `${baseRel}styles/statham.css`;
@@ -42,9 +53,14 @@ function rewriteForQuote(html, { id, text, author, baseRel }) {
   const relAvatar = `${baseRel}staham.jpeg`;
 
   let out = html;
+  // Replace document <title>
+  out = out.replace(/<title>[\s\S]*?<\/title>/, `<title>${titleEsc}<\/title>`);
+  // Replace OG/Twitter titles
+  out = out.replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${titleEsc}">`);
+  out = out.replace(/<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${titleEsc}">`);
   // Replace OG + Twitter descriptions
-  out = out.replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${desc}">`);
-  out = out.replace(/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${desc}">`);
+  out = out.replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${descEsc}">`);
+  out = out.replace(/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${descEsc}">`);
   // Point images to og.jpg within folder
   out = out.replace(/<meta property="og:image" content="[^"]*">/, `<meta property="og:image" content="${ogImg}">`);
   out = out.replace(/<meta name="twitter:image" content="[^"]*">/, `<meta name="twitter:image" content="${ogImg}">`);
@@ -62,9 +78,9 @@ function rewriteForQuote(html, { id, text, author, baseRel }) {
   out = out.replace(/href="https:\/\/gritsenko\.biz\/statham\/staham\.jpeg"/g, `href="${relAltIcon}"`);
   out = out.replace(/src="\.\/staham\.jpeg"/g, `src="${relAvatar}"`);
 
-  // Bake quote into HTML text placeholders
-  out = out.replace(/<p id="quote-display">[\s\S]*?<\/p>/, `<p id="quote-display">"${text}"<\/p>`);
-  out = out.replace(/<cite id="author-display"[^>]*>[\s\S]*?<\/cite>/, `<cite id="author-display" class="author-name block">— ${author}<\/cite>`);
+  // Bake quote into HTML text placeholders (escape to prevent HTML issues)
+  out = out.replace(/<p id="quote-display">[\s\S]*?<\/p>/, `<p id="quote-display">&quot;${titleEsc}&quot;<\/p>`);
+  out = out.replace(/<cite id="author-display"[^>]*>[\s\S]*?<\/cite>/, `<cite id="author-display" class="author-name block">— ${escapeHtml(author)}<\/cite>`);
 
   // Inject baseRel and init quote id; enable permalink mode (no query params)
   const inject = `\n<script>window.STATHAM_BASE_REL='${baseRel.replace(/'/g, "\\'")}';window.INIT_QUOTE_ID=${id};window.STATHAM_PERMALINK_MODE=true;</script>`;

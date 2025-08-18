@@ -36,6 +36,22 @@ async function initQuote() {
             }
         }
 
+        // Если включен режим пермалинков и мы не на странице нужной цитаты — перенаправляем
+        if (window.STATHAM_PERMALINK_MODE && selectedQuote && selectedQuote.id != null) {
+            const baseRoot = resolveBaseRoot();
+            const target = baseRoot + 'quotes/' + selectedQuote.id + '/';
+            try {
+                const current = window.location.href.replace(/index\.html$/i, '');
+                if (current !== target) {
+                    window.location.replace(target);
+                    return; // Остановить дальнейший рендер, страница сменится
+                }
+            } catch (e) {
+                window.location.href = target;
+                return;
+            }
+        }
+
         // В режиме пермалинков не добавляем quoteId в URL
         if (!window.STATHAM_PERMALINK_MODE) {
             try {

@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Небесный Коммерсант</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;700&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Стиль в духе стимпанка */
+        body {
+            font-family: 'EB Garamond', serif;
+            background-color: #4a3c2a;
+            background-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+            color: #f0e6d2;
+        }
+        .main-container {
+            background-color: rgba(30, 25, 20, 0.8);
+            border: 2px solid #8c7853;
+            box-shadow: 0 0 15px rgba(0,0,0,0.7);
+        }
+        .header {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: #3a2d1d;
+            border-bottom: 2px solid #8c7853;
+            color: #d4b996;
+            text-shadow: 1px 1px 2px black;
+        }
+        .btn-steampunk {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: #7a6848;
+            border: 2px solid #c5a774;
+            color: #fff;
+            text-shadow: 1px 1px 1px #000;
+            transition: all 0.2s ease-in-out;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+        .btn-steampunk:hover {
+            background-color: #8c7853;
+            border-color: #f0e6d2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+        .btn-steampunk:disabled {
+            background-color: #554a36;
+            border-color: #7a6848;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+        .card {
+            background-color: #3a2d1d;
+            border: 1px solid #6a583a;
+        }
+        .log-panel {
+            background-color: rgba(0,0,0,0.5);
+            border-top: 2px solid #8c7853;
+            font-family: 'Roboto Condensed', sans-serif;
+            height: 150px;
+        }
+        .modal-bg {
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: #4a3c2a;
+            border: 2px solid #8c7853;
+        }
+        /* Кастомный скроллбар */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #3a2d1d;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #8c7853;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #c5a774;
+        }
+
+        /* Стили для 2D карты */
+        .map-container {
+            position: relative;
+            height: 450px;
+            background-color: rgba(0,0,0,0.2);
+            border: 1px solid #6a583a;
+            border-radius: 8px;
+            background-image: url('https://www.transparenttextures.com/patterns/old-map.png');
+            overflow: hidden;
+        }
+        .map-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Позволяет кликам проходить сквозь SVG к узлам городов */
+        }
+        .city-node {
+            position: absolute;
+            width: 90px;
+            height: 50px;
+            background-color: #7a6848;
+            border: 2px solid #c5a774;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 12px;
+            transform: translate(-50%, -50%); /* Центрирует узел по его координатам */
+            box-shadow: 0 0 10px rgba(0,0,0,0.7);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 5;
+        }
+        .city-node.current {
+            border-color: #f0e6d2;
+            background-color: #9c8a63;
+            box-shadow: 0 0 15px #f0e6d2;
+            z-index: 10;
+            cursor: default;
+        }
+        .city-node.reachable:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            border-color: #fff;
+        }
+        .city-node.unreachable {
+            background-color: #554a36;
+            border-color: #7a6848;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+        .map-tooltip {
+            position: fixed;
+            display: none;
+            background-color: rgba(0,0,0,0.85);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 20;
+            border: 1px solid #c5a774;
+            font-family: 'Roboto Condensed', sans-serif;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div id="game-container" class="main-container max-w-7xl mx-auto rounded-lg shadow-2xl p-4">
+        <!-- Заголовок и Статус игрока -->
+        <header class="header grid grid-cols-2 md:grid-cols-4 gap-4 p-4 mb-4 rounded-md text-sm">
+            <div><strong>Капитан:</strong> <span id="player-name">Игрок</span></div>
+            <div><strong>Деньги:</strong> <span id="player-money">1000</span> кредитов</div>
+            <div><strong>Дирижабль:</strong> <span id="ship-name">"Тритон"</span></div>
+            <div class="col-span-2 md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                <div><strong>Трюм:</strong> <span id="ship-cargo">0</span> / <span id="ship-cargo-max">20</span></div>
+                <div><strong>Прочность:</strong> <span id="ship-hull">100</span> / <span id="ship-hull-max">100</span></div>
+                <div><strong>Уголь:</strong> <span id="ship-fuel">50</span> / <span id="ship-fuel-max">50</span></div>
+                <div><strong>Местоположение:</strong> <span id="current-location">Форт "Шестеренка"</span></div>
+            </div>
+        </header>
+
+        <!-- Основной контент -->
+        <main id="main-content" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Левая панель: Город -->
+            <div id="city-panel" class="md:col-span-1 flex flex-col gap-4">
+                 <div class="card p-4 rounded-md">
+                    <h2 class="text-xl font-bold border-b-2 border-yellow-700 pb-2 mb-2" id="city-name">Форт "Шестеренка"</h2>
+                    <p class="text-sm text-gray-300" id="city-description">Шахтерский город, вросший в скалу горы. Источник угля и руды для всей империи.</p>
+                </div>
+                <div class="card p-4 rounded-md flex flex-col gap-3">
+                    <button id="market-btn" class="btn-steampunk py-2 px-4 rounded-md w-full">Рынок</button>
+                    <button id="shipyard-btn" class="btn-steampunk py-2 px-4 rounded-md w-full">Верфь</button>
+                    <button id="travel-btn" class="btn-steampunk py-2 px-4 rounded-md w-full">Отправиться в путь</button>
+                </div>
+                 <div class="card p-4 rounded-md">
+                    <h3 class="text-lg font-bold border-b-2 border-yellow-700 pb-2 mb-2">Местная газета</h3>
+                    <div id="newspaper" class="text-sm text-gray-300">Свежих новостей пока нет.</div>
+                </div>
+            </div>
+
+            <!-- Правая панель: Действия (Рынок, Верфь, Путешествия) -->
+            <div id="action-panel" class="md:col-span-2 card p-4 rounded-md">
+                <!-- Контент здесь будет меняться динамически -->
+                 <div id="welcome-view" class="text-center">
+                    <h2 class="text-2xl font-bold">Добро пожаловать, капитан!</h2>
+                    <p class="mt-4">Выберите действие в панели города, чтобы начать свою карьеру небесного коммерсанта. Удачи в небесах!</p>
+                </div>
+                <div id="market-view" class="hidden"></div>
+                <div id="shipyard-view" class="hidden"></div>
+                <div id="travel-view" class="hidden"></div>
+            </div>
+        </main>
+
+        <!-- Панель логов -->
+        <footer class="log-panel mt-4 p-2 rounded-md overflow-y-auto" id="log-panel-container">
+            <div id="log-messages">
+                <p>> Добро пожаловать в "Небесный Коммерсант"!</p>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Модальное окно для количества -->
+    <div id="quantity-modal" class="fixed inset-0 modal-bg items-center justify-center hidden">
+        <div class="modal-content p-6 rounded-lg shadow-xl w-11/12 md:w-1/3">
+            <h2 class="text-xl font-bold mb-4" id="modal-title">Покупка/Продажа</h2>
+            <p id="modal-text">Сколько единиц вы хотите ...?</p>
+            <p class="text-sm text-gray-400 mb-2">В трюме свободно: <span id="modal-cargo-space"></span></p>
+            <input type="range" id="quantity-slider" min="1" max="100" value="1" class="w-full mb-2">
+            <div class="text-center font-bold text-lg mb-4"><span id="quantity-value">1</span></div>
+            <div class="flex justify-end gap-4">
+                <button id="modal-cancel" class="btn-steampunk py-2 px-4 rounded-md">Отмена</button>
+                <button id="modal-confirm" class="btn-steampunk py-2 px-4 rounded-md bg-green-800 border-green-600 hover:bg-green-700">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+// --- ИНИЦИАЛИЗАЦИЯ ИГРЫ ---
+
+const game = {
+    // Состояние игрока
+    player: {
+        name: "Капитан Смит",
+        money: 1000,
+        currentLocation: 'fort_gear',
+        ship: {
+            name: "Тритон",
+            cargo: [],
+            cargoMax: 20,
+            hull: 100,
+            hullMax: 100,
+            fuel: 50,
+            fuelMax: 50,
+        }
+    },
+    // Игровой мир
+    world: {
+        locations: {
+            fort_gear: {
+                name: "Форт \"Шестеренка\"",
+                description: "Шахтерский город, вросший в скалу горы. Источник угля и руды для всей империи.",
+                distances: { albion_prime: 20, elysium: 30 },
+                marketGoods: ['coal', 'iron_ore', 'gears'],
+                coords: { x: 20, y: 25 }
+            },
+            albion_prime: {
+                name: "Альбион-Прайм",
+                description: "Затянутый смогом промышленный гигант. Здесь производят почти все механизмы.",
+                distances: { fort_gear: 20, elysium: 15, pirate_cove: 40 },
+                marketGoods: ['gears', 'steam_engine', 'automatons', 'silk'],
+                coords: { x: 50, y: 50 }
+            },
+            elysium: {
+                name: "Элизиум",
+                description: "Парящий город-курорт для аристократии. Здесь ценят роскошь и ненавидят грязь.",
+                distances: { fort_gear: 30, albion_prime: 15 },
+                marketGoods: ['silk', 'tea', 'jewelry', 'automatons'],
+                coords: { x: 80, y: 30 }
+            },
+            pirate_cove: {
+                name: "Пиратская Гавань",
+                description: "Скрытая в ущелье база воздушных корсаров. Опасное, но выгодное место.",
+                distances: { albion_prime: 40 },
+                marketGoods: ['opium', 'stolen_artifacts', 'gears'],
+                coords: { x: 70, y: 75 }
+            }
+        },
+        goods: {
+            coal: { name: "Уголь", basePrice: 10, category: 'Сырье' },
+            iron_ore: { name: "Медная руда", basePrice: 20, category: 'Сырье' },
+            gears: { name: "Шестерни", basePrice: 50, category: 'Промышленные товары' },
+            steam_engine: { name: "Паровой механизм", basePrice: 200, category: 'Промышленные товары' },
+            silk: { name: "Шелк", basePrice: 150, category: 'Предметы роскоши' },
+            tea: { name: "Экзотический чай", basePrice: 120, category: 'Предметы роскоши' },
+            jewelry: { name: "Ювелирные изделия", basePrice: 500, category: 'Предметы роскоши' },
+            automatons: { name: "Автоматон-слуга", basePrice: 1000, category: 'Предметы роскоши' },
+            opium: { name: "Опиум", basePrice: 300, category: 'Контрабанда' },
+            stolen_artifacts: { name: "Краденые артефакты", basePrice: 800, category: 'Контрабанда' },
+        },
+        // Апгрейды для корабля
+        upgrades: {
+            cargo: [
+                { name: "Расширенный трюм I", cost: 800, value: 15 },
+                { name: "Расширенный трюм II", cost: 2000, value: 25 },
+            ],
+            hull: [
+                { name: "Медная обшивка", cost: 1000, value: 50 },
+                { name: "Стальная обшивка", cost: 2500, value: 100 },
+            ],
+            fuel: [
+                { name: "Улучшенный бункер", cost: 700, value: 50 },
+                { name: "Расширенный бункер", cost: 1800, value: 100 },
+            ]
+        },
+        // Мировые события
+        events: [
+            { id: "strike", text: "Забастовка шахтеров в Форте \"Шестеренка\"! Цены на уголь и руду взлетели до небес.", effect: () => priceModifier('coal', 2.5) & priceModifier('iron_ore', 2.0)},
+            { id: "fashion_trend", text: "Новый модный тренд в Элизиуме! Аристократы скупают шелк и ювелирные изделия.", effect: () => priceModifier('silk', 1.8) & priceModifier('jewelry', 1.5)},
+            { id: "war_effort", text: "Королевский флот готовится к походу. Спрос на паровые механизмы в Альбион-Прайм огромен.", effect: () => priceModifier('steam_engine', 2.0) & priceModifier('gears', 1.5)},
+            { id: "raid", text: "Пираты совершили дерзкий налет на караван! В Альбион-Прайм дефицит предметов роскоши.", effect: () => priceModifier('silk', 1.7) & priceModifier('tea', 1.6)},
+            { id: "good_harvest", text: "Отличный урожай чая в колониях! Цены на чай упали.", effect: () => priceModifier('tea', 0.6)}
+        ],
+        currentEvent: null,
+        marketPrices: {}
+    },
+    // DOM элементы для удобства
+    dom: {
+        playerName: document.getElementById('player-name'),
+        playerMoney: document.getElementById('player-money'),
+        shipName: document.getElementById('ship-name'),
+        shipCargo: document.getElementById('ship-cargo'),
+        shipCargoMax: document.getElementById('ship-cargo-max'),
+        shipHull: document.getElementById('ship-hull'),
+        shipHullMax: document.getElementById('ship-hull-max'),
+        shipFuel: document.getElementById('ship-fuel'),
+        shipFuelMax: document.getElementById('ship-fuel-max'),
+        currentLocation: document.getElementById('current-location'),
+        cityName: document.getElementById('city-name'),
+        cityDescription: document.getElementById('city-description'),
+        newspaper: document.getElementById('newspaper'),
+        
+        marketView: document.getElementById('market-view'),
+        shipyardView: document.getElementById('shipyard-view'),
+        travelView: document.getElementById('travel-view'),
+        welcomeView: document.getElementById('welcome-view'),
+        
+        logMessages: document.getElementById('log-messages'),
+        logContainer: document.getElementById('log-panel-container'),
+
+        quantityModal: document.getElementById('quantity-modal'),
+        modalTitle: document.getElementById('modal-title'),
+        modalText: document.getElementById('modal-text'),
+        modalCargoSpace: document.getElementById('modal-cargo-space'),
+        quantitySlider: document.getElementById('quantity-slider'),
+        quantityValue: document.getElementById('quantity-value'),
+        modalConfirm: document.getElementById('modal-confirm'),
+        modalCancel: document.getElementById('modal-cancel'),
+
+    },
+    // --- ОСНОВНЫЕ ФУНКЦИИ ---
+    init() {
+        // Привязка событий к кнопкам
+        document.getElementById('market-btn').addEventListener('click', () => this.showView('market'));
+        document.getElementById('shipyard-btn').addEventListener('click', () => this.showView('shipyard'));
+        document.getElementById('travel-btn').addEventListener('click', () => this.showView('travel'));
+
+        this.generateMarketPrices();
+        this.updateUI();
+        this.log("Системы дирижабля запущены. Можно отправляться.");
+    },
+    
+    // Обновление всего интерфейса
+    updateUI() {
+        const { player } = this;
+        const { dom } = this;
+        
+        dom.playerName.textContent = player.name;
+        dom.playerMoney.textContent = Math.floor(player.money);
+        dom.shipName.textContent = player.ship.name;
+        
+        const currentCargoLoad = player.ship.cargo.reduce((sum, item) => sum + item.quantity, 0);
+        dom.shipCargo.textContent = currentCargoLoad;
+        dom.shipCargoMax.textContent = player.ship.cargoMax;
+        
+        dom.shipHull.textContent = player.ship.hull;
+        dom.shipHullMax.textContent = player.ship.hullMax;
+        dom.shipFuel.textContent = player.ship.fuel;
+        dom.shipFuelMax.textContent = player.ship.fuelMax;
+        
+        const location = this.world.locations[player.currentLocation];
+        dom.currentLocation.textContent = location.name;
+        dom.cityName.textContent = location.name;
+        dom.cityDescription.textContent = location.description;
+        
+        dom.newspaper.textContent = this.world.currentEvent ? this.world.currentEvent.text : "На небесном фронте без перемен.";
+    },
+    
+    // Показать нужный вид (рынок, верфь, путешествия)
+    showView(viewName) {
+        this.dom.welcomeView.classList.add('hidden');
+        this.dom.marketView.classList.add('hidden');
+        this.dom.shipyardView.classList.add('hidden');
+        this.dom.travelView.classList.add('hidden');
+
+        let viewElement;
+        switch(viewName) {
+            case 'market':
+                viewElement = this.dom.marketView;
+                this.renderMarket();
+                break;
+            case 'shipyard':
+                viewElement = this.dom.shipyardView;
+                this.renderShipyard();
+                break;
+            case 'travel':
+                viewElement = this.dom.travelView;
+                this.renderTravel();
+                break;
+        }
+        if (viewElement) {
+            viewElement.classList.remove('hidden');
+        }
+    },
+    
+    // Логирование сообщений
+    log(message) {
+        const p = document.createElement('p');
+        p.textContent = `> ${message}`;
+        this.dom.logMessages.appendChild(p);
+        this.dom.logContainer.scrollTop = this.dom.logContainer.scrollHeight;
+    },
+
+    // --- ЛОГИКА РЫНКА ---
+    generateMarketPrices() {
+        this.world.marketPrices = {};
+        for (const locId in this.world.locations) {
+            this.world.marketPrices[locId] = {};
+            for (const goodId in this.world.goods) {
+                const good = this.world.goods[goodId];
+                let price = good.basePrice;
+                // Небольшая случайная вариация цены
+                price *= (1 + (Math.random() - 0.5) * 0.2); 
+                this.world.marketPrices[locId][goodId] = Math.round(price);
+            }
+        }
+        // Специальные модификаторы цен по умолчанию
+        priceModifier('coal', 0.7, 'fort_gear');
+        priceModifier('iron_ore', 0.8, 'fort_gear');
+        priceModifier('gears', 1.5, 'fort_gear');
+        priceModifier('coal', 1.8, 'elysium');
+        priceModifier('gears', 0.8, 'albion_prime');
+        priceModifier('steam_engine', 0.9, 'albion_prime');
+        priceModifier('silk', 0.7, 'albion_prime');
+        priceModifier('silk', 1.5, 'elysium');
+        priceModifier('jewelry', 1.3, 'elysium');
+        priceModifier('opium', 0.8, 'pirate_cove');
+        priceModifier('stolen_artifacts', 0.8, 'pirate_cove');
+        
+        // Применяем событие, если оно есть
+        if (this.world.currentEvent) {
+             this.world.currentEvent.effect();
+        }
+    },
+
+    renderMarket() {
+        const locationId = this.player.currentLocation;
+        const location = this.world.locations[locationId];
+        const prices = this.world.marketPrices[locationId];
+        const cargo = this.player.ship.cargo;
+
+        let buyHtml = `<h3 class="text-lg font-bold border-b-2 border-yellow-700 pb-2 mb-2">Купить товары</h3><div class="space-y-2">`;
+        location.marketGoods.forEach(goodId => {
+            const good = this.world.goods[goodId];
+            buyHtml += `<div class="grid grid-cols-4 items-center text-sm">
+                <span>${good.name}</span>
+                <span class="text-yellow-400">${prices[goodId]} кр.</span>
+                <span class="text-gray-400">${good.category}</span>
+                <button class="btn-steampunk text-xs py-1 px-2 rounded" onclick="game.openQuantityModal('buy', '${goodId}')">Купить</button>
+            </div>`;
+        });
+        buyHtml += `</div>`;
+
+        let sellHtml = `<h3 class="text-lg font-bold border-b-2 border-yellow-700 pb-2 mb-2 mt-6">Продать товары</h3><div class="space-y-2">`;
+        if (cargo.length === 0) {
+            sellHtml += `<p class="text-sm text-gray-400">Ваш трюм пуст.</p>`;
+        } else {
+            cargo.forEach(item => {
+                const good = this.world.goods[item.id];
+                const sellPrice = prices[item.id] ? Math.round(prices[item.id] * 0.9) : '---'; // Продажа чуть дешевле
+                const buttonDisabled = !prices[item.id] ? 'disabled' : '';
+                sellHtml += `<div class="grid grid-cols-5 items-center text-sm">
+                    <span>${good.name}</span>
+                    <span class="text-green-400">${sellPrice} кр.</span>
+                    <span>${item.quantity} шт.</span>
+                    <span class="text-gray-400">Ср. цена: ${item.avgBuyPrice}</span>
+                    <button class="btn-steampunk text-xs py-1 px-2 rounded" ${buttonDisabled} onclick="game.openQuantityModal('sell', '${item.id}')">Продать</button>
+                </div>`;
+            });
+        }
+        sellHtml += `</div>`;
+        
+        this.dom.marketView.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">${buyHtml}${sellHtml}</div>`;
+    },
+
+    openQuantityModal(type, goodId) {
+        this.dom.quantityModal.classList.remove('hidden');
+        this.dom.quantityModal.classList.add('flex');
+        
+        const currentCargoLoad = this.player.ship.cargo.reduce((sum, item) => sum + item.quantity, 0);
+        const cargoSpace = this.player.ship.cargoMax - currentCargoLoad;
+        this.dom.modalCargoSpace.textContent = cargoSpace;
+        
+        let maxQuantity = 0;
+        if (type === 'buy') {
+            const price = this.world.marketPrices[this.player.currentLocation][goodId];
+            const affordableQuantity = price > 0 ? Math.floor(this.player.money / price) : Infinity;
+            maxQuantity = Math.min(affordableQuantity, cargoSpace);
+            this.dom.modalTitle.textContent = `Покупка: ${this.world.goods[goodId].name}`;
+            this.dom.modalText.textContent = `Цена: ${price} кредитов за единицу.`;
+        } else { // sell
+            const itemInCargo = this.player.ship.cargo.find(i => i.id === goodId);
+            maxQuantity = itemInCargo.quantity;
+            this.dom.modalTitle.textContent = `Продажа: ${this.world.goods[goodId].name}`;
+            this.dom.modalText.textContent = `Цена: ${Math.round(this.world.marketPrices[this.player.currentLocation][goodId] * 0.9)} кредитов за единицу.`;
+        }
+        
+        if (maxQuantity <= 0) {
+            maxQuantity = 1; // Чтобы слайдер не ломался
+            this.dom.quantitySlider.disabled = true;
+            this.dom.modalConfirm.disabled = true;
+        } else {
+            this.dom.quantitySlider.disabled = false;
+            this.dom.modalConfirm.disabled = false;
+        }
+        
+        this.dom.quantitySlider.max = maxQuantity;
+        this.dom.quantitySlider.value = 1;
+        this.dom.quantityValue.textContent = 1;
+
+        const sliderHandler = () => {
+            this.dom.quantityValue.textContent = this.dom.quantitySlider.value;
+        };
+        this.dom.quantitySlider.oninput = sliderHandler;
+
+        this.dom.modalConfirm.onclick = () => this.confirmTransaction(type, goodId, parseInt(this.dom.quantitySlider.value));
+        this.dom.modalCancel.onclick = () => this.closeQuantityModal();
+    },
+
+    closeQuantityModal() {
+        this.dom.quantityModal.classList.add('hidden');
+        this.dom.quantityModal.classList.remove('flex');
+        // Очищаем обработчики
+        this.dom.modalConfirm.onclick = null;
+        this.dom.modalCancel.onclick = null;
+        this.dom.quantitySlider.oninput = null;
+    },
+
+    confirmTransaction(type, goodId, quantity) {
+        if (type === 'buy') {
+            const price = this.world.marketPrices[this.player.currentLocation][goodId];
+            const totalCost = price * quantity;
+            
+            this.player.money -= totalCost;
+            
+            const existingItem = this.player.ship.cargo.find(item => item.id === goodId);
+            if(existingItem) {
+                const totalValue = (existingItem.avgBuyPrice * existingItem.quantity) + totalCost;
+                existingItem.quantity += quantity;
+                existingItem.avgBuyPrice = Math.round(totalValue / existingItem.quantity);
+            } else {
+                this.player.ship.cargo.push({ id: goodId, quantity: quantity, avgBuyPrice: price });
+            }
+            this.log(`Куплено: ${quantity} ед. товара "${this.world.goods[goodId].name}" за ${totalCost} кредитов.`);
+        } else { // sell
+             const sellPrice = Math.round(this.world.marketPrices[this.player.currentLocation][goodId] * 0.9);
+             const totalGain = sellPrice * quantity;
+
+             this.player.money += totalGain;
+
+             const itemInCargo = this.player.ship.cargo.find(i => i.id === goodId);
+             itemInCargo.quantity -= quantity;
+             if(itemInCargo.quantity <= 0) {
+                 this.player.ship.cargo = this.player.ship.cargo.filter(i => i.id !== goodId);
+             }
+             this.log(`Продано: ${quantity} ед. товара "${this.world.goods[goodId].name}" за ${totalGain} кредитов.`);
+        }
+        
+        this.closeQuantityModal();
+        this.updateUI();
+        this.renderMarket();
+    },
+    
+    // --- ЛОГИКА ВЕРФИ ---
+    renderShipyard() {
+        const { player } = this;
+        let html = `
+            <h3 class="text-lg font-bold border-b-2 border-yellow-700 pb-2 mb-4">Услуги верфи</h3>
+            <div class="space-y-4">
+                <div>
+                    <p>Прочность корпуса: ${player.ship.hull}/${player.ship.hullMax}</p>
+                    <div class="flex gap-2 items-center">
+                         <button class="btn-steampunk py-1 px-3 rounded text-sm" onclick="game.repairHull()">Ремонт (10 кр./ед.)</button>
+                         <span class="text-sm text-gray-400">Стоимость полного ремонта: ${(player.ship.hullMax - player.ship.hull) * 10} кр.</span>
+                    </div>
+                </div>
+                <div>
+                    <p>Запасы угля: ${player.ship.fuel}/${player.ship.fuelMax}</p>
+                     <div class="flex gap-2 items-center">
+                         <button class="btn-steampunk py-1 px-3 rounded text-sm" onclick="game.refuel()">Заправка (5 кр./ед.)</button>
+                         <span class="text-sm text-gray-400">Стоимость полной заправки: ${(player.ship.fuelMax - player.ship.fuel) * 5} кр.</span>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="text-lg font-bold border-b-2 border-yellow-700 pb-2 mb-4 mt-6">Улучшения дирижабля</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                ${this.renderUpgradeCategory('cargo', 'Трюм')}
+                ${this.renderUpgradeCategory('hull', 'Корпус')}
+                ${this.renderUpgradeCategory('fuel', 'Топливный отсек')}
+            </div>
+        `;
+        this.dom.shipyardView.innerHTML = html;
+    },
+
+    renderUpgradeCategory(type, title) {
+        let html = `<div><h4 class="font-bold text-yellow-500">${title}</h4><div class="space-y-2 mt-2">`;
+        this.world.upgrades[type].forEach(upgrade => {
+             const canAfford = this.player.money >= upgrade.cost;
+             const alreadyHas = this.isUpgradeInstalled(type, upgrade.value);
+             const disabled = !canAfford || alreadyHas ? 'disabled' : '';
+             const buttonText = alreadyHas ? "Установлено" : `Купить (${upgrade.cost} кр.)`;
+            
+            html += `
+                <div class="text-sm p-2 card rounded">
+                    <p>${upgrade.name} (+${upgrade.value})</p>
+                    <button class="btn-steampunk w-full mt-1 text-xs py-1 px-2 rounded" ${disabled} onclick="game.buyUpgrade('${type}', ${upgrade.cost}, ${upgrade.value})">${buttonText}</button>
+                </div>
+            `;
+        });
+        html += `</div></div>`;
+        return html;
+    },
+
+    isUpgradeInstalled(type, value) {
+        switch(type) {
+            case 'cargo': return this.player.ship.cargoMax > 20 && this.player.ship.cargoMax >= (20 + value);
+            case 'hull': return this.player.ship.hullMax > 100 && this.player.ship.hullMax >= (100 + value);
+            case 'fuel': return this.player.ship.fuelMax > 50 && this.player.ship.fuelMax >= (50 + value);
+            default: return false;
+        }
+    },
+    
+    buyUpgrade(type, cost, value) {
+        if (this.player.money < cost) {
+            this.log("Недостаточно кредитов для покупки этого улучшения.");
+            return;
+        }
+        this.player.money -= cost;
+        switch(type) {
+            case 'cargo': this.player.ship.cargoMax += value; this.log(`Трюм увеличен до ${this.player.ship.cargoMax}.`); break;
+            case 'hull': this.player.ship.hullMax += value; this.player.ship.hull += value; this.log(`Максимальная прочность корпуса увеличена до ${this.player.ship.hullMax}.`); break;
+            case 'fuel': this.player.ship.fuelMax += value; this.log(`Топливный отсек увеличен до ${this.player.ship.fuelMax}.`); break;
+        }
+        this.updateUI();
+        this.renderShipyard();
+    },
+
+    repairHull() {
+        const damage = this.player.ship.hullMax - this.player.ship.hull;
+        if (damage === 0) {
+            this.log("Ремонт не требуется.");
+            return;
+        }
+        const cost = damage * 10;
+        if (this.player.money < cost) {
+            this.log("Недостаточно кредитов для полного ремонта.");
+            return;
+        }
+        this.player.money -= cost;
+        this.player.ship.hull = this.player.ship.hullMax;
+        this.log(`Корпус полностью отремонтирован за ${cost} кредитов.`);
+        this.updateUI();
+        this.renderShipyard();
+    },
+    
+    refuel() {
+        const needed = this.player.ship.fuelMax - this.player.ship.fuel;
+        if (needed === 0) {
+            this.log("Бак полон.");
+            return;
+        }
+        const cost = needed * 5;
+        if (this.player.money < cost) {
+            this.log("Недостаточно кредитов для полной заправки.");
+            return;
+        }
+        this.player.money -= cost;
+        this.player.ship.fuel = this.player.ship.fuelMax;
+        this.log(`Угольный бункер заполнен за ${cost} кредитов.`);
+        this.updateUI();
+        this.renderShipyard();
+    },
+
+
+    // --- ЛОГИКА ПУТЕШЕСТВИЙ ---
+    renderTravel() {
+        const currentLocationId = this.player.currentLocation;
+        const currentLocation = this.world.locations[currentLocationId];
+        const distances = currentLocation.distances;
+        
+        let html = `<h3 class="text-lg font-bold border-b-2 border-yellow-700 pb-2 mb-4">Карта небесных путей</h3>`;
+        
+        const mapContainer = document.createElement('div');
+        mapContainer.className = 'map-container';
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'map-svg');
+
+        const tooltip = document.createElement('div');
+        tooltip.className = 'map-tooltip';
+        document.body.appendChild(tooltip); // Добавляем тултип в body для корректного позиционирования
+
+        for (const locId in this.world.locations) {
+            const locationData = this.world.locations[locId];
+            const isCurrent = locId === currentLocationId;
+            const isDestination = distances.hasOwnProperty(locId);
+
+            const node = document.createElement('div');
+            node.className = 'city-node';
+            node.style.left = `${locationData.coords.x}%`;
+            node.style.top = `${locationData.coords.y}%`;
+            node.textContent = locationData.name;
+
+            if (isCurrent) {
+                node.classList.add('current');
+            } else if (isDestination) {
+                const distance = distances[locId];
+                const fuelCost = Math.round(distance / 2);
+                const canTravel = this.player.ship.fuel >= fuelCost;
+
+                if (canTravel) {
+                    node.classList.add('reachable');
+                    node.onclick = () => game.travelTo(locId);
+
+                    node.onmousemove = (e) => {
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = `${e.clientX + 15}px`;
+                        tooltip.style.top = `${e.clientY + 15}px`;
+                        tooltip.innerHTML = `<b>${locationData.name}</b><br>Расстояние: ${distance}<br>Уголь: ${fuelCost}`;
+                    };
+                    node.onmouseleave = () => {
+                        tooltip.style.display = 'none';
+                    };
+                } else {
+                    node.classList.add('unreachable');
+                }
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', `${currentLocation.coords.x}%`);
+                line.setAttribute('y1', `${currentLocation.coords.y}%`);
+                line.setAttribute('x2', `${locationData.coords.x}%`);
+                line.setAttribute('y2', `${locationData.coords.y}%`);
+                line.setAttribute('stroke', canTravel ? '#c5a774' : '#7a6848');
+                line.setAttribute('stroke-width', '2');
+                if (canTravel) {
+                    line.setAttribute('stroke-dasharray', '5, 5');
+                }
+                svg.appendChild(line);
+
+            } else {
+                node.classList.add('unreachable');
+            }
+            mapContainer.appendChild(node);
+        }
+
+        mapContainer.appendChild(svg);
+        
+        this.dom.travelView.innerHTML = html;
+        this.dom.travelView.appendChild(mapContainer);
+    },
+    
+    travelTo(destinationId) {
+        const currentLocationId = this.player.currentLocation;
+        const distance = this.world.locations[currentLocationId].distances[destinationId];
+        const fuelCost = Math.round(distance / 2);
+
+        if (this.player.ship.fuel < fuelCost) {
+            this.log("Недостаточно угля для этого путешествия!");
+            return;
+        }
+        
+        // Прячем тултип перед путешествием
+        const tooltip = document.querySelector('.map-tooltip');
+        if (tooltip) tooltip.style.display = 'none';
+
+        this.player.ship.fuel -= fuelCost;
+        this.player.currentLocation = destinationId;
+        const destName = this.world.locations[destinationId].name;
+        
+        this.log(`Вы отправляетесь в ${destName}. Путь займет некоторое время...`);
+
+        // Симуляция события в пути
+        let encounterMessage = `Вы благополучно прибыли в ${destName}.`;
+        if (Math.random() < 0.25) { // 25% шанс на событие
+            if (destinationId === 'pirate_cove' || Math.random() < 0.3) {
+                const cargoLoss = Math.min(5, Math.floor(this.player.ship.cargo.reduce((s, i) => s + i.quantity, 0) * 0.2));
+                const hullDamage = Math.floor(Math.random() * 20) + 10;
+                
+                this.player.ship.hull = Math.max(0, this.player.ship.hull - hullDamage);
+
+                if (cargoLoss > 0 && this.player.ship.cargo.length > 0) {
+                    // Упрощенно: удаляем часть первого попавшегося товара
+                     this.player.ship.cargo[0].quantity = Math.max(0, this.player.ship.cargo[0].quantity - cargoLoss);
+                     if(this.player.ship.cargo[0].quantity === 0) this.player.ship.cargo.shift();
+                }
+                
+                encounterMessage = `Нападение пиратов! Вы отбились, но потеряли ${cargoLoss} ед. груза и получили ${hullDamage} ед. повреждений. Вы прибыли в ${destName} на потрепанном корабле.`;
+                 if (this.player.ship.hull <= 0) {
+                    encounterMessage = `Пираты взяли ваш корабль на абордаж! Все потеряно...`;
+                    // Конец игры (упрощенно)
+                    this.player.money = 50;
+                    this.player.ship.cargo = [];
+                    this.player.ship.hull = 20;
+                 }
+            } else {
+                 const stormDamage = Math.floor(Math.random() * 15) + 5;
+                 this.player.ship.hull = Math.max(0, this.player.ship.hull - stormDamage);
+                 encounterMessage = `Вы попали в сильный шторм! Корпус поврежден на ${stormDamage} ед. Вы благополучно добрались до ${destName}.`
+            }
+        }
+        
+        this.log(encounterMessage);
+        
+        // Шанс на новое мировое событие
+        if (Math.random() < 0.4) {
+            this.triggerNewEvent();
+        }
+
+        this.showView('welcome'); // Сбрасываем вид
+        document.getElementById('welcome-view').innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold">Прибытие в ${destName}</h2><p class="mt-4">Двигатели остывают, швартовы закреплены. Чем займетесь, капитан?</p></div>`
+        this.updateUI();
+    },
+
+    triggerNewEvent() {
+        const randomEvent = this.world.events[Math.floor(Math.random() * this.world.events.length)];
+        this.world.currentEvent = randomEvent;
+        this.log(`НОВОСТИ: ${randomEvent.text}`);
+        this.generateMarketPrices(); // Пересчитываем цены с учетом нового события
+    }
+
+};
+
+function priceModifier(goodId, factor, locationId = null) {
+    if (locationId) {
+        if(game.world.marketPrices[locationId] && game.world.marketPrices[locationId][goodId]) {
+            game.world.marketPrices[locationId][goodId] = Math.round(game.world.goods[goodId].basePrice * factor);
+        }
+    } else {
+        for (const locId in game.world.locations) {
+            if(game.world.marketPrices[locId] && game.world.marketPrices[locId][goodId]) {
+                game.world.marketPrices[locId][goodId] = Math.round(game.world.marketPrices[locId][goodId] * factor);
+            }
+        }
+    }
+}
+
+
+// Запуск игры после загрузки DOM
+document.addEventListener('DOMContentLoaded', () => {
+    game.init();
+});
+</script>
+
+</body>
+</html>

@@ -46,16 +46,46 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        // 2. ========= ЗАГРУЗКА ФОНА =========
-        // Измененный метод загрузки через HTML Image элемент для надежности
+        // 2. ========= ЗАГРУЗКА ФОНА С СОХРАНЕНИЕМ ПРОПОРЦИЙ =========
+        let bgPlane;
         const image = document.createElement('img');
         const backgroundTexture = new THREE.Texture(image);
         image.crossOrigin = 'anonymous'; // Важно для избежания CORS ошибок
         image.addEventListener('load', () => {
             backgroundTexture.needsUpdate = true;
-            scene.background = backgroundTexture;
+            
+            // Создаем плоскость для фона
+            const bgGeometry = new THREE.PlaneGeometry(1, 1); // Используем 1x1 для простоты масштабирования
+            const bgMaterial = new THREE.MeshBasicMaterial({ map: backgroundTexture });
+            bgPlane = new THREE.Mesh(bgGeometry, bgMaterial);
+            
+            // Помещаем фон за огнем
+            bgPlane.position.z = -1; 
+            scene.add(bgPlane);
+
+            updateBackgroundScale(); // Масштабируем фон после загрузки
         });
-        image.src = '../images/fireplace_back.jpg';
+        image.src = '../images/fireplace_back.jpg'; // Обновленный URL
+
+        function updateBackgroundScale() {
+            if (!bgPlane || !backgroundTexture.image) return;
+
+            const viewportAspect = window.innerWidth / window.innerHeight;
+            const imageAspect = backgroundTexture.image.width / backgroundTexture.image.height;
+
+            const fov = camera.fov * (Math.PI / 180);
+            const height = 2 * Math.tan(fov / 2) * Math.abs(bgPlane.position.z - camera.position.z);
+            const width = height * viewportAspect;
+
+            bgPlane.scale.set(width, height, 1);
+
+            // Логика для "cover" эффекта
+            if (viewportAspect > imageAspect) {
+                bgPlane.scale.x *= viewportAspect / imageAspect;
+            } else {
+                bgPlane.scale.y *= imageAspect / viewportAspect;
+            }
+        }
         
         // 3. ========= ОСВЕЩЕНИЕ =========
         // Оставляем только динамический свет от огня
@@ -70,7 +100,7 @@
 
         for (let i = 0; i < particleCount; i++) {
             // Начальная позиция смещена вниз и сужена, чтобы соответствовать поленьям
-            positions[i * 3 + 0] = (Math.random() - 0.5) * 1.2; // x
+            positions[i * 3 + 0] = (Math.random() - 0.5) * 1.0; // x (уменьшен разброс)
             positions[i * 3 + 1] = (Math.random() - 0.5) * 0.2 - 0.6; // y
             positions[i * 3 + 2] = (Math.random() - 0.5) * 0.5; // z
             randoms[i] = Math.random();
@@ -206,11 +236,11 @@
         const sparksTimings = new Float32Array(sparksCount * 3);
 
         for (let i = 0; i < sparksCount; i++) {
-            sparksPositions[i * 3 + 0] = (Math.random() - 0.5) * 1.2;
+            sparksPositions[i * 3 + 0] = (Math.random() - 0.5) * 1.0; // x (уменьшен разброс)
             sparksPositions[i * 3 + 1] = -0.6 + (Math.random() * 0.4);
             sparksPositions[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
 
-            sparksVelocities[i * 3 + 0] = (Math.random() - 0.5) * 1.5;
+            sparksVelocities[i * 3 + 0] = (Math.random() - 0.5) * 1.0; // vx (уменьшен разброс)
             sparksVelocities[i * 3 + 1] = Math.random() * 2.5 + 2.5;
             sparksVelocities[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
 
@@ -301,8 +331,8 @@
         // 5. ========= ПОСТОБРАБОТКА (ЭФФЕКТ СВЕЧЕНИЯ) =========
         const renderScene = new RenderPass(scene, camera);
         const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-        bloomPass.threshold = 0.1;
-        bloomPass.strength = 1.4; // Slightly reduced bloom strength
+        bloomPass.threshold = 0.3; // Увеличиваем порог, чтобы светились только самые яркие части
+        bloomPass.strength = 0.9; // Уменьшаем общую силу свечения
         bloomPass.radius = 0.5;
 
         const composer = new EffectComposer(renderer);
@@ -339,6 +369,8 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             
             composer.setSize(window.innerWidth, window.innerHeight);
+
+            updateBackgroundScale(); // Пересчитываем масштаб фона при ресайзе
         });
 
         // Запускаем анимацию

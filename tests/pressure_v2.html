@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>Ваш персональный тонометр "Супруг"</title>
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Ваш персональный тонометр 'Супруг'">
+    <meta property="og:description" content="Шуточный тест, который определит ваше давление по поведению вашего партнера.">
+    <meta property="og:type" content="website">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .element-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        #toast {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg max-w-2xl w-full">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-red-500 mb-2">Ваш персональный тонометр "Супруг"</h1>
+        
+        <!-- Gender Selection Screen -->
+        <div id="gender-selection" class="element-fade-in">
+             <p class="text-center text-gray-600 mb-6">
+                Для подбора релевантных вопросов, пожалуйста, укажите, кто вы:
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 mt-4">
+                <button onclick="startQuiz('female_user')" class="w-full py-3 px-4 bg-pink-500 text-white font-bold text-lg rounded-lg hover:bg-pink-600 transition-all duration-300 shadow-md">Я женщина</button>
+                <button onclick="startQuiz('male_user')" class="w-full py-3 px-4 bg-blue-500 text-white font-bold text-lg rounded-lg hover:bg-blue-600 transition-all duration-300 shadow-md">Я мужчина</button>
+            </div>
+        </div>
+
+        <!-- Quiz Container (hidden by default) -->
+        <div id="quiz-container" class="hidden">
+            <p id="subtitle" class="text-center text-gray-600 mb-6">
+                Ответьте на 7 вопросов о вашем партнере, чтобы определить, насколько с ним стрессово жить.
+            </p>
+
+            <!-- Progress Bar -->
+            <div class="mb-6">
+                <div class="flex justify-between mb-1">
+                    <span id="progress-text" class="text-base font-medium text-gray-700">Вопрос 1 из 7</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 14%"></div>
+                </div>
+            </div>
+
+            <form id="quizForm" class="space-y-6">
+                <!-- Questions will be dynamically inserted here -->
+                <div id="questions-container"></div>
+            </form>
+
+            <!-- Navigation Buttons -->
+            <div id="navigation-controls" class="mt-8 flex justify-center items-center">
+                <button id="next-btn" type="button" class="py-2 px-6 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 focus:outline-none transition-all duration-300 shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed">Вперед</button>
+                <button id="submit-btn" type="button" class="hidden py-3 px-6 bg-green-500 text-white font-bold text-lg rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-300 shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed" onclick="calculateResults()">Узнать свой диагноз</button>
+            </div>
+        </div>
+
+        <div id="results-container" class="mt-8 hidden"></div>
+
+        <p id="disclaimer" class="text-center text-xs text-gray-500 mt-8">
+            <strong>Важное предупреждение:</strong> Этот тест является исключительно юмористическим. Если вы обеспокоены своим давлением, обратитесь к врачу!
+        </p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-5 py-2 rounded-lg shadow-lg">
+      Ссылка скопирована!
+    </div>
+    
+    <script>
+        const allQuestions = {
+            female_user: [ // Questions for women about men
+                {
+                    question: "1. Грязные носки вашего партнера чаще всего оказываются:",
+                    answers: [
+                        { text: "а) Аккуратно в корзине для белья.", value: 10 },
+                        { text: "б) Где-то рядом с корзиной, но не внутри.", value: 20 },
+                        { text: "в) В самых неожиданных местах, создавая новые формы жизни.", value: 30 }
+                    ]
+                },
+                {
+                    question: "2. Ваш партнер простудился. Его состояние можно описать как:",
+                    answers: [
+                        { text: "а) «Ничего страшного, само пройдет».", value: 10 },
+                        { text: "б) Он стоически переносит болезнь, но просит принести чай с лимоном.", value: 20 },
+                        { text: "в) «Вызови скорую, я умираю». Температура 37.2°C.", value: 30 }
+                    ]
+                },
+                {
+                    question: "3. Как соотносятся разговоры вашего партнера о ЗОЖ и его реальные действия?",
+                    answers: [
+                        { text: "а) Полностью. Что говорит, то и делает.", value: 10 },
+                        { text: "б) В основном совпадает, но может читать лекцию о вреде сахара, поедая печенье.", value: 20 },
+                        { text: "в) Никак. Рассказывает о новой диете, заказывая большую пиццу на ночь.", value: 30 }
+                    ]
+                },
+                {
+                    question: "4. Вам нужно выходить из дома в 10:00. В 9:55 ваш партнер, скорее всего:",
+                    answers: [
+                        { text: "а) Уже одет и ждет вас у двери.", value: 10 },
+                        { text: "б) Внезапно не может найти ключи/кошелек/телефон.", value: 20 },
+                        { text: "в) Решает, что это идеальное время, чтобы полить цветы/вынести мусор/сделать важный звонок.", value: 30 }
+                    ]
+                },
+                {
+                    question: "5. Пришла новая мебель из IKEA. Ваш партнер:",
+                    answers: [
+                        { text: "а) Спокойно читает инструкцию и собирает все шаг за шагом.", value: 10 },
+                        { text: "б) Пытается собрать без инструкции, злится, и только потом читает ее.", value: 20 },
+                        { text: "в) Объявляет, что инструкция для слабаков, а в итоге у вас шаткий шкаф и «лишние» детали.", value: 30 }
+                    ]
+                },
+                 {
+                    question: '6. На вопрос "Куда сходим поесть?" партнер обычно отвечает:',
+                    answers: [
+                        { text: "а) «Отличная идея! Давай в [место 1] или [место 2]?»", value: 10 },
+                        { text: "б) «Не знаю, решай сам(а)», а затем отвергает два ваших предложения.", value: 20 },
+                        { text: "в) Начинает 40-минутный анализ всех ресторанов, который заканчивается фразой «Давай лучше дома поедим».", value: 30 }
+                    ]
+                },
+                {
+                    question: "7. Ваш партнер за рулем, и вы едете по навигатору. Когда навигатор говорит «Поверните направо», он:",
+                    answers: [
+                        { text: "а) Сразу поворачивает направо.", value: 10 },
+                        { text: "б) Говорит: «Я знаю дорогу лучше», и едет прямо.", value: 20 },
+                        { text: "в) Начинает спорить с навигатором, а затем обвиняет его (и вас) в том, что вы «не туда» приехали.", value: 30 }
+                    ]
+                }
+            ],
+            male_user: [ // Questions for men about women
+                {
+                    question: "1. Вы забыли опустить крышку унитаза. Какова наиболее вероятная реакция вашей партнерши?",
+                    answers: [
+                        { text: "а) Молча опустит и не придаст этому значения.", value: 10 },
+                        { text: "б) Сделает саркастическое замечание: «Опять трон для короля открыт?».", value: 20 },
+                        { text: "в) Начнет лекцию о гигиене, бактериях и падении в унитаз среди ночи.", value: 30 }
+                    ]
+                },
+                {
+                    question: "2. Пора выходить. Фраза вашей партнерши «Я готова через 5 минут» обычно означает:",
+                    answers: [
+                        { text: "а) Ровно 5 минут. Она мастер тайм-менеджмента.", value: 10 },
+                        { text: "б) 15-20 минут, включая одну смену наряда в последнюю секунду.", value: 20 },
+                        { text: "в) Временную аномалию, где 5 минут растягиваются на час и полный косметический ритуал.", value: 30 }
+                    ]
+                },
+                {
+                    question: '3. Стоя перед полным шкафом, как часто вы слышите "Мне совершенно нечего надеть"?',
+                    answers: [
+                        { text: "а) Почти никогда. Она планирует образы заранее.", value: 10 },
+                        { text: "б) Иногда, перед важными событиями.", value: 20 },
+                        { text: "в) Это стандартная прелюдия к любому выходу, включая поход в магазин.", value: 30 }
+                    ]
+                },
+                {
+                    question: "4. Когда она чего-то хочет, она:",
+                    answers: [
+                        { text: "а) Говорит об этом прямо: «Хочу вот эту книгу».", value: 10 },
+                        { text: "б) Начинает рассказывать, какая классная вещь есть у ее подруги.", value: 20 },
+                        { text: "в) Создает сложную паутину намеков и вздохов, ожидая, что вы телепат.", value: 30 }
+                    ]
+                },
+                {
+                    question: '5. Фраза "Всё нормально" чаще всего означает:',
+                    answers: [
+                        { text: "а) Что всё действительно нормально.", value: 10 },
+                        { text: "б) Есть небольшая проблема, о которой она расскажет позже.", value: 20 },
+                        { text: "в) Код «красная тревога». Вы что-то сделали не так, и у вас есть 3-5 рабочих дней, чтобы это выяснить.", value: 30 }
+                    ]
+                },
+                {
+                    question: "6. Вы смотрите сериал вместе. Когда вас нет, она:",
+                    answers: [
+                        { text: "а) Терпеливо ждет вас, чтобы продолжить просмотр.", value: 10 },
+                        { text: "б) «Случайно» смотрит одну серию вперед и обещает не спойлерить (но спойлерит).", value: 20 },
+                        { text: "в) Смотрит весь сезон, а потом делает удивленное лицо на поворотах сюжета при пересмотре с вами.", value: 30 }
+                    ]
+                },
+                {
+                    question: '7. Ваша партнерша говорит: "Я быстро, только за хлебом". Это обычно означает:',
+                    answers: [
+                        { text: "а) Она вернется через 5 минут с хлебом.", value: 10 },
+                        { text: "б) Она вернется через 20 минут с хлебом и «еще парой нужных вещей».", value: 20 },
+                        { text: "в) Через час она позвонит и спросит, не нужно ли купить еще и новые шторы. Хлеб она забыла.", value: 30 }
+                    ]
+                }
+            ]
+        };
+
+        let currentQuestionIndex = 0;
+        let questions = [];
+        let questionCount = 0;
+
+        let nextBtn, submitBtn, progressBar, progressText;
+
+        function startQuiz(gender) {
+            document.getElementById('gender-selection').classList.add('hidden');
+            
+            const selectedQuestions = allQuestions[gender];
+            const questionsContainer = document.getElementById('questions-container');
+            
+            selectedQuestions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = `question-page element-fade-in ${index === 0 ? '' : 'hidden'}`;
+                questionDiv.dataset.questionIndex = index;
+
+                let answersHTML = q.answers.map(answer => `
+                    <label class="flex items-start p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <input type="radio" name="q${index + 1}" value="${answer.value}" class="h-5 w-5 text-red-600 flex-shrink-0 mt-1">
+                        <span class="ml-3 text-gray-700">${answer.text}</span>
+                    </label>
+                `).join('');
+
+                questionDiv.innerHTML = `
+                    <p class="font-semibold text-lg text-gray-800">${q.question}</p>
+                    <div class="mt-2 space-y-2">${answersHTML}</div>
+                `;
+                questionsContainer.appendChild(questionDiv);
+
+                // Add event listener to enable buttons
+                const radioButtons = questionDiv.querySelectorAll(`input[type="radio"]`);
+                radioButtons.forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        if (currentQuestionIndex === questionCount - 1) {
+                            submitBtn.disabled = false;
+                        } else {
+                            nextBtn.disabled = false;
+                        }
+                    });
+                });
+            });
+            
+            document.getElementById('quiz-container').classList.remove('hidden');
+            initializeQuizLogic();
+        }
+
+        function initializeQuizLogic() {
+            questions = document.querySelectorAll('.question-page');
+            questionCount = questions.length;
+
+            nextBtn = document.getElementById('next-btn');
+            submitBtn = document.getElementById('submit-btn');
+            progressBar = document.getElementById('progress-bar');
+            progressText = document.getElementById('progress-text');
+
+            nextBtn.addEventListener('click', handleNext);
+            
+            showQuestion(0);
+        }
+
+        function showQuestion(index) {
+            questions.forEach((q, i) => q.classList.toggle('hidden', i !== index));
+            updateProgress(index);
+            updateNavigation(index);
+        }
+
+        function updateProgress(index) {
+            const progressPercentage = ((index + 1) / questionCount) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+            progressText.textContent = `Вопрос ${index + 1} из ${questionCount}`;
+        }
+        
+        function updateNavigation(index) {
+            const isAnswered = document.querySelector(`input[name="q${index + 1}"]:checked`) !== null;
+
+            if (index === questionCount - 1) {
+                nextBtn.classList.add('hidden');
+                submitBtn.classList.remove('hidden');
+                submitBtn.disabled = !isAnswered;
+            } else {
+                nextBtn.classList.remove('hidden');
+                submitBtn.classList.add('hidden');
+                nextBtn.disabled = !isAnswered;
+            }
+        }
+
+        function handleNext() {
+            if (currentQuestionIndex < questionCount - 1) {
+                currentQuestionIndex++;
+                showQuestion(currentQuestionIndex);
+            }
+        }
+
+        function calculateResults() {
+            let totalScore = 0;
+            for (let i = 1; i <= questionCount; i++) {
+                const checked = document.querySelector(`input[name="q${i}"]:checked`);
+                if (checked) totalScore += parseInt(checked.value);
+            }
+
+            const resultsContainer = document.getElementById('results-container');
+            let resultHTML = '', resultClass = '';
+            
+            if (totalScore <= 110) {
+                resultClass = 'bg-blue-50 border-blue-200';
+                resultHTML = `<h2 class="text-xl font-bold text-blue-800">Ваше давление ~ 110/70 — «Олимпийское спокойствие»</h2><p class="mt-2 text-blue-700">Поздравляем! Ваш партнер — человек-дзен. Жизнь с ним предсказуема и спокойна. Вашему давлению ничего не угрожает, кроме, возможно, скуки.</p>`;
+            } else if (totalScore <= 160) {
+                resultClass = 'bg-yellow-50 border-yellow-200';
+                resultHTML = `<h2 class="text-xl font-bold text-yellow-800">Ваше давление ~ 130/85 — «Стабильно-напряженное»</h2><p class="mt-2 text-yellow-700">Ваш партнер обеспечивает вам умеренную кардионагрузку. Давление в норме, но пульс иногда учащается. Это не болезнь, это называется «классический брак».</p>`;
+            } else {
+                resultClass = 'bg-red-50 border-red-200';
+                resultHTML = `<h2 class="text-xl font-bold text-red-800">Ваше давление ~ 160/100 — «Осторожно, высокое напряжение!»</h2><p class="mt-2 text-red-700">Ваш партнер — ходячий источник адреналина. Жизнь с ним — вечный аттракцион. Ваше сердце работает в режиме 24/7. Не забывайте глубоко дышать!</p>`;
+            }
+            
+            const shareButtonHTML = `
+                <div class="mt-6">
+                    <button onclick="shareTest()" class="inline-block bg-gray-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-gray-700 transition-all duration-300 text-sm">
+                        🔗 Поделиться тестом
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('quiz-container').classList.add('hidden');
+            
+            resultsContainer.className = `p-6 rounded-lg border text-center element-fade-in ${resultClass}`;
+            resultsContainer.innerHTML = resultHTML + shareButtonHTML;
+            resultsContainer.classList.remove('hidden');
+            resultsContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        async function shareTest() {
+            const shareUrl = 'https://gritsenko.biz/tests/pressure.html';
+            const shareTitle = 'Ваш персональный тонометр "Супруг"';
+            const shareText = 'Пройди шуточный тест и узнай своё давление по поведению партнера!';
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: shareTitle,
+                        text: shareText,
+                        url: shareUrl,
+                    });
+                } catch (error) {
+                    console.log('Пользователь отменил или произошла ошибка:', error);
+                }
+            } else {
+                try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    showToast();
+                } catch (err) {
+                    console.error('Не удалось скопировать ссылку: ', err);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

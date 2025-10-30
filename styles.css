@@ -1,0 +1,21 @@
+/* styles.css */
+.card {
+    overflow: hidden; /* Ensure the card clips the image */
+  }
+  
+  .card-img-top {
+    transition: transform 0.3s ease; /* Apply transition to image */
+  }
+  
+  .card:hover .card-img-top {
+    transform: scale(1.1); /* Zoom in the image */
+  }
+
+  .profile-picture {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%; /* This creates a circular shape */
+    margin-right: 20px; /* Adjust spacing as needed */
+    display: inline-block; /* Display image inline with paragraph */
+    vertical-align: middle; /* Align image vertically with paragraph */
+  }

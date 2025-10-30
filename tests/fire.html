@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Камин</title>
+    <style>
+        /* Убираем отступы и скрываем прокрутку для полноэкранного режима */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+        }
+        /* Канвас будет занимать все доступное пространство */
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Скрипты для Three.js и его модулей постобработки -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // 1. ========= НАСТРОЙКА СЦЕНЫ =========
+        const scene = new THREE.Scene();
+        // Настраиваем камеру, чтобы она соответствовала перспективе изображения
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0.2, 2.9);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // 2. ========= ЗАГРУЗКА ФОНА С СОХРАНЕНИЕМ ПРОПОРЦИЙ =========
+        let bgPlane;
+        const image = document.createElement('img');
+        const backgroundTexture = new THREE.Texture(image);
+        image.crossOrigin = 'anonymous'; // Важно для избежания CORS ошибок
+        image.addEventListener('load', () => {
+            backgroundTexture.needsUpdate = true;
+            
+            // Создаем плоскость для фона
+            const bgGeometry = new THREE.PlaneGeometry(1, 1); // Используем 1x1 для простоты масштабирования
+            const bgMaterial = new THREE.MeshBasicMaterial({ map: backgroundTexture });
+            bgPlane = new THREE.Mesh(bgGeometry, bgMaterial);
+            
+            // Помещаем фон за огнем
+            bgPlane.position.z = -1; 
+            scene.add(bgPlane);
+
+            updateBackgroundScale(); // Масштабируем фон после загрузки
+        });
+        image.src = '../images/fireplace_back.jpg'; // Обновленный URL
+
+        function updateBackgroundScale() {
+            if (!bgPlane || !backgroundTexture.image) return;
+
+            const viewportAspect = window.innerWidth / window.innerHeight;
+            const imageAspect = backgroundTexture.image.width / backgroundTexture.image.height;
+
+            const fov = camera.fov * (Math.PI / 180);
+            const height = 2 * Math.tan(fov / 2) * Math.abs(bgPlane.position.z - camera.position.z);
+            const width = height * viewportAspect;
+
+            bgPlane.scale.set(width, height, 1);
+
+            // Логика для "cover" эффекта
+            if (viewportAspect > imageAspect) {
+                bgPlane.scale.x *= viewportAspect / imageAspect;
+            } else {
+                bgPlane.scale.y *= imageAspect / viewportAspect;
+            }
+        }
+        
+        // 3. ========= ОСВЕЩЕНИЕ =========
+        // Оставляем только динамический свет от огня
+        const fireLight = new THREE.PointLight(0xff8c00, 5, 10, 2);
+        fireLight.position.set(0, -0.2, 0.2); // Смещаем свет ниже, к поленьям
+        scene.add(fireLight);
+
+        // 4. ========= СОЗДАНИЕ ОГНЯ (СИСТЕМА ЧАСТИЦ) =========
+        const particleCount = 2000;
+        const positions = new Float32Array(particleCount * 3);
+        const randoms = new Float32Array(particleCount);
+
+        for (let i = 0; i < particleCount; i++) {
+            // Начальная позиция смещена вниз и сужена, чтобы соответствовать поленьям
+            positions[i * 3 + 0] = (Math.random() - 0.5) * 1.0; // x (уменьшен разброс)
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 0.2 - 0.6; // y
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 0.5; // z
+            randoms[i] = Math.random();
+        }
+
+        const particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particleGeometry.setAttribute('aRandom', new THREE.BufferAttribute(randoms, 1));
+        
+        // --- Шейдеры для огня ---
+        const vertexShader = `
+            attribute float aRandom;
+            uniform float uTime;
+            uniform float uSize;
+            varying float vProgress;
+            varying float vClusterFactor;
+
+            vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+            vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+            float snoise(vec3 v) {
+                const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+                const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+                vec3 i  = floor(v + dot(v, C.yyy));
+                vec3 x0 = v - i + dot(i, C.xxx);
+                vec3 g = step(x0.yzx, x0.xyz);
+                vec3 l = 1.0 - g;
+                vec3 i1 = min(g.xyz, l.zxy);
+                vec3 i2 = max(g.xyz, l.zxy);
+                vec3 x1 = x0 - i1 + C.xxx;
+                vec3 x2 = x0 - i2 + C.yyy;
+                vec3 x3 = x0 - D.yyy;
+                i = mod289(i);
+                vec4 p = permute(permute(permute(
+                    i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                    + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                    + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+                float n_ = 0.142857142857;
+                vec3 ns = n_ * D.wyz - D.xzx;
+                vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+                vec4 x_ = floor(j * ns.z);
+                vec4 y_ = floor(j - 7.0 * x_);
+                vec4 x = x_ * ns.x + ns.yyyy;
+                vec4 y = y_ * ns.x + ns.yyyy;
+                vec4 h = 1.0 - abs(x) - abs(y);
+                vec4 b0 = vec4(x.xy, y.xy);
+                vec4 b1 = vec4(x.zw, y.zw);
+                vec4 s0 = floor(b0)*2.0 + 1.0;
+                vec4 s1 = floor(b1)*2.0 + 1.0;
+                vec4 sh = -step(h, vec4(0.0));
+                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+                vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+                vec3 p0 = vec3(a0.xy,h.x);
+                vec3 p1 = vec3(a0.zw,h.y);
+                vec3 p2 = vec3(a1.xy,h.z);
+                vec3 p3 = vec3(a1.zw,h.w);
+                vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+                p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+                vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                m = m * m;
+                return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+            }
+            void main() {
+                float lifetime = 2.0;
+                vProgress = mod(uTime * 0.9 + aRandom * lifetime, lifetime) / lifetime;
+                
+                vec3 pos = position;
+
+                float trapezoidFactor = mix(1.0, 0.2, vProgress);
+                pos.x *= trapezoidFactor;
+
+                float clusterNoise = snoise(vec3(position.x * 0.7, uTime * 0.3, position.z * 0.7));
+                vClusterFactor = smoothstep(0.0, 0.8, (clusterNoise + 1.0) / 2.0);
+
+                pos.y += vProgress * 3.0; // Slightly less upward velocity
+
+                float movementNoise = snoise(vec3(pos.x * 1.2, pos.y * 0.8, uTime * 0.5));
+                pos.x += movementNoise * (1.0 - vProgress) * 0.8 * vClusterFactor;
+                pos.z += snoise(vec3(pos.z * 1.2, pos.y * 0.8, uTime * 0.5 + 10.0)) * (1.0 - vProgress) * 0.3;
+
+                vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+                vec4 viewPosition = viewMatrix * modelPosition;
+                gl_Position = projectionMatrix * viewPosition;
+
+                float sizeProgress = pow(sin(vProgress * 3.14159), 2.0);
+                
+                gl_PointSize = uSize * sizeProgress * vClusterFactor * aRandom * 1.5;
+                gl_PointSize *= (1.0 / -viewPosition.z);
+            }
+        `;
+
+        const fragmentShader = `
+            varying float vProgress;
+            varying float vClusterFactor;
+
+            void main() {
+                float distanceToCenter = distance(gl_PointCoord, vec2(0.5));
+                float strength = 1.0 - smoothstep(0.0, 0.5, distanceToCenter);
+
+                vec3 hotColor = vec3(1.0, 0.9, 0.7);
+                vec3 midColor = vec3(1.0, 0.5, 0.0);
+                vec3 coolColor = vec3(0.6, 0.1, 0.0);
+
+                vec3 color = mix(hotColor, midColor, smoothstep(0.0, 0.4, vProgress));
+                color = mix(color, coolColor, smoothstep(0.4, 1.0, vProgress));
+
+                float alphaProgress = pow(sin(vProgress * 3.14159), 2.0);
+
+                gl_FragColor = vec4(color, strength * alphaProgress * vClusterFactor * 0.9);
+            }
+        `;
+
+        const fireMaterial = new THREE.ShaderMaterial({
+            vertexShader,
+            fragmentShader,
+            uniforms: {
+                uTime: { value: 0 },
+                uSize: { value: 120 } // Slightly smaller particles to fit the new scene
+            },
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false,
+        });
+
+        const fire = new THREE.Points(particleGeometry, fireMaterial);
+        scene.add(fire);
+
+        // 4.5. ========= СОЗДАНИЕ ИСКР (ВТОРАЯ СИСТЕМА ЧАСТИЦ) =========
+        const sparksCount = 200;
+        const sparksPositions = new Float32Array(sparksCount * 3);
+        const sparksVelocities = new Float32Array(sparksCount * 3);
+        const sparksTimings = new Float32Array(sparksCount * 3);
+
+        for (let i = 0; i < sparksCount; i++) {
+            sparksPositions[i * 3 + 0] = (Math.random() - 0.5) * 1.0; // x (уменьшен разброс)
+            sparksPositions[i * 3 + 1] = -0.6 + (Math.random() * 0.4);
+            sparksPositions[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
+
+            sparksVelocities[i * 3 + 0] = (Math.random() - 0.5) * 1.0; // vx (уменьшен разброс)
+            sparksVelocities[i * 3 + 1] = Math.random() * 2.5 + 2.5;
+            sparksVelocities[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
+
+            const totalLifetime = Math.random() * 8.0 + 2.0;
+            const visibleLifetime = Math.random() * 0.5 + 1.0;
+            const timeOffset = Math.random() * 10.0;
+            sparksTimings[i*3 + 0] = totalLifetime;
+            sparksTimings[i*3 + 1] = visibleLifetime;
+            sparksTimings[i*3 + 2] = timeOffset;
+        }
+
+        const sparksGeometry = new THREE.BufferGeometry();
+        sparksGeometry.setAttribute('position', new THREE.BufferAttribute(sparksPositions, 3));
+        sparksGeometry.setAttribute('aVelocity', new THREE.BufferAttribute(sparksVelocities, 3));
+        sparksGeometry.setAttribute('aTiming', new THREE.BufferAttribute(sparksTimings, 3));
+
+
+        const sparksVertexShader = `
+            attribute vec3 aVelocity;
+            attribute vec3 aTiming;
+            uniform float uTime;
+            uniform float uSize;
+            varying float vProgress;
+
+            void main() {
+                float totalLifetime = aTiming.x;
+                float visibleLifetime = aTiming.y;
+                float timeOffset = aTiming.z;
+
+                float totalProgress = mod(uTime + timeOffset, totalLifetime) / totalLifetime;
+
+                float visibleRatio = visibleLifetime / totalLifetime;
+
+                if (totalProgress > visibleRatio) {
+                    gl_PointSize = 0.0;
+                    vProgress = -1.0;
+                    return;
+                }
+
+                vProgress = totalProgress / visibleRatio;
+
+                vec3 pos = position;
+                pos.x += aVelocity.x * vProgress * 0.5;
+                pos.y += aVelocity.y * vProgress - 4.9 * vProgress * vProgress; 
+                pos.z += aVelocity.z * vProgress * 0.5;
+
+                vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
+                vec4 viewPosition = viewMatrix * modelPosition;
+                gl_Position = projectionMatrix * viewPosition;
+
+                gl_PointSize = uSize * (1.0 - vProgress) * 0.5;
+                gl_PointSize *= (1.0 / -viewPosition.z);
+            }
+        `;
+
+        const sparksFragmentShader = `
+            varying float vProgress;
+            void main() {
+                if (vProgress < 0.0) {
+                    discard;
+                }
+
+                float distanceToCenter = distance(gl_PointCoord, vec2(0.5));
+                if (distanceToCenter > 0.5) {
+                    discard;
+                }
+                vec3 color = vec3(1.0, 0.8, 0.4);
+                gl_FragColor = vec4(color, (1.0 - vProgress) * 0.9);
+            }
+        `;
+
+        const sparksMaterial = new THREE.ShaderMaterial({
+            vertexShader: sparksVertexShader,
+            fragmentShader: sparksFragmentShader,
+            uniforms: {
+                uTime: { value: 0 },
+                uSize: { value: 50 }
+            },
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false,
+        });
+
+        const sparks = new THREE.Points(sparksGeometry, sparksMaterial);
+        scene.add(sparks);
+
+
+        // 5. ========= ПОСТОБРАБОТКА (ЭФФЕКТ СВЕЧЕНИЯ) =========
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = 0.3; // Увеличиваем порог, чтобы светились только самые яркие части
+        bloomPass.strength = 0.9; // Уменьшаем общую силу свечения
+        bloomPass.radius = 0.5;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // 6. ========= ЦИКЛ АНИМАЦИИ =========
+        const clock = new THREE.Clock();
+        
+        function animate() {
+            const elapsedTime = clock.getElapsedTime();
+
+            // Обновляем время в шейдерах
+            fireMaterial.uniforms.uTime.value = elapsedTime;
+            sparksMaterial.uniforms.uTime.value = elapsedTime;
+
+            // Заставляем свет мерцать
+            fireLight.intensity = Math.sin(elapsedTime * 5.0) * 0.5 + 4.5;
+            fireLight.position.y = Math.sin(elapsedTime * 3.0) * 0.1 - 0.2;
+            
+            // Рендерим сцену с эффектами
+            composer.render();
+
+            requestAnimationFrame(animate);
+        }
+
+        // 7. ========= ОБРАБОТЧИК ИЗМЕНЕНИЯ РАЗМЕРА ОКНА =========
+        window.addEventListener('resize', () => {
+            // Обновляем размеры
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            
+            composer.setSize(window.innerWidth, window.innerHeight);
+
+            updateBackgroundScale(); // Пересчитываем масштаб фона при ресайзе
+        });
+
+        // Запускаем анимацию
+        animate();
+    </script>
+</body>
+</html>

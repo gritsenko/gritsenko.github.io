@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Визуализатор использования токенов</title>
+    <!-- Подключение Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение шрифта Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Кастомные стили для слайдера */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6; /* blue-500 */
+            cursor: pointer;
+            border-radius: 50%;
+            margin-top: -6px;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+         /* Стили для date input в темной теме */
+        input[type="date"] {
+            color-scheme: dark;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-gray-800 rounded-2xl shadow-2xl p-8 space-y-8 border border-gray-700">
+        <!-- Заголовок -->
+        <div>
+            <h1 class="text-3xl font-bold text-center text-blue-400">Анализатор лимитов</h1>
+            <p class="text-center text-gray-400 mt-2">Оцените свой темп расхода токенов в течение месяца.</p>
+        </div>
+
+        <!-- Панель управления -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <!-- Выбор даты -->
+            <div class="space-y-2">
+                <label for="date-picker" class="block text-sm font-medium text-gray-300">Выберите дату</label>
+                <input type="date" id="date-picker" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-white focus:ring-blue-500 focus:border-blue-500 transition">
+            </div>
+            <!-- Слайдер токенов -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <label for="tokens-slider" class="block text-sm font-medium text-gray-300">Использовано токенов</tabel>
+                    <span id="tokens-value" class="text-lg font-semibold text-blue-400">50%</span>
+                </div>
+                <input id="tokens-slider" type="range" min="0" max="100" value="50" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+            </div>
+        </div>
+
+        <!-- Прогресс бары -->
+        <div class="space-y-6 pt-4">
+            <!-- Прогресс бар использования токенов -->
+            <div class="space-y-2">
+                <div class="flex justify-between mb-1">
+                    <span class="text-base font-medium text-gray-300">Расход токенов</span>
+                    <span id="tokens-progress-text" class="text-sm font-medium text-gray-300">50%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-5">
+                    <div id="tokens-progress" class="bg-blue-600 h-5 rounded-full text-center text-xs font-bold text-white flex items-center justify-center transition-all duration-300 ease-in-out" style="width: 50%;">
+                        <span id="token-status-icon"></span>
+                    </div>
+                </div>
+                 <p id="status-text" class="text-sm text-center mt-2 text-gray-400"></p>
+            </div>
+
+            <!-- Прогресс бар прошедших дней -->
+            <div class="space-y-2">
+                <div class="flex justify-between mb-1">
+                    <span class="text-base font-medium text-gray-300">Прошло дней в месяце</span>
+                    <span id="days-progress-text" class="text-sm font-medium text-gray-300">0%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-5">
+                    <div id="days-progress" class="bg-gray-500 h-5 rounded-full transition-all duration-300 ease-in-out" style="width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Получаем элементы DOM
+            const datePicker = document.getElementById('date-picker');
+            const tokensSlider = document.getElementById('tokens-slider');
+            const tokensValue = document.getElementById('tokens-value');
+
+            const tokensProgress = document.getElementById('tokens-progress');
+            const tokensProgressText = document.getElementById('tokens-progress-text');
+            const tokenStatusIcon = document.getElementById('token-status-icon');
+            const statusText = document.getElementById('status-text');
+
+            const daysProgress = document.getElementById('days-progress');
+            const daysProgressText = document.getElementById('days-progress-text');
+            
+            // Функция для установки сегодняшней даты по умолчанию
+            const setDefaultDate = () => {
+                const today = new Date();
+                // Форматируем дату в YYYY-MM-DD
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                datePicker.value = `${year}-${month}-${day}`;
+            };
+
+            // Основная функция обновления
+            const updateVisualization = () => {
+                // 1. Получаем значения из инпутов
+                const selectedDateStr = datePicker.value;
+                if (!selectedDateStr) return; // Выходим, если дата не выбрана
+                
+                // Добавляем время, чтобы избежать проблем с часовыми поясами
+                const selectedDate = new Date(selectedDateStr + 'T00:00:00');
+                const tokensUsedPercent = parseInt(tokensSlider.value);
+
+                // 2. Рассчитываем процент прошедших дней
+                const dayOfMonth = selectedDate.getDate();
+                const year = selectedDate.getFullYear();
+                const month = selectedDate.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const daysElapsedPercent = (dayOfMonth / daysInMonth) * 100;
+
+                // 3. Обновляем UI
+                // Слайдер
+                tokensValue.textContent = `${tokensUsedPercent}%`;
+
+                // Прогресс бар токенов
+                tokensProgress.style.width = `${tokensUsedPercent}%`;
+                tokensProgressText.textContent = `${tokensUsedPercent}%`;
+
+                // Прогресс бар дней
+                daysProgress.style.width = `${daysElapsedPercent.toFixed(0)}%`;
+                daysProgressText.textContent = `${daysElapsedPercent.toFixed(0)}%`;
+                
+                // 4. Логика цвета и статуса
+                const colorClassesToRemove = ['bg-red-500', 'bg-green-500', 'bg-blue-500'];
+                tokensProgress.classList.remove(...colorClassesToRemove);
+                
+                const difference = tokensUsedPercent - daysElapsedPercent;
+
+                if (difference > 5) {
+                    // Превышение лимита
+                    tokensProgress.classList.add('bg-red-500');
+                    tokenStatusIcon.textContent = '⚠️';
+                    statusText.textContent = 'Вы расходуете токены быстрее, чем проходит месяц. Возможен перерасход.';
+                    statusText.className = 'text-sm text-center mt-2 text-red-400';
+                } else if (difference < -5) {
+                    // Экономия
+                    tokensProgress.classList.add('bg-green-500');
+                    tokenStatusIcon.textContent = '✅';
+                    statusText.textContent = 'Отличный темп! У вас есть запас токенов.';
+                    statusText.className = 'text-sm text-center mt-2 text-green-400';
+                } else {
+                    // В рамках нормы
+                    tokensProgress.classList.add('bg-blue-500');
+                    tokenStatusIcon.textContent = '👍';
+                    statusText.textContent = 'Вы идете точно по графику.';
+                    statusText.className = 'text-sm text-center mt-2 text-blue-400';
+                }
+            };
+
+            // Назначаем обработчики событий
+            datePicker.addEventListener('input', updateVisualization);
+            tokensSlider.addEventListener('input', updateVisualization);
+
+            // Инициализация при загрузке страницы
+            setDefaultDate();
+            updateVisualization();
+        });
+    </script>
+
+</body>
+</html>

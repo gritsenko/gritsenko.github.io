@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест скорости скачивания</title>
+    <!-- Подключаем Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Используем шрифт Inter, как рекомендовано для Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl">
+        
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">
+            Тест скорости скачивания
+        </h1>
+
+        <p class="text-center text-gray-600 mb-6">
+            Файлы не будут сохранены на диск,
+            будет только измерена скорость их получения.
+        </p>
+
+        <!-- [NEW] Добавленные ссылки -->
+        <div class="text-center text-sm text-gray-500 mb-6 space-x-4">
+            <a href="https://adsadvisor.my.games/api/crhub/fs/sharing/PkwKz73W3GZm9OyAx56dDBjeNLMVQqzYZDKvw1RKY0zg7PJX4Erpb2nlakVMr5eL/download?node_id=7523849" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 hover:underline">
+                Прямая ссылка
+            </a>
+            <span class="text-gray-300">|</span>
+            <a href="https://aa.gritsenko.biz/api/crhub/fs/sharing/PkwKz73W3GZm9OyAx56dDBjeNLMVQqzYZDKvw1RKY0zg7PJX4Erpb2nlakVMr5eL/download?node_id=7523849" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 hover:underline">
+                Прокси
+            </a>
+        </div>
+
+        <!-- [NEW] Переключатель режима -->
+        <div class="flex items-center justify-center mb-6 space-x-3">
+            <span id="label-parallel" class="text-sm font-medium text-gray-900 transition-colors">Параллельно</span>
+            <button type="button" id="modeToggle" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-blue-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50" role="switch" aria-checked="true">
+                <span class="sr-only">Режим скачивания</span>
+                <!-- 'translate-x-5' (parallel) vs 'translate-x-0' (sequential) -->
+                <span id="modeToggleHandle" aria-hidden="true" class="inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+            </button>
+            <span id="label-sequential" class="text-sm font-medium text-gray-400 transition-colors">Последовательно</span>
+        </div>
+
+
+        <!-- Кнопка запуска -->
+        <button id="startButton" class="w-full bg-blue-600 text-white font-bold p-3 rounded-lg mt-6 hover:bg-blue-700 transition disabled:bg-gray-400">
+            Начать тест
+        </button>
+        <!-- Кнопка отмены -->
+        <button id="stopButton" class="w-full bg-red-600 text-white font-bold p-3 rounded-lg mt-2 hover:bg-red-700 transition hidden">
+            Прервать тест
+        </button>
+
+        <!-- Область результатов -->
+        <div id="results" class="mt-6 space-y-4">
+            <!-- Спиннер загрузки, который показывается во время теста -->
+            <div id="loader" class="text-center py-4 hidden">
+                <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-gray-600 mt-2">Идет тестирование...</p>
+            </div>
+            <!-- Карточки результатов будут вставлены сюда -->
+        </div>
+    </div>
+
+    <script>
+        // Получаем ссылки на элементы DOM
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton'); // Новая кнопка
+        const resultsDiv = document.getElementById('results');
+        const loader = document.getElementById('loader');
+        
+        // [NEW] Элементы переключателя
+        const modeToggle = document.getElementById('modeToggle');
+        const modeToggleHandle = document.getElementById('modeToggleHandle');
+        const labelParallel = document.getElementById('label-parallel');
+        const labelSequential = document.getElementById('label-sequential');
+        let isParallelMode = true; // true = parallel, false = sequential
+
+        let abortController; // Контроллер для прерывания fetch
+
+        // Лимит 50МБ больше не нужен, будем качать файл целиком
+        // const TEST_DOWNLOAD_BYTES = 50 * 1024 * 1024; // 50MB
+        
+        // [NEW] Обработчик переключателя
+        modeToggle.addEventListener('click', () => {
+            isParallelMode = !isParallelMode;
+            modeToggle.setAttribute('aria-checked', isParallelMode);
+            if (isParallelMode) {
+                // Включен Параллельный режим
+                modeToggle.classList.add('bg-blue-600');
+                modeToggle.classList.remove('bg-gray-400');
+                modeToggleHandle.classList.add('translate-x-5');
+                modeToggleHandle.classList.remove('translate-x-0');
+                labelParallel.classList.add('text-gray-900');
+                labelParallel.classList.remove('text-gray-400');
+                labelSequential.classList.add('text-gray-400');
+                labelSequential.classList.remove('text-gray-900');
+            } else {
+                // Включен Последовательный режим
+                modeToggle.classList.remove('bg-blue-600');
+                modeToggle.classList.add('bg-gray-400');
+                modeToggleHandle.classList.remove('translate-x-5');
+                modeToggleHandle.classList.add('translate-x-0');
+                labelParallel.classList.remove('text-gray-900');
+                labelParallel.classList.add('text-gray-400');
+                labelSequential.classList.remove('text-gray-400');
+                labelSequential.classList.add('text-gray-900');
+            }
+        });
+
+
+        // Вешаем обработчик клика на кнопку
+        startButton.addEventListener('click', async () => {
+            // Очищаем предыдущие результаты
+            resultsDiv.innerHTML = '';
+            // Показываем спиннер
+            loader.classList.remove('hidden');
+            // Блокируем кнопку "Старт" и показываем "Прервать"
+            startButton.disabled = true;
+            stopButton.classList.remove('hidden');
+            modeToggle.disabled = true; // [NEW] Блокируем переключатель
+
+            // Создаем новый AbortController для этого теста
+            abortController = new AbortController();
+            const signal = abortController.signal;
+
+            // Жестко задаем URL-адреса, лейблы и общий размер файла
+            const tests = [
+                { 
+                    label: "Прямая ссылка", 
+                    url: "https://adsadvisor.my.games/api/crhub/fs/sharing/PkwKz73W3GZm9OyAx56dDBjeNLMVQqzYZDKvw1RKY0zg7PJX4Erpb2nlakVMr5eL/download?node_id=7523849" 
+                },
+                { 
+                    label: "Через Прокси", 
+                    url: "https://aa.gritsenko.biz/api/crhub/fs/sharing/PkwKz73W3GZm9OyAx56dDBjeNLMVQqzYZDKvw1RKY0zg7PJX4Erpb2nlakVMr5eL/download?node_id=7523849" 
+                }
+            ];
+            const TOTAL_BYTES = 378728939; // Размер файла, который вы указали
+
+            // Запускаем оба теста параллельно
+            // Promise.allSettled ждет, пока *все* промисы завершатся (успешно или с ошибкой)
+            try {
+                // [MODIFIED] - Логика запуска в зависимости от режима
+                if (isParallelMode) {
+                    // --- Параллельный режим ---
+                    loader.classList.remove('hidden'); // Показываем спиннер
+                    await Promise.allSettled([
+                        measureDownloadSpeed(tests[0].url, tests[0].label, TOTAL_BYTES, signal),
+                        measureDownloadSpeed(tests[1].url, tests[1].label, TOTAL_BYTES, signal)
+                    ]);
+                } else {
+                    // --- Последовательный режим ---
+                    loader.classList.add('hidden'); // Не показываем общий спиннер
+                    
+                    // Запускаем первый
+                    await measureDownloadSpeed(tests[0].url, tests[0].label, TOTAL_BYTES, signal);
+                    
+                    // Если тест не был прерван, запускаем второй
+                    if (!signal.aborted) {
+                        await measureDownloadSpeed(tests[1].url, tests[1].label, TOTAL_BYTES, signal);
+                    }
+                }
+            } finally {
+                // Этот блок выполнится в любом случае:
+                // после успешного завершения, ошибки или отмены
+                
+                // Прячем спиннер
+                loader.classList.add('hidden');
+                // Возвращаем кнопки в исходное состояние
+                startButton.disabled = false;
+                stopButton.classList.add('hidden');
+                modeToggle.disabled = false; // [NEW] Разблокируем переключатель
+            }
+        });
+
+        // Обработчик для кнопки "Прервать"
+        stopButton.addEventListener('click', () => {
+            if (abortController) {
+                abortController.abort(); // Отправляем сигнал отмены всем fetch-запросам
+            }
+        });
+
+        /**
+         * Асинхронная функция для измерения скорости скачивания
+         * @param {string} url - URL для тестирования
+         * @param {string} label - Название теста (для отображения)
+         * @param {number} totalBytes - Общий размер файла для расчета %
+         * @param {AbortSignal} signal - Сигнал от AbortController для прерывания
+         */
+        async function measureDownloadSpeed(url, label, totalBytes, signal) {
+            const id = label.replace(/\s+/g, '-').toLowerCase(); // e.g., "прямая-ссылка"
+            const totalMb = (totalBytes / (1024 * 1024)).toFixed(1);
+            
+            // 1. Создаем UI для прогресс-бара и добавляем его в resultsDiv
+            const progressElement = document.createElement('div');
+            progressElement.className = "mb-4 p-4 border rounded-lg bg-gray-50"; // Добавим фон и отступы
+            progressElement.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">${label}</label>
+                <div class="w-full bg-gray-200 rounded-full h-6 overflow-hidden relative">
+                    <div id="bar-${id}" class="bg-blue-600 h-full text-center text-white text-sm leading-6 transition-all duration-100 ease-linear" style="width: 0%">
+                    </div>
+                    <!-- Текст с процентами поверх прогресс-бара -->
+                    <div id="percent-${id}" class="absolute inset-0 flex items-center justify-center text-sm font-bold text-black opacity-60">
+                        0%
+                    </div>
+                </div>
+                <!-- Статистика -->
+                <div class="mt-2 grid grid-cols-2 gap-2 font-mono text-sm">
+                    <!-- Левая сторона: Данные и Время -->
+                    <div class="text-left text-gray-600">
+                        <div id="data-${id}">Скачано: 0.0 / ${totalMb} МБ</div>
+                        <div id="time-${id}" class="mt-1">Время: 0.0 сек</div>
+                    </div>
+                    <!-- Правая сторона: Скорость -->
+                    <div id="speed-${id}" class="text-right text-gray-800 font-bold self-center">
+                        --.-- Мбит/с<br>(--.-- МБ/с)
+                    </div>
+                </div>
+                <!-- [NEW] График -->
+                <canvas id="chart-${id}" class="mt-4 w-full h-24 bg-gray-100 rounded-lg" width="400" height="100"></canvas>
+            `;
+            resultsDiv.appendChild(progressElement);
+
+            const barElement = document.getElementById(`bar-${id}`);
+            const percentElement = document.getElementById(`percent-${id}`);
+            const speedElement = document.getElementById(`speed-${id}`);
+            const dataElement = document.getElementById(`data-${id}`); // Новый элемент
+            const timeElement = document.getElementById(`time-${id}`); // Новый элемент
+            
+            // [NEW] Элементы графика
+            const chartCanvas = document.getElementById(`chart-${id}`);
+            // Устанавливаем реальный размер канваса (отличается от CSS размера)
+            chartCanvas.width = chartCanvas.offsetWidth;
+            chartCanvas.height = chartCanvas.offsetHeight;
+            const chartCtx = chartCanvas.getContext('2d');
+            let speedHistory = []; // Массив для хранения точек скорости
+            const graphUpdateInterval = 500; // мс (как часто обновлять график)
+
+            const startTime = performance.now();
+            let lastUpdateTime = startTime;
+            let lastGraphUpdateTime = startTime; // [NEW]
+            let lastReceivedLength = 0;
+            let receivedLength = 0; // Будем считать полученные байты здесь
+
+            try {
+                // 1. Отправляем запрос на получение файла, передаем signal
+                const response = await fetch(url, { signal });
+
+                // 2. Проверяем, успешен ли ответ
+                if (!response.ok) {
+                    throw new Error(`Ошибка HTTP: ${response.status} ${response.statusText}`);
+                }
+                
+                // 3. (УДАЛЕНО) Проверку Content-Length убрали.
+
+                // 4. "Потребляем" тело ответа, не сохраняя его
+                const reader = response.body.getReader();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    // Как только done === true, поток закончился
+                    if (done) {
+                        const endTime = performance.now();
+                        const durationInSeconds = (endTime - startTime) / 1000;
+                        // Считаем *среднюю* скорость за все время
+                        const avgBitsPerSecond = (receivedLength * 8) / durationInSeconds;
+                        const avgMegabitsPerSecond = (avgBitsPerSecond / 1000 / 1000).toFixed(2);
+                        const avgMegabytesPerSecond = (receivedLength / (1024 * 1024)) / durationInSeconds; // МБ/с
+                        const receivedMb = (receivedLength / (1024 * 1024)).toFixed(1);
+
+                        barElement.style.width = '100%';
+                        barElement.classList.remove('bg-blue-600');
+                        barElement.classList.add('bg-green-600'); // Зеленыый цвет при успехе
+                        percentElement.innerText = '100%';
+                        
+                        // Обновляем финальные значения
+                        speedElement.innerHTML = `Средняя: ${avgMegabitsPerSecond} Мбит/с<br>(${avgMegabytesPerSecond.toFixed(2)} МБ/с)`;
+                        dataElement.innerText = `Скачано: ${receivedMb} / ${totalMb} МБ`;
+                        timeElement.innerText = `Время: ${durationInSeconds.toFixed(1)} сек`;
+                        
+                        // [NEW] Финальная отрисовка графика
+                        speedHistory.push(parseFloat(avgMegabitsPerSecond)); // Добавляем среднюю скорость как последнюю точку
+                        drawGraph(chartCtx, speedHistory, true);
+                        break;
+                    }
+                    
+                    receivedLength += value.length; // Считаем полученные байты
+                    const now = performance.now();
+                    
+                    // [NEW] Логика обновления графика (каждые 500мс)
+                    if (now - lastGraphUpdateTime > graphUpdateInterval) {
+                        const timeDiffSeconds_graph = (now - lastGraphUpdateTime) / 1000;
+                        const bytesDiff_graph = receivedLength - lastReceivedLength;
+                        const speedBitsPerSecond_graph = (bytesDiff_graph * 8) / timeDiffSeconds_graph;
+                        const speedMegabitsPerSecond_graph = (speedBitsPerSecond_graph / 1000 / 1000);
+
+                        if (isFinite(speedMegabitsPerSecond_graph) && speedMegabitsPerSecond_graph > 0) {
+                            speedHistory.push(parseFloat(speedMegabitsPerSecond_graph.toFixed(2)));
+                            drawGraph(chartCtx, speedHistory);
+                        }
+                        lastGraphUpdateTime = now;
+                    }
+
+                    // Обновляем UI не чаще, чем раз в 200мс, чтобы не перегружать браузер
+                    if (now - lastUpdateTime > 200) {
+                        const percent = Math.min(100, (receivedLength / totalBytes) * 100);
+                        const durationInSeconds = (now - startTime) / 1000;
+                        const receivedMb = (receivedLength / (1024 * 1024)).toFixed(1);
+                        
+                        barElement.style.width = `${percent.toFixed(1)}%`;
+                        percentElement.innerText = `${percent.toFixed(0)}%`;
+
+                        // Обновляем данные и время
+                        dataElement.innerText = `Скачано: ${receivedMb} / ${totalMb} МБ`;
+                        timeElement.innerText = `Время: ${durationInSeconds.toFixed(1)} сек`;
+
+                        // Считаем *мгновенную* скорость
+                        const timeDiffSeconds = (now - lastUpdateTime) / 1000;
+                        const bytesDiff = receivedLength - lastReceivedLength;
+                        
+                        const speedBitsPerSecond = (bytesDiff * 8) / timeDiffSeconds;
+                        const speedMegabitsPerSecond = (speedBitsPerSecond / 1000 / 1000).toFixed(2);
+                        const speedMegabytesPerSecond = (bytesDiff / (1024 * 1024)) / timeDiffSeconds; // МБ/с
+
+                        // Показываем текущую (мгновенную) скорость
+                        if (isFinite(speedMegabitsPerSecond) && isFinite(speedMegabytesPerSecond)) {
+                            speedElement.innerHTML = `${speedMegabitsPerSecond} Мбит/с<br>(${speedMegabytesPerSecond.toFixed(2)} МБ/с)`;
+                        }
+
+                        lastUpdateTime = now;
+                        lastReceivedLength = receivedLength;
+                    }
+                }
+
+            } catch (error) {
+                // 8. Обрабатываем ошибки
+                
+                // Проверяем, была ли это ошибка отмены
+                if (error.name === 'AbortError') {
+                    console.log(`Тест "${label}" отменен.`);
+                    barElement.style.width = '100%';
+                    barElement.classList.remove('bg-blue-600');
+                    barElement.classList.add('bg-yellow-500'); // Желтый цвет для отмены
+                    percentElement.innerText = 'Остановлено'; // <== ИЗМЕНЕНО
+                    
+                    // Обновляем время и скачанные данные на момент остановки
+                    const now = performance.now();
+                    const durationInSeconds = (now - startTime) / 1000;
+                    const receivedMb = (receivedLength / (1024 * 1024)).toFixed(1);
+                    dataElement.innerText = `Скачано: ${receivedMb} / ${totalMb} МБ`;
+                    timeElement.innerText = `Время: ${durationInSeconds.toFixed(1)} сек`;
+
+                    // [NEW] Отрисовка графика отмены
+                    drawGraph(chartCtx, speedHistory, false, true);
+
+                    // НЕ МЕНЯЕМ `speedElement.innerText`, оставляя последнее значение
+                    return; // Выходим из функции
+                }
+
+                // Обработка других ошибок (CORS, HTTP и т.д.)
+                console.error(`Ошибка при тесте URL ${label} (${url}):`, error);
+                
+                barElement.style.width = '100%';
+                barElement.classList.remove('bg-blue-600');
+                barElement.classList.add('bg-red-600'); // Красный цвет при ошибке
+                percentElement.innerText = 'Ошибка';
+                
+                let errorMessage = error.message;
+                if (error.name === 'TypeError') {
+                    errorMessage = `Ошибка CORS. Сервер не разрешает скачивание.`;
+                }
+                
+                speedElement.innerHTML = errorMessage; // <== Убрал <br> для ошибки
+                // Обновляем время и скачанные данные на момент ошибки
+                const now = performance.now();
+                const durationInSeconds = (now - startTime) / 1000;
+                const receivedMb = (receivedLength / (1024 * 1024)).toFixed(1);
+                dataElement.innerText = `Скачано: ${receivedMb} / ${totalMb} МБ`;
+                timeElement.innerText = `Время: ${durationInSeconds.toFixed(1)} сек (ошибка)`;
+                
+                // [NEW] Отрисовка графика ошибки
+                drawGraph(chartCtx, speedHistory, false, false, true);
+            }
+        }
+
+        /**
+         * [NEW] Рисует график скорости на Canvas
+         * @param {CanvasRenderingContext2D} ctx - Контекст 2D Canvas
+         * @param {number[]} data - Массив значений скорости (в Мбит/с)
+         * @param {boolean} [isFinal=false] - Завершающий рендер (зеленый)
+         * @param {boolean} [isAborted=false] - Рендер отмены (желтый)
+         * @param {boolean} [isError=false] - Рендер ошибки (красный)
+         */
+        function drawGraph(ctx, data, isFinal = false, isAborted = false, isError = false) {
+            const canvas = ctx.canvas;
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Очищаем канвас
+            ctx.clearRect(0, 0, width, height);
+
+            if (data.length < 2) {
+                // Нечего рисовать, если точек меньше 2
+                return;
+            }
+
+            // Находим макс. скорость для масштабирования
+            const maxSpeed = Math.max(...data);
+            if (maxSpeed === 0) return; // Не делим на ноль
+
+            // Настройка линии
+            let strokeStyle = 'rgb(59, 130, 246)'; // blue-600
+            if (isFinal) strokeStyle = 'rgb(34, 197, 94)'; // green-600
+            if (isAborted) strokeStyle = 'rgb(234, 179, 8)'; // yellow-500
+            if (isError) strokeStyle = 'rgb(220, 38, 38)'; // red-600
+
+            ctx.strokeStyle = strokeStyle;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            // Рассчитываем шаг по X
+            const xStep = width / (data.length - 1);
+
+            for (let i = 0; i < data.length; i++) {
+                const speed = data[i];
+                // Y-координата (перевернута, т.к. 0,0 вверху слева + небольшой отступ, чтобы линия не упиралась в край)
+                const x = i * xStep;
+                const y = Math.max(2, height - (speed / maxSpeed) * (height - 5)); // 5px отступ сверху, 2px снизу
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+
+            // Метка о макс. скорости
+            ctx.fillStyle = '#6b7280'; // gray-500
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Max: ${maxSpeed.toFixed(1)} Мбит/с`, width - 5, 12);
+        }
+
+
+        /**
+         * (УДАЛЕНО)
+         * Отображает карточку с результатом
+         * ...
+         * function displayResult(label, url, message, status) { ... }
+         */
+    </script>
+</body>
+</html>

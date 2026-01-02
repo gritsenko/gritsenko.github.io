@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Рекалибровка 3.4 | Индикатор-точка</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #e5e7eb;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* --- Color System --- */
+        :root {
+            --color-pinky: #f87171;  /* Red */
+            --color-ring: #fbbf24;   /* Amber */
+            --color-middle: #34d399; /* Emerald */
+            --color-index: #60a5fa;  /* Blue */
+            --color-thumb: #a78bfa;  /* Purple */
+        }
+
+        /* Text Highlighting */
+        .text-finger-pinky { color: var(--color-pinky); text-shadow: 0 0 5px rgba(248, 113, 113, 0.4); }
+        .text-finger-ring { color: var(--color-ring); text-shadow: 0 0 5px rgba(251, 191, 36, 0.4); }
+        .text-finger-middle { color: var(--color-middle); text-shadow: 0 0 5px rgba(52, 211, 153, 0.4); }
+        .text-finger-index { color: var(--color-index); text-shadow: 0 0 5px rgba(96, 165, 250, 0.4); }
+        .text-finger-thumb { color: var(--color-thumb); }
+
+        /* Finger Borders & Initial State */
+        .finger { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); opacity: 0.5; transform-origin: bottom center; }
+        
+        .border-finger-pinky { background-color: var(--color-pinky); }
+        .border-finger-ring { background-color: var(--color-ring); }
+        .border-finger-middle { background-color: var(--color-middle); }
+        .border-finger-index { background-color: var(--color-index); }
+        .border-finger-thumb { background-color: var(--color-thumb); }
+
+        /* Finger Active State (Animation) */
+        .finger.active {
+            opacity: 1;
+            transform: scaleY(1.1);
+            box-shadow: 0 0 15px currentColor;
+            z-index: 10;
+        }
+        
+        /* --- NEW CURSOR STYLES --- */
+        .cursor {
+            position: relative;
+            background-color: rgba(255,255,255,0.05);
+            border-radius: 2px;
+            /* Base underline */
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* The Dot Indicator */
+        .cursor::after {
+            content: '';
+            position: absolute;
+            bottom: -3px; /* Center perfectly on the 2px border */
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            z-index: 20;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        /* Left Hand: Blue dot on the LEFT */
+        .cursor-l { border-bottom-color: rgba(96, 165, 250, 0.5); }
+        .cursor-l::after {
+            left: 0;
+            background-color: #60a5fa; /* Blue */
+            color: #60a5fa; /* For box-shadow currentColor */
+        }
+
+        /* Right Hand: Green dot on the RIGHT */
+        .cursor-r { border-bottom-color: rgba(52, 211, 153, 0.5); }
+        .cursor-r::after {
+            right: 0;
+            background-color: #34d399; /* Green/Emerald */
+            color: #34d399;
+        }
+        
+        /* Thumb/Space: Purple dot in the CENTER */
+        .cursor-lr { border-bottom-color: rgba(167, 139, 250, 0.5); }
+        .cursor-lr::after {
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #a78bfa; /* Purple */
+            color: #a78bfa;
+            width: 8px; /* Slightly larger for space */
+            height: 8px;
+            bottom: -4px;
+        }
+
+        .correct { color: #4b5563 !important; text-shadow: none; opacity: 0.4; } 
+        .wrong { 
+            color: #ef4444 !important; 
+            background-color: rgba(239, 68, 68, 0.2); 
+            border-radius: 4px;
+        }
+        
+        /* Space Character */
+        .space-char {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 0.8ch; 
+            height: 1.2em;
+            margin: 0 1px;
+            vertical-align: middle;
+            border-bottom: 2px solid rgba(75, 85, 99, 0.5); 
+            border-radius: 2px;
+        }
+        /* Remove tray when typed correctly */
+        .space-char.correct { border-bottom-color: transparent; }
+        /* When cursor is on space, rely on cursor class for border */
+        .space-char.cursor { border-bottom: 2px solid rgba(167, 139, 250, 0.3); } 
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-center overflow-hidden selection:bg-purple-500 selection:text-white">
+
+  <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+      k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+    })
+      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+    ym(98653129, "init", {
+      clickmap: true,
+      trackLinks: true,
+      accurateTrackBounce: true
+    });
+  </script>
+  <noscript>
+    <div><img src="https://mc.yandex.ru/watch/98653129" style="position:absolute; left:-9999px;" alt="" /></div>
+  </noscript>
+  <!-- /Yandex.Metrika counter -->
+
+
+    <!-- Header -->
+    <div class="w-full max-w-6xl px-6 mb-8 flex justify-between items-end">
+        <div>
+            <h1 class="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                <i class="fas fa-hands text-purple-500"></i>
+                <span>Схема Пальцев</span>
+            </h1>
+            <p class="text-gray-400 text-sm mt-1">Точка показывает, какой рукой печатать</p>
+        </div>
+        
+        <!-- Stats -->
+        <div class="flex gap-8">
+            <div class="text-right">
+                <div class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Скорость</div>
+                <div class="text-3xl font-bold text-blue-400 mono-font"><span id="wpm">0</span> <span class="text-sm text-gray-600">WPM</span></div>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Точность</div>
+                <div class="text-3xl font-bold text-green-400 mono-font" id="accuracy">100%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="w-full max-w-6xl px-6 mb-6 flex gap-4 items-center">
+        <!-- Lang Switch -->
+        <div class="flex bg-gray-800 p-1 rounded-lg border border-gray-700">
+            <button id="langRu" class="px-4 py-1.5 rounded-md text-sm font-bold transition bg-gray-600 text-white shadow-sm">RU</button>
+            <button id="langEn" class="px-4 py-1.5 rounded-md text-sm font-bold transition text-gray-400 hover:text-white">EN</button>
+        </div>
+
+        <select id="lessonSelect" class="bg-gray-800 text-white text-sm border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 hover:bg-gray-750 transition flex-grow">
+            <!-- Populated by JS -->
+        </select>
+        
+        <button id="restartBtn" class="w-10 h-10 flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition" title="Перезапуск">
+            <i class="fas fa-redo"></i>
+        </button>
+
+        <div class="flex items-center gap-2 px-4 py-2 bg-gray-900 rounded-lg border border-gray-800">
+            <input type="checkbox" id="strictMode" checked class="w-4 h-4 rounded border-gray-600 text-purple-600 focus:ring-purple-600 bg-gray-700 cursor-pointer">
+            <label for="strictMode" class="text-xs text-gray-400 cursor-pointer select-none font-medium">Без ошибок</label>
+        </div>
+    </div>
+
+    <!-- Typing Area -->
+    <div class="w-full max-w-6xl px-6 mb-10 relative group">
+        <div class="absolute -top-3 right-8 bg-gray-800 px-3 py-1 rounded text-[10px] text-gray-400 font-mono border border-gray-700 shadow-sm opacity-0 group-hover:opacity-100 transition">
+            Backspace отключен в строгом режиме
+        </div>
+        <div id="typingArea" class="w-full h-48 bg-gray-800/50 rounded-2xl border border-gray-700 p-8 text-3xl mono-font leading-loose focus:outline-none focus:ring-2 focus:ring-purple-500/50 shadow-inner overflow-hidden cursor-text flex flex-wrap content-start items-center transition-colors hover:bg-gray-800/80" tabindex="0">
+            <!-- Text injected via JS -->
+        </div>
+        <div class="text-center mt-3 text-sm text-gray-500 h-6 font-medium" id="instructionText">Нажмите ПРОБЕЛ, чтобы начать</div>
+    </div>
+
+    <!-- Hands Visualization -->
+    <div class="w-full max-w-6xl flex justify-center gap-24 mt-4 select-none pointer-events-none">
+        
+        <!-- Left Hand -->
+        <div class="relative">
+            <div class="flex items-end gap-3">
+                <!-- Pinky -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-l-pinky" class="finger w-8 h-20 rounded-full border-finger-pinky shadow-[0_0_10px_rgba(248,113,113,0.3)]"></div>
+                </div>
+                <!-- Ring -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-l-ring" class="finger w-8 h-24 rounded-full border-finger-ring shadow-[0_0_10px_rgba(251,191,36,0.3)]"></div>
+                </div>
+                <!-- Middle -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-l-middle" class="finger w-8 h-28 rounded-full border-finger-middle shadow-[0_0_10px_rgba(52,211,153,0.3)]"></div>
+                </div>
+                <!-- Index -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-l-index" class="finger w-8 h-24 rounded-full border-finger-index shadow-[0_0_10px_rgba(96,165,250,0.3)]"></div>
+                </div>
+                <!-- Thumb -->
+                <div class="flex flex-col items-center gap-2 pl-4">
+                    <div id="finger-l-thumb" class="finger w-8 h-16 rounded-full border-finger-thumb rotate-[-20deg] translate-y-4 shadow-[0_0_10px_rgba(167,139,250,0.3)]"></div>
+                </div>
+            </div>
+            <div class="text-center mt-4 text-xs text-gray-600 font-bold tracking-widest uppercase text-blue-400">Левая</div>
+        </div>
+
+        <!-- Right Hand -->
+        <div class="relative">
+            <div class="flex items-end gap-3">
+                 <!-- Thumb -->
+                 <div class="flex flex-col items-center gap-2 pr-4">
+                    <div id="finger-r-thumb" class="finger w-8 h-16 rounded-full border-finger-thumb rotate-[20deg] translate-y-4 shadow-[0_0_10px_rgba(167,139,250,0.3)]"></div>
+                </div>
+                <!-- Index -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-r-index" class="finger w-8 h-24 rounded-full border-finger-index shadow-[0_0_10px_rgba(96,165,250,0.3)]"></div>
+                </div>
+                <!-- Middle -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-r-middle" class="finger w-8 h-28 rounded-full border-finger-middle shadow-[0_0_10px_rgba(52,211,153,0.3)]"></div>
+                </div>
+                <!-- Ring -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-r-ring" class="finger w-8 h-24 rounded-full border-finger-ring shadow-[0_0_10px_rgba(251,191,36,0.3)]"></div>
+                </div>
+                <!-- Pinky -->
+                <div class="flex flex-col items-center gap-2">
+                    <div id="finger-r-pinky" class="finger w-8 h-20 rounded-full border-finger-pinky shadow-[0_0_10px_rgba(248,113,113,0.3)]"></div>
+                </div>
+            </div>
+            <div class="text-center mt-4 text-xs text-gray-600 font-bold tracking-widest uppercase text-green-400">Правая</div>
+        </div>
+
+    </div>
+
+    <!-- Feedback Toast -->
+    <div id="toast" class="fixed bottom-10 bg-gray-800 text-white px-8 py-4 rounded-2xl shadow-2xl border border-gray-700 transform translate-y-32 opacity-0 transition duration-500 flex items-center gap-3">
+        <i class="fas fa-check-circle text-green-400 text-xl"></i>
+        <div>
+            <div class="font-bold">Урок завершен!</div>
+            <div class="text-xs text-gray-400">Готовим следующий...</div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Data ---
+        // h: 'l' (Left), 'r' (Right), 'lr' (Both/Thumb)
+        // f: 'pinky', 'ring', 'middle', 'index', 'thumb'
+        
+        const KEYBOARD_MAP = [
+            // Row 1 (Numbers)
+            { keys: ['ё', '`', '1', '1'], h: 'l', f: 'pinky' },
+            { keys: ['2', '2'], h: 'l', f: 'ring' },
+            { keys: ['3', '3'], h: 'l', f: 'middle' },
+            { keys: ['4', '4', '5', '5'], h: 'l', f: 'index' },
+            { keys: ['6', '6', '7', '7'], h: 'r', f: 'index' }, 
+            { keys: ['8', '8'], h: 'r', f: 'middle' },
+            { keys: ['9', '9'], h: 'r', f: 'ring' },
+            { keys: ['0', '0', '-', '-', '=', '=', 'backspace'], h: 'r', f: 'pinky' },
+            
+            // Row 2 (Top Letters)
+            { keys: ['tab', 'й', 'q'], h: 'l', f: 'pinky' },
+            { keys: ['ц', 'w'], h: 'l', f: 'ring' },
+            { keys: ['у', 'e'], h: 'l', f: 'middle' },
+            { keys: ['к', 'r', 'е', 't'], h: 'l', f: 'index' },
+            { keys: ['н', 'y', 'г', 'u'], h: 'r', f: 'index' },
+            { keys: ['ш', 'i'], h: 'r', f: 'middle' },
+            { keys: ['щ', 'o'], h: 'r', f: 'ring' },
+            { keys: ['з', 'p', 'х', '[', 'ъ', ']', '\\', '\\'], h: 'r', f: 'pinky' },
+
+            // Row 3 (Home Row)
+            { keys: ['capslock', 'ф', 'a'], h: 'l', f: 'pinky' },
+            { keys: ['ы', 's'], h: 'l', f: 'ring' },
+            { keys: ['в', 'd'], h: 'l', f: 'middle' },
+            { keys: ['а', 'f', 'п', 'g'], h: 'l', f: 'index' },
+            { keys: ['р', 'h', 'о', 'j'], h: 'r', f: 'index' },
+            { keys: ['л', 'k'], h: 'r', f: 'middle' },
+            { keys: ['д', 'l'], h: 'r', f: 'ring' },
+            { keys: ['ж', ';', 'э', '\'', 'enter'], h: 'r', f: 'pinky' },
+
+            // Row 4 (Bottom)
+            { keys: ['shift', 'я', 'z'], h: 'l', f: 'pinky' },
+            { keys: ['ч', 'x'], h: 'l', f: 'ring' },
+            { keys: ['с', 'c'], h: 'l', f: 'middle' },
+            { keys: ['м', 'v', 'и', 'b'], h: 'l', f: 'index' },
+            { keys: ['т', 'n', 'ь', 'm'], h: 'r', f: 'index' },
+            { keys: ['б', ','], h: 'r', f: 'middle' },
+            { keys: ['ю', '.'], h: 'r', f: 'ring' },
+            { keys: ['.', '/', 'shift'], h: 'r', f: 'pinky' },
+
+            // Space
+            { keys: [' '], h: 'lr', f: 'thumb' } 
+        ];
+
+        const LESSONS = {
+            ru: {
+                base: { 
+                    title: "1. Базовая позиция (Удлиненная)", 
+                    text: [
+                        "фыва олдж фыва олдж фыва олдж ждло авыф ждло авыф", 
+                        "алла дала вал вода жаль лад два фаза ваза лава зал", 
+                        "овал жало вода дада лала фафа вава жажа алло алло", 
+                        "да лад вал фа фажа алло вода ждал жал дал вал"
+                    ] 
+                },
+                index: { 
+                    title: "2. Указательные пальцы", 
+                    text: [
+                        "папа ира мир пир рот тор арап апорт пара иврит тир", 
+                        "мир пир тир риф миф пат пот топ тип пик кип", 
+                        "пора пара папа мама ира рама рана нора нота рота",
+                        "капитан пират таран титан парта карта марка арка"
+                    ] 
+                },
+                middle: { 
+                    title: "3. Средние пальцы", 
+                    text: [
+                        "кол гол вол лов кум лук кит тик когда глава влага", 
+                        "долго около молоко колос голос волос сокол локон", 
+                        "кило лик лил бил мил вил сил пил нил гид",
+                        "лук жук бук дуб куб клуб глубь сруб друг круг"
+                    ] 
+                },
+                ring: { 
+                    title: "4. Безымянные пальцы", 
+                    text: [
+                        "цыц щука роща чаща сыр рысь дым моды слышу дышу", 
+                        "ищу пищу чащу гущу пущу тащу лещу плещу свищу", 
+                        "цапля цирк цепь цель центр цвет свет совет ответ",
+                        "дым дом дам дум дыра дыбы дыня дядя няня мята"
+                    ] 
+                },
+                pinky: { 
+                    title: "5. Мизинцы", 
+                    text: [
+                        "зхъ йфя эжю злой эхо цех фазан зай эффект этаж", 
+                        "эра эльф эму эль мэр сэр пэр мэтр фетр ветр", 
+                        "чей чай лай май рай край дай бай пай кай",
+                        "яма юла юг яд як яр уж муж луж лыж пыж"
+                    ] 
+                },
+                sentences: { 
+                    title: "6. Текст (Сложный)", 
+                    text: [
+                        "съешь же ещё этих мягких французских булок да выпей чаю", 
+                        "широкая электрификация южных губерний даст мощный толчок", 
+                        "однажды в студеную зимнюю пору я из лесу вышел был сильный мороз",
+                        "в чащах юга жил бы цитрус да но фальшивый экземпляр"
+                    ] 
+                }
+            },
+            en: {
+                base: { 
+                    title: "1. Base Row (Extended)", 
+                    text: [
+                        "asdf jkl; asdf jkl; asdf jkl; jkl; asdf jkl; asdf", 
+                        "fads lads fall salad ask dad flask jaffa all fall", 
+                        "dad adds salad sad lass flask half hall falls all", 
+                        "ask dad add sad lad fad fall all lass glass class"
+                    ] 
+                },
+                index: { 
+                    title: "2. Index Fingers", 
+                    text: [
+                        "rug burn fun gun turn hurt just hunt right night light", 
+                        "try fry dry cry my by guy buy high thigh sigh", 
+                        "turn burn hurt turf surf murk lurk turk jerk perk",
+                        "hunt runt bunt punt grunt blunt stunt front brunt"
+                    ] 
+                },
+                middle: { 
+                    title: "3. Middle Fingers", 
+                    text: [
+                        "ed ik kid did red led like ride fire wire tire hire", 
+                        "deck dock dick duck dack lack lick luck lock leck", 
+                        "side ride tide wide hide bide guide slide glide pride",
+                        "feel keel heel reel peel wheel kneel steel creel"
+                    ] 
+                },
+                ring: { 
+                    title: "4. Ring Fingers", 
+                    text: [
+                        "ws ol low slow saw laws wood cool loss moss toss boss", 
+                        "wow owl howl cowl bowl fowl growl prowl scowl", 
+                        "solo polo lolo soso wowo lsw osw slw lws owl",
+                        "wool wood food mood hood good rood brood stood"
+                    ] 
+                },
+                pinky: { 
+                    title: "5. Pinky Fingers", 
+                    text: [
+                        "qa p; zap yap quiet pay zero play party quiz plaza", 
+                        "quick queen quilt quest quart quote quota query qua", 
+                        "papa papa zaza qiqi popo ;;; zqzq p;p; aqaq ;p;p",
+                        "zone zoom zeal zest zinc zero zulu zap zip zed"
+                    ] 
+                },
+                sentences: { 
+                    title: "6. Sentences (Long)", 
+                    text: [
+                        "the quick brown fox jumps over the lazy dog and runs away", 
+                        "pack my box with five dozen liquor jugs right now please", 
+                        "sphinx of black quartz judge my vow and hear my plea",
+                        "jackdaws love my big sphinx of quartz and gold rings"
+                    ] 
+                }
+            }
+        };
+
+        // --- State ---
+        let state = {
+            lang: 'ru',
+            lessonId: 'base',
+            text: '',
+            charIndex: 0,
+            errors: 0,
+            started: false,
+            startTime: 0,
+            timer: null
+        };
+        
+        let charMap = {}; 
+
+        // --- DOM ---
+        const typingArea = document.getElementById('typingArea');
+        const instruction = document.getElementById('instructionText');
+        const wpmEl = document.getElementById('wpm');
+        const accEl = document.getElementById('accuracy');
+        const lessonSelect = document.getElementById('lessonSelect');
+
+        // --- Init ---
+        function init() {
+            buildCharMap();
+            populateLessons();
+            setLang('ru');
+        }
+
+        function buildCharMap() {
+            charMap = {};
+            KEYBOARD_MAP.forEach(group => {
+                group.keys.forEach(k => {
+                    charMap[k.toLowerCase()] = { h: group.h, f: group.f };
+                });
+            });
+        }
+
+        function setLang(lang) {
+            state.lang = lang;
+            
+            // UI Toggle
+            const btnRu = document.getElementById('langRu');
+            const btnEn = document.getElementById('langEn');
+            if (lang === 'ru') {
+                btnRu.classList.replace('text-gray-400', 'bg-gray-600');
+                btnRu.classList.replace('text-gray-400', 'text-white');
+                btnRu.classList.add('bg-gray-600', 'text-white');
+                btnEn.classList.remove('bg-gray-600', 'text-white');
+                btnEn.classList.add('text-gray-400');
+            } else {
+                btnEn.classList.add('bg-gray-600', 'text-white');
+                btnEn.classList.remove('text-gray-400');
+                btnRu.classList.remove('bg-gray-600', 'text-white');
+                btnRu.classList.add('text-gray-400');
+            }
+
+            populateLessons();
+            startLesson();
+        }
+
+        function populateLessons() {
+            lessonSelect.innerHTML = '';
+            const list = LESSONS[state.lang];
+            for (let k in list) {
+                const opt = document.createElement('option');
+                opt.value = k;
+                opt.textContent = list[k].title;
+                lessonSelect.appendChild(opt);
+            }
+            lessonSelect.value = 'base';
+            state.lessonId = 'base';
+        }
+
+        function startLesson() {
+            // Reset state
+            state.started = false;
+            state.charIndex = 0;
+            state.errors = 0;
+            state.startTime = 0;
+            clearInterval(state.timer);
+            
+            // Get text
+            const pool = LESSONS[state.lang][state.lessonId].text;
+            state.text = pool[Math.floor(Math.random() * pool.length)];
+
+            // Render
+            typingArea.innerHTML = '';
+            state.text.split('').forEach((char, i) => {
+                const span = document.createElement('span');
+                span.textContent = char;
+                const fingerData = getFingerData(char);
+                
+                // Add specific class for space
+                if (char === ' ') {
+                    span.classList.add('space-char');
+                }
+
+                if (fingerData) {
+                    span.classList.add(`text-finger-${fingerData.f}`);
+                } else {
+                    span.classList.add('text-gray-500');
+                }
+                
+                // Cursor init for first char
+                if (i === 0) {
+                    addCursorClass(span, char);
+                }
+                
+                typingArea.appendChild(span);
+            });
+
+            wpmEl.textContent = '0';
+            accEl.textContent = '100%';
+            instruction.textContent = "Нажмите пробел для старта";
+            instruction.className = "text-center mt-3 text-sm text-gray-500 h-6 font-medium";
+            
+            highlightNextFinger();
+        }
+        
+        function addCursorClass(span, char) {
+            span.classList.add('cursor');
+            const data = getFingerData(char);
+            if (data) {
+                if (data.h === 'l') span.classList.add('cursor-l');
+                else if (data.h === 'r') span.classList.add('cursor-r');
+                else if (data.h === 'lr') span.classList.add('cursor-lr');
+            }
+        }
+
+        function getFingerData(char) {
+            return charMap[char.toLowerCase()];
+        }
+
+        function highlightNextFinger() {
+            // Clear current active fingers
+            document.querySelectorAll('.finger.active').forEach(el => el.classList.remove('active'));
+
+            if (state.charIndex >= state.text.length) return;
+
+            const char = state.text[state.charIndex];
+            const data = getFingerData(char);
+
+            if (data) {
+                if (data.h === 'lr') {
+                    // Spacebar - highlight both thumbs or just preferred
+                    document.getElementById('finger-l-thumb').classList.add('active');
+                    document.getElementById('finger-r-thumb').classList.add('active');
+                } else {
+                    const el = document.getElementById(`finger-${data.h}-${data.f}`);
+                    if (el) el.classList.add('active');
+                }
+            }
+        }
+
+        function updateStats() {
+            if (!state.started) return;
+            const elapsedMin = (Date.now() - state.startTime) / 1000 / 60;
+            if (elapsedMin > 0) {
+                const wpm = Math.round((state.charIndex / 5) / elapsedMin);
+                wpmEl.textContent = wpm;
+            }
+            const accuracy = Math.round(((state.charIndex - state.errors) / (state.charIndex || 1)) * 100);
+            accEl.textContent = Math.max(0, accuracy) + '%';
+        }
+
+        // --- Interaction ---
+        document.addEventListener('keydown', (e) => {
+            // Safety checks
+            if (document.activeElement !== typingArea && document.activeElement !== lessonSelect && !e.ctrlKey && e.key.length === 1) {
+                typingArea.focus();
+            }
+            if (document.activeElement !== typingArea) return;
+            if (e.key === ' ' && document.activeElement === typingArea) e.preventDefault();
+            
+            // Ignore modifiers for typing logic
+            if (['Shift','Control','Alt','CapsLock','Tab'].includes(e.key)) return;
+            if (e.key === 'Backspace') return; 
+
+            // Start timer
+            if (!state.started) {
+                state.started = true;
+                state.startTime = Date.now();
+                state.timer = setInterval(updateStats, 500);
+                instruction.textContent = "Печатаем...";
+            }
+
+            if (state.charIndex >= state.text.length) return;
+
+            const expected = state.text[state.charIndex];
+            const input = e.key;
+
+            const spans = typingArea.querySelectorAll('span');
+            const currentSpan = spans[state.charIndex];
+
+            // Layout Check
+            const isCyrillicInput = /[а-яё]/i.test(input);
+            const isCyrillicExpected = /[а-яё]/i.test(expected);
+            if (input.length === 1 && /[a-zа-я]/i.test(input) && isCyrillicInput !== isCyrillicExpected) {
+                instruction.textContent = "⚠️ Смените раскладку!";
+                instruction.classList.add('text-red-400', 'animate-pulse');
+                return;
+            } else {
+                 instruction.classList.remove('text-red-400', 'animate-pulse');
+            }
+
+            if (input === expected) {
+                // Correct
+                currentSpan.className = 'correct'; 
+                // Restore space styling if it was a space
+                if (expected === ' ') currentSpan.classList.add('space-char');
+
+                state.charIndex++;
+                
+                if (state.charIndex < state.text.length) {
+                    const nextSpan = spans[state.charIndex];
+                    const nextChar = state.text[state.charIndex];
+                    addCursorClass(nextSpan, nextChar);
+                    
+                    highlightNextFinger();
+                } else {
+                    finishLesson();
+                }
+            } else {
+                // Error
+                state.errors++;
+                updateStats();
+                if (document.getElementById('strictMode').checked) {
+                    // Flash error on finger
+                    const data = getFingerData(expected);
+                    if(data) {
+                        const fingerEl = document.getElementById(`finger-${data.h}-${data.f}`);
+                         if(fingerEl) {
+                             fingerEl.style.backgroundColor = 'rgba(239, 68, 68, 0.8)';
+                             setTimeout(() => fingerEl.style.backgroundColor = '', 200);
+                         }
+                    }
+                    currentSpan.classList.add('wrong');
+                } else {
+                    // Non-strict
+                    currentSpan.classList.remove('cursor', 'cursor-l', 'cursor-r', 'cursor-lr'); // Remove any cursor class
+                    currentSpan.classList.add('wrong');
+                    state.charIndex++;
+                    if(state.charIndex < state.text.length) {
+                         const nextSpan = spans[state.charIndex];
+                         const nextChar = state.text[state.charIndex];
+                         addCursorClass(nextSpan, nextChar);
+                        highlightNextFinger();
+                    }
+                }
+            }
+        });
+
+        function finishLesson() {
+            clearInterval(state.timer);
+            state.started = false;
+            document.querySelectorAll('.finger.active').forEach(el => el.classList.remove('active'));
+            
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-32', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-32', 'opacity-0');
+                startLesson();
+            }, 2000);
+        }
+
+        // Listeners
+        document.getElementById('langRu').onclick = () => setLang('ru');
+        document.getElementById('langEn').onclick = () => setLang('en');
+        document.getElementById('restartBtn').onclick = () => startLesson();
+        lessonSelect.onchange = (e) => {
+            state.lessonId = e.target.value;
+            startLesson();
+            typingArea.focus();
+        };
+
+        // Boot
+        init();
+
+    </script>
+</body>
+</html>

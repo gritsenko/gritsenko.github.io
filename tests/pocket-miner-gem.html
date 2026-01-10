@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pocket Miner RPG</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --ui-bg: #2d2d2d;
+            --accent: #f39c12;
+            --text: #ecf0f1;
+            --dirt: #5d4037;
+            --stone: #424242;
+            --sky: #87CEEB;
+            --grass: #4CAF50;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none; /* Prevent text selection on rapid tapping */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+            padding-bottom: 80px; /* Space for footer */
+        }
+
+        /* --- HEADER (HUD) --- */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            z-index: 100;
+            border-bottom: 2px solid #444;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .stat-box {
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .gold-text { color: #f1c40f; }
+        .depth-text { color: #3498db; }
+
+        /* --- THE SURFACE (BASE) --- */
+        #surface {
+            height: 250px;
+            background: linear-gradient(to bottom, var(--sky), var(--sky) 80%, var(--grass) 80%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            margin-top: 50px; /* Offset for HUD */
+        }
+
+        .base-building {
+            background: #fff;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 4px solid #333;
+            text-align: center;
+            box-shadow: 0 10px 0 #ccc;
+            margin-bottom: 40px;
+        }
+
+        #sell-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 4px 0 #1e8449;
+            transition: transform 0.1s;
+        }
+
+        #sell-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        #sell-btn:disabled {
+            background: #7f8c8d;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* --- THE MINE (GRID) --- */
+        #mine-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 5 columns */
+            gap: 2px;
+            background: #000;
+            padding: 2px;
+        }
+
+        .block {
+            aspect-ratio: 1; /* Square blocks */
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            border-radius: 4px;
+            transition: filter 0.1s;
+            overflow: hidden;
+        }
+
+        /* Block Variants */
+        .block.dirt { background: var(--dirt); border: 2px solid #4e342e; }
+        .block.stone { background: var(--stone); border: 2px solid #212121; }
+        .block.coal { background: #2c3e50; border: 2px solid #1a252f; }
+        .block.iron { background: #95a5a6; border: 2px solid #7f8c8d; }
+        .block.gold { background: #f1c40f; border: 2px solid #d4ac0d; }
+        .block.diamond { background: #3498db; border: 2px solid #2980b9; }
+        .block.bedrock { background: #000; border: 1px solid #333; cursor: not-allowed; }
+        .block.empty { background: transparent; pointer-events: none; border: none;}
+
+        .hp-bar {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            right: 2px;
+            height: 4px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 2px;
+            display: none; /* Hidden until damaged */
+        }
+        .hp-fill {
+            height: 100%;
+            background: #e74c3c;
+            width: 100%;
+            transition: width 0.1s;
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shaking {
+            animation: shake 0.2s;
+            filter: brightness(1.3);
+        }
+
+        .pop-text {
+            position: absolute;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards;
+            z-index: 10;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-30px); opacity: 0; }
+        }
+
+        /* --- FOOTER (SHOP) --- */
+        #shop {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            background: var(--ui-bg);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 2px solid #444;
+            padding: 5px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        .upgrade-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 48%;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #2c3e50;
+            transition: all 0.1s;
+        }
+
+        .upgrade-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .upgrade-btn h3 { margin: 0; font-size: 14px; }
+        .upgrade-btn small { color: #bdc3c7; font-size: 11px; margin-top: 2px;}
+
+        /* --- AUTONOMOUS DRONE --- */
+        .drone {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, red, maroon);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 5;
+            transition: top 0.5s, left 0.5s;
+            box-shadow: 0 0 5px red;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="stat-box">💰 <span id="gold-display">0</span></div>
+        <div class="stat-box">🎒 <span id="bag-display">0</span> Items</div>
+        <div class="stat-box">⬇️ <span id="depth-display">0m</span></div>
+    </div>
+
+    <!-- SURFACE -->
+    <div id="surface">
+        <div class="base-building">
+            <h2>MINING HQ</h2>
+            <p>Scroll up here to sell!</p>
+            <button id="sell-btn" onclick="sellResources()">SELL LOOT (+0g)</button>
+        </div>
+        <div style="position:absolute; bottom: 10px; font-size: 12px; color: #333; font-weight: bold;">
+            ⬇️ START DIGGING DOWN ⬇️
+        </div>
+    </div>
+
+    <!-- MINE -->
+    <div id="mine-container">
+        <!-- Rows generated by JS -->
+    </div>
+
+    <!-- SHOP -->
+    <div id="shop">
+        <button class="upgrade-btn" onclick="buyUpgrade('pickaxe')">
+            <h3>⛏️ Upgrade Pick</h3>
+            <small id="cost-pickaxe">Cost: 50g</small>
+        </button>
+        <button class="upgrade-btn" onclick="buyUpgrade('auto')">
+            <h3>🤖 Auto-Miner</h3>
+            <small id="cost-auto">Cost: 100g</small>
+        </button>
+    </div>
+
+    <script>
+        // --- GAME CONFIG & STATE ---
+        const config = {
+            columns: 5,
+            initialRows: 20,
+            chunkSize: 10,
+        };
+
+        const state = {
+            gold: 0,
+            inventory: [], // Array of objects {name, value}
+            depth: 0,
+            pickaxePower: 1,
+            pickaxeLevel: 1,
+            autoMiners: 0,
+            autoMinerLevel: 0,
+            generatedRows: 0,
+            costs: {
+                pickaxe: 50,
+                auto: 150
+            }
+        };
+
+        const blockTypes = [
+            { id: 'dirt', name: 'Dirt', hp: 2, value: 0, chance: 60, icon: '' },
+            { id: 'stone', name: 'Stone', hp: 5, value: 0, chance: 25, icon: '' },
+            { id: 'coal', name: 'Coal', hp: 10, value: 5, chance: 8, icon: '⚫' },
+            { id: 'iron', name: 'Iron', hp: 20, value: 15, chance: 4, icon: '⚪' },
+            { id: 'gold', name: 'Gold', hp: 40, value: 40, chance: 2, icon: '🟡' },
+            { id: 'diamond', name: 'Diamond', hp: 80, value: 150, chance: 1, icon: '💎' }
+        ];
+
+        // --- DOM ELEMENTS ---
+        const mineContainer = document.getElementById('mine-container');
+        const goldDisplay = document.getElementById('gold-display');
+        const bagDisplay = document.getElementById('bag-display');
+        const depthDisplay = document.getElementById('depth-display');
+        const sellBtn = document.getElementById('sell-btn');
+        const costPickaxeDisplay = document.getElementById('cost-pickaxe');
+        const costAutoDisplay = document.getElementById('cost-auto');
+
+        // --- INIT ---
+        function init() {
+            generateRows(config.initialRows);
+            updateUI();
+            
+            // Infinite scroll listener
+            window.addEventListener('scroll', () => {
+                const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+                const scrolled = window.scrollY;
+
+                // Update Depth UI based on scroll
+                state.depth = Math.floor(scrolled / 50); // Rough estimate
+                depthDisplay.innerText = `${state.depth}m`;
+
+                // Generate more if near bottom
+                if (Math.ceil(scrolled) >= scrollable - 200) {
+                    generateRows(config.chunkSize);
+                }
+            });
+
+            // Auto Miner Loop
+            setInterval(runAutoMiners, 1000);
+        }
+
+        // --- GENERATION LOGIC ---
+        function generateRows(count) {
+            for (let i = 0; i < count; i++) {
+                state.generatedRows++;
+                const depthFactor = Math.floor(state.generatedRows / 20); // Harder every 20 rows
+                
+                for (let c = 0; c < config.columns; c++) {
+                    const blockData = chooseBlockType(state.generatedRows);
+                    const block = document.createElement('div');
+                    
+                    block.classList.add('block', blockData.id);
+                    block.dataset.maxHp = blockData.hp + (depthFactor * 2); // HP scaling
+                    block.dataset.hp = block.dataset.maxHp;
+                    block.dataset.value = blockData.value;
+                    block.dataset.name = blockData.name;
+                    block.dataset.icon = blockData.icon;
+                    block.dataset.id = `r${state.generatedRows}-c${c}`; // Unique ID for auto-miner
+                    
+                    // HP Bar
+                    const hpBar = document.createElement('div');
+                    hpBar.className = 'hp-bar';
+                    const hpFill = document.createElement('div');
+                    hpFill.className = 'hp-fill';
+                    hpBar.appendChild(hpFill);
+                    block.appendChild(hpBar);
+
+                    // Icon (if ore)
+                    if(blockData.icon) {
+                        const iconSpan = document.createElement('span');
+                        iconSpan.innerText = blockData.icon;
+                        block.appendChild(iconSpan);
+                    }
+
+                    // Click Event
+                    block.addEventListener('mousedown', (e) => hitBlock(block, state.pickaxePower, e));
+                    block.addEventListener('touchstart', (e) => {
+                        e.preventDefault(); // Stop zoom
+                        hitBlock(block, state.pickaxePower, e);
+                    });
+
+                    mineContainer.appendChild(block);
+                }
+            }
+        }
+
+        function chooseBlockType(depth) {
+            // Simple probability logic
+            const rand = Math.random() * 100;
+            let sum = 0;
+            
+            // Adjust chances based on depth (more ores deeper)
+            let currentTypes = [...blockTypes];
+            if (depth > 50) currentTypes.find(t=>t.id==='gold').chance += 2;
+            if (depth > 100) currentTypes.find(t=>t.id==='diamond').chance += 1;
+
+            for (const type of currentTypes) {
+                sum += type.chance;
+                if (rand <= sum) return type;
+            }
+            return blockTypes[0]; // Fallback to Dirt
+        }
+
+        // --- INTERACTION ---
+        function hitBlock(element, damage, event) {
+            if (element.classList.contains('empty')) return;
+
+            let hp = parseFloat(element.dataset.hp);
+            hp -= damage;
+            element.dataset.hp = hp;
+
+            // Visual Shake
+            element.classList.remove('shaking');
+            void element.offsetWidth; // Trigger reflow
+            element.classList.add('shaking');
+
+            // HP Bar Update
+            const maxHp = parseFloat(element.dataset.maxHp);
+            const hpBar = element.querySelector('.hp-bar');
+            const hpFill = element.querySelector('.hp-fill');
+            
+            hpBar.style.display = 'block';
+            const pct = Math.max(0, (hp / maxHp) * 100);
+            hpFill.style.width = `${pct}%`;
+            hpFill.style.backgroundColor = pct < 30 ? '#e74c3c' : '#f1c40f';
+
+            // Check Destroy
+            if (hp <= 0) {
+                destroyBlock(element);
+            }
+        }
+
+        function destroyBlock(element) {
+            const val = parseInt(element.dataset.value);
+            const name = element.dataset.name;
+            const icon = element.dataset.icon;
+
+            // Add to Inventory
+            if (val > 0) {
+                state.inventory.push({ name, value: val });
+                showFloatText(element, `+1 ${name}`);
+            }
+
+            // Visual Clear
+            element.className = 'block empty';
+            element.innerHTML = ''; // Remove icon/bar
+            element.style.backgroundColor = '#111'; // Void color
+            
+            updateUI();
+        }
+
+        function showFloatText(element, text) {
+            const float = document.createElement('div');
+            float.className = 'pop-text';
+            float.innerText = text;
+            
+            // Position relative to block
+            const rect = element.getBoundingClientRect();
+            float.style.left = rect.left + 10 + 'px';
+            float.style.top = rect.top + window.scrollY + 'px'; // Absolute position fix
+            
+            document.body.appendChild(float);
+            setTimeout(() => float.remove(), 800);
+        }
+
+        // --- ECONOMY ---
+        function sellResources() {
+            if (state.inventory.length === 0) return;
+
+            let totalVal = 0;
+            state.inventory.forEach(item => totalVal += item.value);
+            
+            state.gold += totalVal;
+            const count = state.inventory.length;
+            state.inventory = [];
+
+            // Feedback
+            sellBtn.innerText = `SOLD! (+${totalVal}g)`;
+            setTimeout(updateUI, 1000); // Reset text in updateUI
+            updateUI();
+        }
+
+        function buyUpgrade(type) {
+            if (type === 'pickaxe') {
+                if (state.gold >= state.costs.pickaxe) {
+                    state.gold -= state.costs.pickaxe;
+                    state.pickaxeLevel++;
+                    state.pickaxePower = Math.floor(state.pickaxePower * 1.5) + 1;
+                    state.costs.pickaxe = Math.floor(state.costs.pickaxe * 1.8);
+                }
+            } else if (type === 'auto') {
+                if (state.gold >= state.costs.auto) {
+                    state.gold -= state.costs.auto;
+                    state.autoMiners++;
+                    state.costs.auto = Math.floor(state.costs.auto * 2);
+                }
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            goldDisplay.innerText = state.gold;
+            bagDisplay.innerText = state.inventory.length;
+
+            // Sell Button Calculation
+            let currentLootValue = 0;
+            state.inventory.forEach(i => currentLootValue += i.value);
+            if (currentLootValue > 0) {
+                sellBtn.innerText = `SELL LOOT (+${currentLootValue}g)`;
+                sellBtn.disabled = false;
+            } else {
+                sellBtn.innerText = "NO LOOT";
+                sellBtn.disabled = true;
+            }
+
+            // Shop UI
+            document.getElementById('cost-pickaxe').innerText = `Lvl ${state.pickaxeLevel} | Cost: ${state.costs.pickaxe}g`;
+            document.getElementById('cost-auto').innerText = `Lvl ${state.autoMiners} | Cost: ${state.costs.auto}g`;
+        }
+
+        // --- AUTO MINER BOT ---
+        function runAutoMiners() {
+            if (state.autoMiners === 0) return;
+
+            const visibleBlocks = [];
+            const allBlocks = document.querySelectorAll('.block:not(.empty)');
+            
+            // Find blocks currently in viewport
+            allBlocks.forEach(b => {
+                const rect = b.getBoundingClientRect();
+                if (rect.top >= 0 && rect.bottom <= window.innerHeight) {
+                    visibleBlocks.push(b);
+                }
+            });
+
+            if (visibleBlocks.length === 0) return;
+
+            // Auto miners hit random visible blocks
+            for(let i=0; i < state.autoMiners; i++) {
+                setTimeout(() => {
+                    const randomBlock = visibleBlocks[Math.floor(Math.random() * visibleBlocks.length)];
+                    if(randomBlock && !randomBlock.classList.contains('empty')) {
+                        // Create visual drone shot (simplified)
+                        hitBlock(randomBlock, state.pickaxePower, null);
+                        
+                        // Optional: Add a little laser effect here if desired
+                    }
+                }, i * 200); // Stagger shots
+            }
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>

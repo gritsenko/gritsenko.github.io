@@ -1,0 +1,686 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pocket Miner</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --surface-color: #87CEEB;
+            --ui-bg: #2d2d2d;
+            --text-color: #f0f0f0;
+            --accent-color: #ffcc00;
+            --danger-color: #ff4444;
+            --block-size: 18vw; /* Responsive block size */
+            --max-block-size: 70px;
+            
+            /* Ore Colors */
+            --color-dirt: #8b5a2b;
+            --color-stone: #777777;
+            --color-coal: #333333;
+            --color-iron: #cd7f32;
+            --color-gold: #ffd700;
+            --color-diamond: #00ffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none; /* Prevent text selection on tapping */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; /* Main scroll handles the game area */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Sticky Header --- */
+        header {
+            background-color: var(--ui-bg);
+            border-bottom: 2px solid #444;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--accent-color);
+        }
+
+        /* --- Main Game Area (Scrollable) --- */
+        #game-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            position: relative;
+            scroll-behavior: smooth;
+            padding-bottom: 80px; /* Space for footer */
+        }
+
+        /* Surface Zone */
+        #surface {
+            height: 150px;
+            background: linear-gradient(to bottom, var(--surface-color), #e0f7fa);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 5px solid #4caf50;
+            color: #333;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        #surface h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #2c3e50;
+        }
+
+        .sell-btn {
+            background: #ff9800;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: white;
+            box-shadow: 0 4px 0 #e65100;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .sell-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #e65100;
+        }
+
+        /* Inventory Bar */
+        #inventory-bar {
+            background: rgba(0,0,0,0.8);
+            width: 90%;
+            padding: 5px;
+            border-radius: 10px;
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-around;
+            font-size: 0.8rem;
+        }
+        .inv-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* The Mine Grid */
+        #mine-grid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 10px;
+            width: 100%;
+            /* Background pattern for cave wall */
+            background-image: radial-gradient(#222 15%, transparent 16%), radial-gradient(#222 15%, transparent 16%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 2px;
+        }
+
+        .block {
+            width: var(--block-size);
+            height: var(--block-size);
+            max-width: var(--max-block-size);
+            max-height: var(--max-block-size);
+            border: 1px solid rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            position: relative;
+            transition: filter 0.1s;
+        }
+
+        .block:active {
+            filter: brightness(1.2);
+        }
+
+        /* Block Types */
+        .type-dirt { background-color: var(--color-dirt); }
+        .type-stone { background-color: var(--color-stone); }
+        .type-coal { background-color: var(--color-coal); border: 1px solid #555; }
+        .type-iron { background-color: var(--color-iron); }
+        .type-gold { background-color: var(--color-gold); box-shadow: inset 0 0 5px #b8860b; }
+        .type-diamond { background-color: var(--color-diamond); box-shadow: inset 0 0 5px #008b8b; }
+
+        .block.broken {
+            background: transparent;
+            border: none;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        /* Shake Animation */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            100% { transform: translate(0, 0) rotate(0); }
+        }
+        .shake {
+            animation: shake 0.3s;
+        }
+
+        /* Floating Text */
+        .floater {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #000;
+            z-index: 10;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-30px) scale(1.2); }
+        }
+
+        /* --- Footer (Shop) --- */
+        footer {
+            height: 80px;
+            background-color: var(--ui-bg);
+            border-top: 2px solid #444;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+            z-index: 100;
+        }
+
+        .shop-btn {
+            background: #444;
+            border: 2px solid #666;
+            color: white;
+            padding: 8px;
+            border-radius: 8px;
+            width: 45%;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+
+        .shop-btn:disabled {
+            opacity: 0.5;
+            filter: grayscale(1);
+        }
+
+        .shop-btn .cost {
+            color: var(--accent-color);
+            margin-top: 4px;
+            font-weight: bold;
+        }
+        
+        .shop-btn .level {
+            font-size: 0.7rem;
+            color: #aaa;
+            margin-bottom: 2px;
+        }
+
+        /* Toast Notification */
+        #toast {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 200;
+        }
+        #toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Stats Header -->
+    <header>
+        <div class="stat-box">
+            <span>Gold</span>
+            <span class="stat-value" id="gold-display">0</span>
+        </div>
+        <div class="stat-box">
+            <span>Depth</span>
+            <span class="stat-value" id="depth-display">0m</span>
+        </div>
+    </header>
+
+    <!-- Scrollable Game Area -->
+    <main id="game-scroll-area">
+        
+        <!-- Surface / Base Camp -->
+        <section id="surface">
+            <h1>🏕️ Base Camp</h1>
+            <button class="sell-btn" id="sell-btn">Sell All Resources</button>
+            
+            <!-- Inventory Display -->
+            <div id="inventory-bar">
+                <div class="inv-item" title="Coal">⚫ <span id="inv-coal">0</span></div>
+                <div class="inv-item" title="Iron">🔶 <span id="inv-iron">0</span></div>
+                <div class="inv-item" title="Gold">🟡 <span id="inv-gold">0</span></div>
+                <div class="inv-item" title="Diamond">💎 <span id="inv-diamond">0</span></div>
+            </div>
+        </section>
+
+        <!-- The Mine -->
+        <div id="mine-grid">
+            <!-- Rows generated by JS -->
+        </div>
+        
+        <!-- Space at bottom to ensure scroll works -->
+        <div style="height: 300px;"></div>
+    </main>
+
+    <!-- Shop Footer -->
+    <footer>
+        <button class="shop-btn" id="btn-upgrade-pickaxe">
+            <span>⛏️ Pickaxe Power</span>
+            <span class="level">Lvl <span id="lvl-pickaxe">1</span></span>
+            <span class="cost" id="cost-pickaxe">10 G</span>
+        </button>
+        <button class="shop-btn" id="btn-upgrade-auto">
+            <span>🤖 Auto-Miner</span>
+            <span class="level">Lvl <span id="lvl-auto">0</span></span>
+            <span class="cost" id="cost-auto">50 G</span>
+        </button>
+    </footer>
+
+    <!-- Feedback Toast -->
+    <div id="toast">Sold items for 0 Gold!</div>
+
+    <script>
+        /**
+         * POCKET MINER GAME LOGIC
+         */
+
+        // --- Configuration ---
+        const CONFIG = {
+            cols: 5,
+            initialRows: 15,
+            chunkSize: 5, // Rows added at a time
+            basePrice: { pickaxe: 10, auto: 50 },
+            priceMultiplier: 1.5,
+        };
+
+        const BLOCKS = {
+            dirt: { hp: 1, color: 'type-dirt', emoji: '', chance: 0.6, value: 0, depthStart: 0 },
+            stone: { hp: 3, color: 'type-stone', emoji: '', chance: 0.3, value: 0, depthStart: 0 },
+            coal: { hp: 5, color: 'type-coal', emoji: '⚫', chance: 0.08, value: 5, depthStart: 2 },
+            iron: { hp: 8, color: 'type-iron', emoji: '🔶', chance: 0.05, value: 15, depthStart: 10 },
+            gold: { hp: 12, color: 'type-gold', emoji: '🟡', chance: 0.03, value: 50, depthStart: 25 },
+            diamond: { hp: 20, color: 'type-diamond', emoji: '💎', chance: 0.01, value: 150, depthStart: 50 }
+        };
+
+        // --- State ---
+        const state = {
+            gold: 0,
+            depth: 0, // Deepest row generated
+            rows: [],
+            inventory: { coal: 0, iron: 0, gold: 0, diamond: 0 },
+            upgrades: {
+                pickaxe: { level: 1, power: 1, cost: 10 },
+                auto: { level: 0, power: 0, cost: 50 } // Power here is DPS
+            }
+        };
+
+        // --- DOM Elements ---
+        const els = {
+            grid: document.getElementById('mine-grid'),
+            scrollArea: document.getElementById('game-scroll-area'),
+            gold: document.getElementById('gold-display'),
+            depth: document.getElementById('depth-display'),
+            sellBtn: document.getElementById('sell-btn'),
+            toast: document.getElementById('toast'),
+            // Shop Buttons
+            btnPickaxe: document.getElementById('btn-upgrade-pickaxe'),
+            btnAuto: document.getElementById('btn-upgrade-auto'),
+            lvlPickaxe: document.getElementById('lvl-pickaxe'),
+            costPickaxe: document.getElementById('cost-pickaxe'),
+            lvlAuto: document.getElementById('lvl-auto'),
+            costAuto: document.getElementById('cost-auto'),
+            // Inventory
+            invCoal: document.getElementById('inv-coal'),
+            invIron: document.getElementById('inv-iron'),
+            invGold: document.getElementById('inv-gold'),
+            invDiamond: document.getElementById('inv-diamond'),
+        };
+
+        // --- Initialization ---
+        function init() {
+            renderShop();
+            generateRows(CONFIG.initialRows);
+            updateStats();
+            
+            // Infinite Scroll Listener
+            els.scrollArea.addEventListener('scroll', handleScroll);
+
+            // Shop Listeners
+            els.btnPickaxe.addEventListener('click', () => buyUpgrade('pickaxe'));
+            els.btnAuto.addEventListener('click', () => buyUpgrade('auto'));
+
+            // Sell Listener
+            els.sellBtn.addEventListener('click', sellAll);
+
+            // Start Auto-Miner Loop
+            setInterval(autoMineLoop, 1000);
+        }
+
+        // --- Grid Generation ---
+        function generateRows(amount) {
+            const fragment = document.createDocumentFragment();
+
+            for (let i = 0; i < amount; i++) {
+                state.depth++;
+                const rowEl = document.createElement('div');
+                rowEl.className = 'row';
+                rowEl.dataset.depth = state.depth;
+
+                const rowData = [];
+
+                for (let j = 0; j < CONFIG.cols; j++) {
+                    const block = createBlock(state.depth);
+                    rowData.push(block);
+                    rowEl.appendChild(block.el);
+                }
+
+                state.rows.push(rowData);
+                fragment.appendChild(rowEl);
+            }
+
+            els.grid.appendChild(fragment);
+            els.depth.textContent = `${state.depth}m`;
+        }
+
+        function createBlock(depth) {
+            // Determine Block Type based on probability and depth
+            let type = 'dirt';
+            const rand = Math.random();
+            
+            // Filter valid blocks for this depth
+            const validBlocks = Object.values(BLOCKS).filter(b => depth >= b.depthStart);
+            // Calculate total chance
+            const totalChance = validBlocks.reduce((sum, b) => sum + b.chance, 0);
+            
+            let accumulatedChance = 0;
+            // Normalize random to totalChance
+            const normalizedRand = rand * totalChance;
+
+            for (const b of validBlocks) {
+                accumulatedChance += b.chance;
+                if (normalizedRand <= accumulatedChance) {
+                    type = Object.keys(BLOCKS).find(key => BLOCKS[key] === b);
+                    break;
+                }
+            }
+
+            const props = BLOCKS[type];
+            
+            // Scale HP with depth slightly
+            const scaling = 1 + (depth * 0.05); 
+            const maxHp = Math.ceil(props.hp * scaling);
+
+            const el = document.createElement('div');
+            el.className = `block ${props.color}`;
+            if (props.emoji) el.textContent = props.emoji;
+            
+            // Interaction
+            el.addEventListener('mousedown', (e) => handleMine(e, blockObj));
+            el.addEventListener('touchstart', (e) => {
+                // Prevent double firing on some devices
+                e.preventDefault(); 
+                handleMine(e, blockObj);
+            }, {passive: false});
+
+            const blockObj = {
+                type: type,
+                maxHp: maxHp,
+                currentHp: maxHp,
+                value: props.value,
+                el: el,
+                broken: false
+            };
+
+            return blockObj;
+        }
+
+        // --- Mining Logic ---
+        function handleMine(e, block) {
+            if (block.broken) return;
+
+            // Calculate Damage
+            const damage = state.upgrades.pickaxe.power;
+            
+            applyDamage(block, damage);
+            
+            // Visual Shake (remove class to reset if spamming)
+            block.el.classList.remove('shake');
+            void block.el.offsetWidth; // trigger reflow
+            block.el.classList.add('shake');
+
+            // Floating Damage Text
+            const rect = block.el.getBoundingClientRect();
+            spawnFloater(rect.left + rect.width/2, rect.top, `-${damage}`, '#fff');
+        }
+
+        function applyDamage(block, dmg) {
+            block.currentHp -= dmg;
+            
+            // Visual darken effect based on HP
+            const hpPct = block.currentHp / block.maxHp;
+            block.el.style.filter = `brightness(${hpPct})`;
+
+            if (block.currentHp <= 0) {
+                breakBlock(block);
+            }
+        }
+
+        function breakBlock(block) {
+            block.broken = true;
+            block.el.classList.add('broken');
+            block.el.textContent = ''; // Remove emoji
+
+            // Drop Resource?
+            if (block.value > 0) {
+                if (state.inventory.hasOwnProperty(block.type)) {
+                    state.inventory[block.type]++;
+                }
+            } else {
+                // Chance for small gold from dirt/stone? No, stick to prompt rules.
+            }
+
+            // Particles/Text
+            const rect = block.el.getBoundingClientRect();
+            if(block.value > 0) {
+                spawnFloater(rect.left + rect.width/2, rect.top, `+1 ${block.type.toUpperCase()}`, BLOCKS[block.type].color === 'type-diamond' ? '#00ffff' : '#fff');
+            }
+            
+            updateStats();
+        }
+
+        // --- Auto Miner Logic ---
+        function autoMineLoop() {
+            if (state.upgrades.auto.level === 0) return;
+
+            const dps = state.upgrades.auto.power;
+            
+            // Find visible blocks
+            const visibleBlocks = [];
+            
+            // A simple heuristic: Look at the last 50 generated rows that aren't fully broken
+            // Or check DOM offset (heavier). Let's check logical state for simplicity.
+            
+            const searchLimit = Math.max(0, state.rows.length - 50);
+            for (let i = state.rows.length - 1; i >= searchLimit; i--) {
+                const row = state.rows[i];
+                for (const block of row) {
+                    if (!block.broken) {
+                        visibleBlocks.push(block);
+                    }
+                }
+            }
+
+            if (visibleBlocks.length > 0) {
+                // Damage random block
+                const target = visibleBlocks[Math.floor(Math.random() * visibleBlocks.length)];
+                applyDamage(target, dps);
+                target.el.classList.remove('shake');
+                void target.el.offsetWidth;
+                target.el.classList.add('shake');
+            }
+        }
+
+        // --- Scroll & Generation ---
+        function handleScroll() {
+            const scrollTop = els.scrollArea.scrollTop;
+            const scrollHeight = els.scrollArea.scrollHeight;
+            const clientHeight = els.scrollArea.clientHeight;
+
+            // If near bottom, generate more
+            if (scrollTop + clientHeight > scrollHeight - 400) {
+                generateRows(CONFIG.chunkSize);
+            }
+        }
+
+        // --- Economy & Shop ---
+        function sellAll() {
+            let total = 0;
+            
+            total += state.inventory.coal * BLOCKS.coal.value;
+            total += state.inventory.iron * BLOCKS.iron.value;
+            total += state.inventory.gold * BLOCKS.gold.value;
+            total += state.inventory.diamond * BLOCKS.diamond.value;
+
+            if (total === 0) {
+                showToast("Inventory is empty!");
+                return;
+            }
+
+            state.gold += total;
+            
+            // Reset Inventory
+            state.inventory = { coal: 0, iron: 0, gold: 0, diamond: 0 };
+            
+            updateStats();
+            showToast(`Sold for ${total} Gold!`);
+        }
+
+        function buyUpgrade(type) {
+            const upg = state.upgrades[type];
+            if (state.gold >= upg.cost) {
+                state.gold -= upg.cost;
+                upg.level++;
+                upg.cost = Math.floor(upg.cost * CONFIG.priceMultiplier);
+
+                if (type === 'pickaxe') {
+                    upg.power += 1; // Linear power increase
+                } else if (type === 'auto') {
+                    upg.power += 1; // 1 DPS per level
+                }
+
+                updateStats();
+                renderShop();
+                showToast(`${type === 'pickaxe' ? 'Pickaxe' : 'Auto-Miner'} Upgraded!`);
+            }
+        }
+
+        // --- UI Updates ---
+        function updateStats() {
+            els.gold.textContent = state.gold;
+            
+            els.invCoal.textContent = state.inventory.coal;
+            els.invIron.textContent = state.inventory.iron;
+            els.invGold.textContent = state.inventory.gold;
+            els.invDiamond.textContent = state.inventory.diamond;
+
+            // Check shop affordability
+            els.btnPickaxe.disabled = state.gold < state.upgrades.pickaxe.cost;
+            els.btnAuto.disabled = state.gold < state.upgrades.auto.cost;
+        }
+
+        function renderShop() {
+            els.lvlPickaxe.textContent = state.upgrades.pickaxe.level;
+            els.costPickaxe.textContent = `${state.upgrades.pickaxe.cost} G`;
+            
+            els.lvlAuto.textContent = state.upgrades.auto.level;
+            els.costAuto.textContent = `${state.upgrades.auto.cost} G`;
+        }
+
+        // --- Visual FX ---
+        function spawnFloater(x, y, text, color) {
+            const el = document.createElement('div');
+            el.className = 'floater';
+            el.textContent = text;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.style.color = color;
+            document.body.appendChild(el);
+            
+            setTimeout(() => {
+                el.remove();
+            }, 800);
+        }
+
+        function showToast(msg) {
+            els.toast.textContent = msg;
+            els.toast.classList.add('show');
+            setTimeout(() => {
+                els.toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // Start Game
+        init();
+
+    </script>
+</body>
+</html>

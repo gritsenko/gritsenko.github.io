@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pocket Miner RPG</title>
+    <style>
+        :root {
+            --bg-color: #111;
+            --ui-bg: #2d2d2d;
+            --accent: #f39c12;
+            --text: #ecf0f1;
+            --dirt: #5d4037;
+            --stone: #424242;
+            --sky: #87CEEB;
+            --grass: #4CAF50;
+            --unexplored: #1a1a1a; /* Color for Fog of War */
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+            padding-bottom: 80px;
+        }
+
+        /* --- HUD --- */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            z-index: 100;
+            border-bottom: 2px solid #444;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .stat-box {
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .gold-text { color: #f1c40f; }
+        .depth-text { color: #3498db; }
+        
+        /* Highlight bag when full */
+        .bag-full { color: #e74c3c; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* --- SURFACE --- */
+        #surface {
+            height: 250px;
+            background: linear-gradient(to bottom, var(--sky), var(--sky) 80%, var(--grass) 80%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            margin-top: 50px;
+        }
+
+        .base-building {
+            background: #fff;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 4px solid #333;
+            text-align: center;
+            box-shadow: 0 10px 0 #ccc;
+            margin-bottom: 40px;
+            color: #333;
+        }
+
+        #sell-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            box-shadow: 0 4px 0 #1e8449;
+            transition: transform 0.1s;
+        }
+
+        #sell-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        #sell-btn:disabled {
+            background: #7f8c8d;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* --- MINE --- */
+        #mine-container {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            background: #000;
+            padding: 2px;
+        }
+
+        .block {
+            aspect-ratio: 1;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            border-radius: 4px;
+            /* Smooth transition for revealing blocks */
+            transition: background-color 0.4s ease, border-color 0.4s ease, filter 0.2s;
+            overflow: hidden;
+        }
+
+        /* Block Types */
+        .block.dirt { background: var(--dirt); border: 2px solid #4e342e; }
+        .block.stone { background: var(--stone); border: 2px solid #212121; }
+        .block.coal { background: #2c3e50; border: 2px solid #1a252f; }
+        .block.iron { background: #95a5a6; border: 2px solid #7f8c8d; }
+        .block.gold { background: #f1c40f; border: 2px solid #d4ac0d; }
+        .block.diamond { background: #3498db; border: 2px solid #2980b9; }
+        .block.empty { background: transparent; border: none; cursor: default; }
+
+        /* --- FOG OF WAR (LOCKED STATE) --- */
+        .block.locked {
+            /* Override colors to look like generic dark rock */
+            background-color: var(--unexplored) !important;
+            border: 2px solid #222 !important;
+            /* Remove filters, use flat dark color instead */
+            filter: none;
+        }
+
+        /* Hide the ore icon inside locked blocks (Fog of War) */
+        .block.locked span {
+            display: none;
+        }
+
+        /* Hide HP bar in fog of war */
+        .block.locked .hp-bar {
+            display: none !important;
+        }
+
+        /* --- PARTICLES --- */
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            pointer-events: none;
+            z-index: 1001; /* Above almost everything */
+            border-radius: 2px;
+        }
+
+        /* --- HP BAR --- */
+        .hp-bar {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            right: 4px;
+            height: 6px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 3px;
+            display: none;
+            z-index: 5;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .hp-fill {
+            height: 100%;
+            background: #e74c3c;
+            width: 100%;
+            border-radius: 2px;
+            transition: width 0.1s;
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        @keyframes deny {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .shaking { animation: shake 0.2s; filter: brightness(1.3); }
+        .denied { animation: deny 0.3s; }
+
+        /* --- BIG POP TEXT --- */
+        .pop-text {
+            position: absolute;
+            color: white;
+            font-weight: 900;
+            font-size: 28px;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards;
+            z-index: 20;
+            text-shadow: 
+                2px 2px 0 #000, 
+               -1px -1px 0 #000,  
+                1px -1px 0 #000,
+               -1px 1px 0 #000,
+                1px 1px 0 #000;
+            white-space: nowrap;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            50% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1); opacity: 0; }
+        }
+
+        /* --- SHOP --- */
+        #shop {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            background: var(--ui-bg);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 2px solid #444;
+            padding: 5px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        .upgrade-btn {
+            background: #34495e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            width: 48%;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #2c3e50;
+            transition: all 0.1s;
+        }
+
+        .upgrade-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="stat-box">💰 <span id="gold-display">0</span></div>
+        <div class="stat-box">🎒 <span id="bag-display">0/40</span></div>
+        <div class="stat-box">⬇️ <span id="depth-display">0m</span></div>
+    </div>
+
+    <!-- SURFACE -->
+    <div id="surface">
+        <div class="base-building">
+            <h2>MINING HQ</h2>
+            <p>Scroll up here to sell!</p>
+            <button id="sell-btn" onclick="sellResources()">SELL LOOT (+0g)</button>
+        </div>
+        <div style="position:absolute; bottom: 10px; font-size: 12px; color: #333; font-weight: bold;">
+            ⬇️ DIG DOWN (Sides First!) ⬇️
+        </div>
+    </div>
+
+    <!-- MINE -->
+    <div id="mine-container"></div>
+
+    <!-- SHOP -->
+    <div id="shop">
+        <button class="upgrade-btn" onclick="buyUpgrade('pickaxe')">
+            <h3>⛏️ Pickaxe</h3>
+            <small id="cost-pickaxe">50g</small>
+        </button>
+        <button class="upgrade-btn" onclick="buyUpgrade('auto')">
+            <h3>🤖 Bot</h3>
+            <small id="cost-auto">150g</small>
+        </button>
+    </div>
+
+    <script>
+        // --- CONFIG & STATE ---
+        const config = {
+            columns: 7, 
+            initialRows: 25,
+            chunkSize: 10,
+        };
+
+        const state = {
+            gold: 0,
+            inventory: [],
+            maxInventory: 40, // New Bag Limit
+            depth: 0,
+            pickaxePower: 1,
+            pickaxeLevel: 1,
+            autoMiners: 0,
+            generatedRows: 0,
+            costs: { pickaxe: 50, auto: 150 }
+        };
+
+        const blockTypes = [
+            // Dirt and Stone now have low value > 0
+            { id: 'dirt', name: 'Dirt', hp: 2, value: 1, chance: 60, icon: '' },
+            { id: 'stone', name: 'Stone', hp: 5, value: 2, chance: 25, icon: '' },
+            { id: 'coal', name: 'Coal', hp: 12, value: 5, chance: 8, icon: '⚫' },
+            { id: 'iron', name: 'Iron', hp: 25, value: 15, chance: 4, icon: '⚪' },
+            { id: 'gold', name: 'Gold', hp: 50, value: 40, chance: 2, icon: '🟡' },
+            { id: 'diamond', name: 'Diamond', hp: 100, value: 150, chance: 1, icon: '💎' }
+        ];
+
+        // Mapped colors for particles
+        const typeColors = {
+            dirt: '#5d4037',
+            stone: '#424242',
+            coal: '#2c3e50',
+            iron: '#95a5a6',
+            gold: '#f1c40f',
+            diamond: '#3498db'
+        };
+
+        // --- DOM ---
+        const mineContainer = document.getElementById('mine-container');
+        const goldDisplay = document.getElementById('gold-display');
+        const bagDisplay = document.getElementById('bag-display');
+        const depthDisplay = document.getElementById('depth-display');
+        const sellBtn = document.getElementById('sell-btn');
+
+        // --- INIT ---
+        function init() {
+            generateRows(config.initialRows);
+            updateUI();
+            
+            window.addEventListener('scroll', () => {
+                const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+                const scrolled = window.scrollY;
+                state.depth = Math.floor(scrolled / 50);
+                depthDisplay.innerText = `${state.depth}m`;
+
+                if (Math.ceil(scrolled) >= scrollable - 300) {
+                    generateRows(config.chunkSize);
+                }
+            });
+
+            setInterval(runAutoMiners, 1000);
+        }
+
+        // --- GENERATION ---
+        function generateRows(count) {
+            for (let i = 0; i < count; i++) {
+                const currentRowIndex = state.generatedRows; 
+                state.generatedRows++;
+                const depthFactor = Math.floor(currentRowIndex / 20);
+                
+                for (let c = 0; c < config.columns; c++) {
+                    const blockData = chooseBlockType(currentRowIndex);
+                    const block = document.createElement('div');
+                    
+                    block.classList.add('block', blockData.id);
+                    block.id = `blk-${currentRowIndex}-${c}`;
+                    block.dataset.row = currentRowIndex;
+                    block.dataset.col = c;
+                    // Store ID/Type for particles
+                    block.dataset.typeId = blockData.id;
+
+                    block.dataset.maxHp = blockData.hp + (depthFactor * 3);
+                    block.dataset.hp = block.dataset.maxHp;
+                    block.dataset.value = blockData.value;
+                    block.dataset.name = blockData.name;
+                    block.dataset.icon = blockData.icon;
+                    
+                    // HP Bar
+                    const hpBar = document.createElement('div');
+                    hpBar.className = 'hp-bar';
+                    const hpFill = document.createElement('div');
+                    hpFill.className = 'hp-fill';
+                    hpBar.appendChild(hpFill);
+                    block.appendChild(hpBar);
+
+                    // Icon
+                    if(blockData.icon) {
+                        const iconSpan = document.createElement('span');
+                        iconSpan.innerText = blockData.icon;
+                        block.appendChild(iconSpan);
+                    }
+
+                    // Events
+                    let startX, startY;
+                    block.addEventListener('touchstart', (e) => {
+                        const touch = e.changedTouches[0];
+                        startX = touch.screenX;
+                        startY = touch.screenY;
+                    }, { passive: true });
+
+                    block.addEventListener('touchend', (e) => {
+                        const touch = e.changedTouches[0];
+                        const diffX = Math.abs(touch.screenX - startX);
+                        const diffY = Math.abs(touch.screenY - startY);
+                        if (diffX < 10 && diffY < 10) {
+                            if (e.cancelable) e.preventDefault();
+                            handleInteraction(block, e);
+                        }
+                    });
+
+                    block.addEventListener('mousedown', (e) => {
+                        handleInteraction(block, e);
+                    });
+
+                    mineContainer.appendChild(block);
+
+                    // --- CHECK LOCKED STATUS ---
+                    if (!checkExposed(currentRowIndex, c)) {
+                        block.classList.add('locked');
+                    }
+                }
+            }
+        }
+
+        function chooseBlockType(depth) {
+            const rand = Math.random() * 100;
+            let sum = 0;
+            let currentTypes = JSON.parse(JSON.stringify(blockTypes));
+            
+            if (depth > 50) currentTypes.find(t=>t.id==='gold').chance += 2;
+            if (depth > 100) currentTypes.find(t=>t.id==='diamond').chance += 1.5;
+
+            for (const type of currentTypes) {
+                sum += type.chance;
+                if (rand <= sum) return type;
+            }
+            return blockTypes[0];
+        }
+
+        // --- CORE MECHANICS ---
+        function checkExposed(row, col) {
+            row = parseInt(row);
+            col = parseInt(col);
+
+            if (row === 0) return true;
+
+            const isNeighborSolid = (r, c) => {
+                if (c < 0 || c >= config.columns) return true; 
+                if (r >= state.generatedRows) return true; 
+                if (r < 0) return false;
+
+                const neighbor = document.getElementById(`blk-${r}-${c}`);
+                if (!neighbor) return true;
+                return !neighbor.classList.contains('empty');
+            };
+
+            const topSolid = isNeighborSolid(row - 1, col);
+            const bottomSolid = isNeighborSolid(row + 1, col);
+            const leftSolid = isNeighborSolid(row, col - 1);
+            const rightSolid = isNeighborSolid(row, col + 1);
+
+            if (topSolid && bottomSolid && leftSolid && rightSolid) {
+                return false; 
+            }
+            return true; 
+        }
+
+        function unlockNeighbors(row, col) {
+            const coords = [
+                [row - 1, col], [row + 1, col],
+                [row, col - 1], [row, col + 1]
+            ];
+            coords.forEach(([r, c]) => {
+                const el = document.getElementById(`blk-${r}-${c}`);
+                if (el && !el.classList.contains('empty') && el.classList.contains('locked')) {
+                    el.classList.remove('locked');
+                }
+            });
+        }
+
+        function handleInteraction(element, event) {
+            if (element.classList.contains('empty')) return;
+
+            if (element.classList.contains('locked')) {
+                element.classList.remove('denied');
+                void element.offsetWidth;
+                element.classList.add('denied');
+                showFloatText(element, "🔒 ?", "#95a5a6");
+                return;
+            }
+
+            hitBlock(element, state.pickaxePower);
+        }
+
+        function hitBlock(element, damage) {
+            let hp = parseFloat(element.dataset.hp);
+            hp -= damage;
+            element.dataset.hp = hp;
+
+            // Animate Block
+            element.classList.remove('shaking');
+            void element.offsetWidth;
+            element.classList.add('shaking');
+            
+            // Damage Number
+            const randomX = (Math.random() - 0.5) * 20;
+            const randomY = (Math.random() - 0.5) * 20;
+            showFloatText(element, `-${damage}`, "#ff4444", randomX, randomY);
+
+            // Determine if destroyed or just hit
+            if (hp <= 0) {
+                destroyBlock(element);
+            } else {
+                // Not destroyed: Emit small particles
+                const rect = element.getBoundingClientRect();
+                const type = element.dataset.typeId || 'dirt';
+                createParticles(rect, type, 4);
+                
+                // Update HP Bar
+                const maxHp = parseFloat(element.dataset.maxHp);
+                const hpBar = element.querySelector('.hp-bar');
+                const hpFill = element.querySelector('.hp-fill');
+                hpBar.style.display = 'block';
+                const pct = Math.max(0, (hp / maxHp) * 100);
+                hpFill.style.width = `${pct}%`;
+            }
+        }
+
+        function destroyBlock(element) {
+            const val = parseInt(element.dataset.value);
+            const name = element.dataset.name;
+            const row = parseInt(element.dataset.row);
+            const col = parseInt(element.dataset.col);
+            const type = element.dataset.typeId || 'dirt';
+
+            // BIG PARTICLE EXPLOSION
+            const rect = element.getBoundingClientRect();
+            createParticles(rect, type, 15);
+
+            // --- INVENTORY LOGIC UPDATE ---
+            if (state.inventory.length < state.maxInventory) {
+                // Add item (even dirt/stone now)
+                state.inventory.push({ name, value: val });
+                showFloatText(element, `+1 ${name}`, "#fff", 0, -20);
+            } else {
+                // Bag Full!
+                showFloatText(element, "FULL!", "#e74c3c", 0, -20);
+            }
+
+            element.className = 'block empty';
+            element.innerHTML = ''; 
+            element.style.backgroundColor = '#111';
+            
+            unlockNeighbors(row, col);
+            updateUI();
+        }
+
+        // --- PARTICLE SYSTEM ---
+        function createParticles(rect, type, count) {
+            const color = typeColors[type] || '#fff';
+            // Coordinates relative to document
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + window.scrollY + rect.height / 2;
+
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.backgroundColor = color;
+                
+                // Random size
+                const size = 4 + Math.random() * 4; // 4px to 8px
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+
+                // Start near center
+                const startX = centerX + (Math.random() - 0.5) * 30;
+                const startY = centerY + (Math.random() - 0.5) * 30;
+
+                p.style.left = startX + 'px';
+                p.style.top = startY + 'px';
+                
+                document.body.appendChild(p);
+
+                // --- PHYSICS SIMULATION ---
+                // Random angle and velocity
+                const angle = Math.random() * Math.PI * 2;
+                // Shoot upwards a bit more often for nice fountains
+                // velocity: pixels per second
+                const velocity = 100 + Math.random() * 150; 
+                let vx = Math.cos(angle) * velocity;
+                let vy = Math.sin(angle) * velocity;
+                
+                // Add initial upward bias to simulate "popping" out
+                if (Math.random() > 0.3) {
+                    vy = -Math.abs(vy) * 1.5; 
+                }
+
+                const gravity = 800; // px/s^2 (Gravity strength)
+                const duration = 1000 + Math.random() * 500; // 1s - 1.5s duration
+
+                // Generate physics-based keyframes
+                const keyframes = [];
+                const steps = 30;
+                
+                for (let s = 0; s <= steps; s++) {
+                    const t = s / steps; // 0.0 to 1.0
+                    const timeSec = (duration / 1000) * t;
+
+                    // Projectile motion formula:
+                    // x = vx * t
+                    // y = vy * t + 0.5 * g * t^2
+                    const x = vx * timeSec;
+                    const y = (vy * timeSec) + (0.5 * gravity * timeSec * timeSec);
+                    
+                    const scale = 1 - (t * 0.5); // Shrink to 50%
+                    const opacity = t > 0.7 ? 1 - ((t - 0.7) * 3.33) : 1; // Fade out only at the end
+
+                    keyframes.push({
+                        transform: `translate(${x}px, ${y}px) scale(${scale})`,
+                        opacity: Math.max(0, opacity)
+                    });
+                }
+
+                const anim = p.animate(keyframes, {
+                    duration: duration,
+                    easing: 'linear' // Physics curve is baked into keyframes
+                });
+
+                anim.onfinish = () => p.remove();
+            }
+        }
+
+        function showFloatText(element, text, color, offsetX = 0, offsetY = 0) {
+            const float = document.createElement('div');
+            float.className = 'pop-text';
+            float.innerText = text;
+            float.style.color = color || 'white';
+            
+            const rect = element.getBoundingClientRect();
+            float.style.left = (rect.left + 5 + offsetX) + 'px'; 
+            float.style.top = (rect.top + window.scrollY - 10 + offsetY) + 'px'; 
+            
+            document.body.appendChild(float);
+            setTimeout(() => float.remove(), 800);
+        }
+
+        // --- ECONOMY ---
+        function sellResources() {
+            if (state.inventory.length === 0) return;
+
+            let totalVal = 0;
+            state.inventory.forEach(item => totalVal += item.value);
+            state.gold += totalVal;
+            state.inventory = [];
+            
+            sellBtn.innerText = `SOLD! (+${totalVal}g)`;
+            updateUI();
+            setTimeout(updateUI, 1500);
+        }
+
+        function buyUpgrade(type) {
+            if (type === 'pickaxe') {
+                if (state.gold >= state.costs.pickaxe) {
+                    state.gold -= state.costs.pickaxe;
+                    state.pickaxeLevel++;
+                    state.pickaxePower = Math.floor(state.pickaxePower * 1.5) + 1;
+                    state.costs.pickaxe = Math.floor(state.costs.pickaxe * 1.6);
+                }
+            } else if (type === 'auto') {
+                if (state.gold >= state.costs.auto) {
+                    state.gold -= state.costs.auto;
+                    state.autoMiners++;
+                    state.costs.auto = Math.floor(state.costs.auto * 1.8);
+                }
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            goldDisplay.innerText = state.gold;
+            // Update Bag display with Max Capacity
+            bagDisplay.innerText = `${state.inventory.length}/${state.maxInventory}`;
+            
+            // Visual feedback for full bag
+            if(state.inventory.length >= state.maxInventory) {
+                bagDisplay.parentElement.classList.add('bag-full');
+            } else {
+                bagDisplay.parentElement.classList.remove('bag-full');
+            }
+
+            let currentVal = state.inventory.reduce((sum, item) => sum + item.value, 0);
+            if (sellBtn.innerText.indexOf("SOLD") === -1) {
+                sellBtn.innerText = currentVal > 0 ? `SELL LOOT (+${currentVal}g)` : "NO LOOT";
+                sellBtn.disabled = currentVal === 0;
+            }
+
+            document.getElementById('cost-pickaxe').innerText = `${state.costs.pickaxe}g (Lvl ${state.pickaxeLevel})`;
+            document.getElementById('cost-auto').innerText = `${state.costs.auto}g (x${state.autoMiners})`;
+        }
+
+        // --- AUTO MINER ---
+        function runAutoMiners() {
+            if (state.autoMiners === 0) return;
+
+            // Efficiently select only valid, unlocked blocks
+            const validTargets = [];
+            const allBlocks = document.querySelectorAll('.block:not(.empty):not(.locked)');
+
+            allBlocks.forEach(b => {
+                const rect = b.getBoundingClientRect();
+                // Check if visible
+                if (rect.top >= -50 && rect.bottom <= window.innerHeight + 50) {
+                    validTargets.push(b);
+                }
+            });
+
+            if (validTargets.length === 0) return;
+
+            for(let i=0; i < state.autoMiners; i++) {
+                setTimeout(() => {
+                    const target = validTargets[Math.floor(Math.random() * validTargets.length)];
+                    // Double check it wasn't destroyed in the last few ms
+                    if(target && !target.classList.contains('empty')) {
+                        hitBlock(target, state.pickaxePower);
+                    }
+                }, i * 200);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

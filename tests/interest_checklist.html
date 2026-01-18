@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аудитор Игрового Интереса</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease;
+        }
+        .accordion-content.active {
+            max-height: 1000px;
+            padding-bottom: 1.5rem;
+        }
+        .checkbox-custom:checked + .checkbox-visual {
+            background-color: #22c55e;
+            border-color: #22c55e;
+        }
+        .item-checked h3 {
+            text-decoration: line-through;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen py-8 px-4 sm:px-6">
+
+    <div class="max-w-3xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <div class="inline-block p-3 bg-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-200">
+                <i data-lucide="brain-circuit" class="w-8 h-8 text-white"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Аудитор Игрового Интереса</h1>
+            <p class="text-slate-600 max-w-md mx-auto">
+                Проверьте вашу игру на соответствие фундаментальным психологическим теориям вовлечения.
+            </p>
+        </header>
+
+        <!-- Progress Bar -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm mb-8 border border-slate-200">
+            <div class="flex justify-between items-end mb-2">
+                <div>
+                    <span class="text-sm font-semibold text-blue-600 uppercase tracking-wider">Ваш прогресс</span>
+                    <h2 id="status-message" class="text-xl font-bold text-slate-800 transition-all duration-300">Начните проверку вашей идеи</h2>
+                </div>
+                <span id="progress-percent" class="text-2xl font-black text-blue-600">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                <div id="progress-fill" class="bg-blue-600 h-full transition-all duration-500 ease-out" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Checklist Container -->
+        <div id="checklist-container" class="space-y-4">
+            <!-- Items will be injected here by JS -->
+        </div>
+
+        <!-- Diagnostics Box -->
+        <div class="mt-12 p-6 bg-slate-900 rounded-3xl text-white shadow-xl relative overflow-hidden">
+            <div class="relative z-10">
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="zap" class="text-yellow-400 w-6 h-6"></i> Быстрая диагностика проблем
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="bg-white/10 p-4 rounded-xl border border-white/10">
+                        <p class="text-yellow-400 text-xs font-bold uppercase mb-1">Скучно?</p>
+                        <p class="text-sm text-slate-300">Проверьте новизну и информационный пробел. Скорее всего, игрок понимает систему слишком быстро или в ней нет тайны.</p>
+                    </div>
+                    <div class="bg-white/10 p-4 rounded-xl border border-white/10">
+                        <p class="text-red-400 text-xs font-bold uppercase mb-1">Фрустрация?</p>
+                        <p class="text-sm text-slate-300">Проверьте потенциал совладания. Игрок может быть заинтересован, но не верит, что сможет победить систему.</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Decorative background circle -->
+            <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-600 rounded-full blur-[60px] opacity-20"></div>
+        </div>
+
+        <footer class="mt-12 text-center text-slate-400 text-sm">
+            <p>© 2024 Основано на теориях Берлайна, Томкинса, Левенштейна и Чиксентмихайи</p>
+        </footer>
+    </div>
+
+    <script>
+        const checklistData = [
+            {
+                id: 'novelty',
+                category: 'Колативные переменные (Берлайн)',
+                title: 'Новизна (Novelty)',
+                theory: 'Мозг эволюционно запрограммирован выделять новые объекты в среде. Новизна запускает активное возбуждение и направляет внимание.',
+                question: 'Есть ли в вашей игре механика, сеттинг или ситуация, которую игрок еще не видел или видел в другом контексте?',
+                implementation: [
+                    'Уникальное визуальное решение.',
+                    'Неожиданная комбинация двух привычных жанров.',
+                    'Механика, меняющая правила игры (например, порталы или гравитация).'
+                ],
+                example: 'Portal — использование пространственных дыр для перемещения; Scorn — уникальный биомеханический стиль.'
+            },
+            {
+                id: 'complexity',
+                category: 'Колативные переменные (Берлайн)',
+                title: 'Сложность (Complexity)',
+                theory: 'Сложность стимулирует исследование, пока она поддается анализу. Слишком простая система ведет к скуке, слишком сложная — к хаосу.',
+                question: 'Достаточно ли в игре элементов, которые нужно изучать и связывать между собой?',
+                implementation: [
+                    'Многослойная система магии или крафта.',
+                    'Деревья навыков с неочевидными синергиями.',
+                    'Косвенное повествование через окружение (Environmental Storytelling).'
+                ],
+                example: 'Elden Ring — сложность мира и его истории заставляет игроков строить теории и исследовать каждый угол.'
+            },
+            {
+                id: 'gap',
+                category: 'Теория пробела (Левенштейн)',
+                title: 'Информационный пробел',
+                theory: 'Интерес возникает в разрыве между тем, что мы знаем, и тем, что хотим знать. Если мы не знаем о существовании информации, пробела нет.',
+                question: 'Знает ли игрок о существовании тайны? Видит ли он "запертую дверь", которую хочет открыть?',
+                implementation: [
+                    'Покажите цель (сокровище), но не давайте путь к нему сразу.',
+                    'Используйте NPC, которые знают больше, чем говорят.',
+                    'Оставляйте фрагменты информации (записки, аудио), которые обрываются на самом интересном.'
+                ],
+                example: 'Outer Wilds — вся игра построена на заполнении пробелов в знаниях о древней цивилизации.'
+            },
+            {
+                id: 'coping',
+                category: 'Модель оценки (Пол Силви)',
+                title: 'Потенциал совладания',
+                theory: 'Интерес умирает, если человек не верит, что сможет разобраться. Нужен баланс между сложностью системы и верой игрока в свои силы.',
+                question: 'Дает ли игра инструменты, которые позволяют игроку чувствовать себя компетентным?',
+                implementation: [
+                    'Качественное обучение (онбординг) через практику.',
+                    'Постепенное введение новых механик.',
+                    'Система подсказок или "мягких" ограничений, направляющих игрока.'
+                ],
+                example: 'Super Mario — первый уровень учит всем механикам без единого слова текста, создавая веру в успех.'
+            },
+            {
+                id: 'u_curve',
+                category: 'Золотая зона (Берлайн)',
+                title: 'Кривая Берлайна (Золотая зона)',
+                theory: 'Зависимость интереса от новизны имеет форму перевернутой "U". Интерес максимален при умеренном уровне стимуляции.',
+                question: 'Находится ли ваша игра в "золотой середине" между скукой и когнитивной перегрузкой?',
+                implementation: [
+                    'Чередование интенсивных боев и спокойных моментов.',
+                    'Постепенное усложнение правил по мере роста навыков игрока.',
+                    'Сочетание знакомых элементов (тропов) с неожиданными поворотами.'
+                ],
+                example: 'Left 4 Dead — ИИ-режиссер регулирует темп игры, подкидывая врагов или давая передышку в зависимости от состояния игроков.'
+            },
+            {
+                id: 'flow',
+                category: 'Поток (Чиксентмихайи)',
+                title: 'Состояние Потока',
+                theory: 'Поток — это глубокая поглощенность. Интерес затягивает в поток, а условия потока удерживают интерес часами.',
+                question: 'Есть ли в игре ясные цели, немедленная обратная связь и баланс вызова?',
+                implementation: [
+                    'Понятный интерфейс, мгновенно реагирующий на нажатия.',
+                    'Микро-цели (квесты, этапы), ведущие к глобальной цели.',
+                    'Отсутствие лишних трений (бесконечных загрузок, запутанных меню).'
+                ],
+                example: 'Tetris — идеальный баланс возрастающей сложности и мгновенного вознаграждения за успех.'
+            }
+        ];
+
+        const container = document.getElementById('checklist-container');
+        const progressFill = document.getElementById('progress-fill');
+        const progressPercent = document.getElementById('progress-percent');
+        const statusMessage = document.getElementById('status-message');
+
+        function updateProgress() {
+            const checkedCount = document.querySelectorAll('.item-checkbox:checked').length;
+            const percent = Math.round((checkedCount / checklistData.length) * 100);
+            
+            progressFill.style.width = `${percent}%`;
+            progressPercent.innerText = `${percent}%`;
+
+            if (percent === 0) statusMessage.innerText = "Начните проверку вашей идеи";
+            else if (percent < 40) statusMessage.innerText = "Есть фундамент, но нужно больше крючков интереса";
+            else if (percent < 70) statusMessage.innerText = "Хороший уровень вовлечения!";
+            else if (percent < 100) statusMessage.innerText = "Игра обещает быть захватывающей!";
+            else statusMessage.innerText = "Идеальный баланс интереса!";
+        }
+
+        function toggleItem(id) {
+            const content = document.getElementById(`content-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            const isOpening = !content.classList.contains('active');
+            
+            // Close others
+            document.querySelectorAll('.accordion-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.chevron-icon').forEach(el => el.style.transform = 'rotate(0deg)');
+
+            if (isOpening) {
+                content.classList.add('active');
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function renderChecklist() {
+            checklistData.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'bg-white rounded-xl border border-slate-200 transition-all duration-200 overflow-hidden item-card';
+                itemEl.id = `card-${item.id}`;
+                
+                itemEl.innerHTML = `
+                    <div class="flex items-center p-4">
+                        <div class="flex-shrink-0 relative w-8 h-8">
+                            <input type="checkbox" id="check-${item.id}" class="item-checkbox opacity-0 absolute inset-0 z-10 cursor-pointer" onchange="handleCheck('${item.id}')">
+                            <div id="visual-${item.id}" class="checkbox-visual w-8 h-8 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center text-white transition-colors">
+                                <i data-lucide="check" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="ml-4 flex-grow cursor-pointer" onclick="toggleItem('${item.id}')">
+                            <span class="text-[10px] font-bold text-blue-500 uppercase tracking-tighter block mb-0.5">
+                                ${item.category}
+                            </span>
+                            <h3 id="title-${item.id}" class="text-lg font-bold text-slate-800 transition-all">
+                                ${item.title}
+                            </h3>
+                        </div>
+
+                        <button onclick="toggleItem('${item.id}')" class="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors">
+                            <i data-lucide="chevron-down" id="icon-${item.id}" class="chevron-icon transition-transform duration-300"></i>
+                        </button>
+                    </div>
+
+                    <div id="content-${item.id}" class="accordion-content px-4 ml-12 border-t border-slate-50">
+                        <div class="pt-4">
+                            <div class="mb-4">
+                                <div class="flex items-start gap-2 text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                    <i data-lucide="info" class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0"></i>
+                                    <div>
+                                        <p class="text-sm italic mb-2">«${item.theory}»</p>
+                                        <p class="font-semibold text-slate-900">${item.question}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3 uppercase tracking-wide">
+                                        <i data-lucide="target" class="w-4 h-4 text-orange-500"></i> Как внедрить
+                                    </h4>
+                                    <ul class="space-y-2">
+                                        ${item.implementation.map(p => `<li class="text-sm text-slate-600 flex gap-2"><span class="text-blue-500 font-bold">•</span>${p}</li>`).join('')}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3 uppercase tracking-wide">
+                                        <i data-lucide="lightbulb" class="w-4 h-4 text-yellow-500"></i> Пример
+                                    </h4>
+                                    <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-sm text-yellow-900 leading-relaxed font-medium">
+                                        ${item.example}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(itemEl);
+            });
+            lucide.createIcons();
+        }
+
+        window.handleCheck = function(id) {
+            const isChecked = document.getElementById(`check-${id}`).checked;
+            const visual = document.getElementById(`visual-${id}`);
+            const title = document.getElementById(`title-${id}`);
+            const card = document.getElementById(`card-${id}`);
+
+            if (isChecked) {
+                visual.classList.add('bg-green-500', 'border-green-500');
+                visual.classList.remove('bg-slate-100', 'border-slate-200');
+                title.classList.add('text-slate-400', 'line-through');
+            } else {
+                visual.classList.remove('bg-green-500', 'border-green-500');
+                visual.classList.add('bg-slate-100', 'border-slate-200');
+                title.classList.remove('text-slate-400', 'line-through');
+            }
+            updateProgress();
+        };
+
+        // Initialize
+        renderChecklist();
+    </script>
+</body>
+</html>

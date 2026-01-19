@@ -55,8 +55,11 @@ fs.readFile('index_source.html', 'utf8', (err, templateSource) => {
         // Parse JSON
         const data = JSON.parse(jsonData);
 
-        // Generate HTML using the template and data
-        const html = template({ games: data.games });
+        // Filter only published games
+        const publishedGames = data.games.filter(game => game.published);
+
+        // Generate HTML using the template and filtered data
+        const html = template({ games: publishedGames });
 
         // Write the generated HTML to index.html
         fs.writeFile('index.html', html, (err) => {

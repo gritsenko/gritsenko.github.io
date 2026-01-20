@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Deep Core</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+        background: #1a1a2e;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      
+      #app {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+      
+      #game-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      
+      /* UI Overlay */
+      #ui-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 100;
+      }
+      
+      /* Hero HUD - Top Center */
+      #hero-hud {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: auto;
+      }
+      
+      #hero-portrait {
+        width: 64px;
+        height: 64px;
+        border: 3px solid #ffd700;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #4a4a6a, #2a2a4a);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+      }
+      
+      #fuel-bar-container {
+        width: 80px;
+        height: 8px;
+        background: #333;
+        border-radius: 4px;
+        margin-top: 4px;
+        overflow: hidden;
+      }
+      
+      #fuel-bar {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, #ff6b35, #f7c531);
+        transition: width 0.3s ease;
+      }
+      
+      /* Gold Counter */
+      #gold-counter {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 8px 16px;
+        border-radius: 20px;
+        color: #ffd700;
+        font-weight: bold;
+        font-size: 18px;
+        pointer-events: auto;
+      }
+      
+      #gold-icon {
+        font-size: 24px;
+      }
+      
+      /* Tool Belt - Bottom */
+      #tool-belt {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 12px;
+        pointer-events: auto;
+      }
+      
+      .tool-slot {
+        width: 60px;
+        height: 60px;
+        border: 3px solid #555;
+        border-radius: 10px;
+        background: rgba(30, 30, 50, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      .tool-slot.active {
+        border-color: #ffd700;
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        transform: scale(1.1);
+      }
+      
+      .tool-slot:hover {
+        border-color: #888;
+      }
+      
+      /* Turbo Button */
+      #turbo-btn {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 70px;
+        height: 70px;
+        border: 3px solid #ff4444;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        color: white;
+        font-weight: bold;
+        font-size: 12px;
+        cursor: pointer;
+        pointer-events: auto;
+        transition: all 0.2s ease;
+      }
+      
+      #turbo-btn:active {
+        transform: scale(0.95);
+      }
+      
+      #turbo-btn.active {
+        border-color: #ffd700;
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+        animation: pulse 0.5s infinite alternate;
+      }
+      
+      @keyframes pulse {
+        from { transform: scale(1); }
+        to { transform: scale(1.1); }
+      }
+      
+      /* Shop Button */
+      #shop-btn {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        width: 50px;
+        height: 50px;
+        border: 2px solid #4ecdc4;
+        border-radius: 10px;
+        background: rgba(78, 205, 196, 0.2);
+        font-size: 24px;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+      
+      /* Shop Modal */
+      #shop-modal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        z-index: 200;
+      }
+      
+      #shop-modal.open {
+        display: flex;
+      }
+      
+      #shop-content {
+        background: linear-gradient(135deg, #2a2a4a, #1a1a2e);
+        border: 3px solid #4ecdc4;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 320px;
+        width: 90%;
+      }
+      
+      #shop-content h2 {
+        color: #4ecdc4;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      
+      .shop-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+      }
+      
+      .shop-item-info {
+        color: white;
+      }
+      
+      .shop-item-name {
+        font-weight: bold;
+      }
+      
+      .shop-item-desc {
+        font-size: 12px;
+        color: #aaa;
+      }
+      
+      .shop-item-btn {
+        background: linear-gradient(135deg, #ffd700, #ffaa00);
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-weight: bold;
+        cursor: pointer;
+        color: #333;
+      }
+      
+      .shop-item-btn:disabled {
+        background: #555;
+        color: #888;
+        cursor: not-allowed;
+      }
+      
+      #shop-close {
+        width: 100%;
+        padding: 12px;
+        margin-top: 12px;
+        background: #555;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      
+      /* Depth Counter */
+      #depth-counter {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 8px 16px;
+        border-radius: 20px;
+        color: #4ecdc4;
+        font-weight: bold;
+        font-size: 14px;
+        pointer-events: auto;
+      }
+      
+      /* Loading Screen */
+      #loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #1a1a2e;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 1000;
+      }
+      
+      #loading h1 {
+        font-size: 48px;
+        margin-bottom: 20px;
+        background: linear-gradient(135deg, #ffd700, #ff6b35);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      
+      #loading-bar-container {
+        width: 200px;
+        height: 8px;
+        background: #333;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      
+      #loading-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #4ecdc4, #44a08d);
+        transition: width 0.3s ease;
+      }
+      
+      #loading-text {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #888;
+      }
+      
+      .hidden {
+        display: none !important;
+      }
+      
+      /* Debug Panel */
+      #debug-panel {
+        position: absolute;
+        top: 50%;
+        right: 20px;
+        transform: translateY(-50%);
+        background: rgba(20, 20, 30, 0.95);
+        border: 2px solid #4ecdc4;
+        border-radius: 12px;
+        padding: 20px;
+        width: 320px;
+        max-height: 80vh;
+        overflow-y: auto;
+        display: none;
+        pointer-events: auto;
+        z-index: 300;
+      }
+      
+      #debug-panel.open {
+        display: block;
+      }
+      
+      #debug-panel h2 {
+        color: #4ecdc4;
+        margin-bottom: 16px;
+        font-size: 20px;
+      }
+      
+      .debug-control {
+        margin-bottom: 16px;
+      }
+      
+      .debug-label {
+        color: #ccc;
+        font-size: 12px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+      }
+      
+      .debug-value {
+        color: #4ecdc4;
+        font-weight: bold;
+      }
+      
+      .debug-slider {
+        width: 100%;
+        height: 8px;
+        -webkit-appearance: none;
+        background: #333;
+        border-radius: 4px;
+        outline: none;
+      }
+      
+      .debug-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        background: #4ecdc4;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+      
+      .debug-slider::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        background: #4ecdc4;
+        border-radius: 50%;
+        cursor: pointer;
+        border: none;
+      }
+      
+      .debug-color-picker {
+        width: 100%;
+        height: 36px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background: transparent;
+      }
+      
+      #debug-close {
+        width: 100%;
+        padding: 10px;
+        margin-top: 8px;
+        background: #ff4444;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      
+      #debug-close:hover {
+        background: #ff6666;
+      }
+      
+      /* Performance Panel - Compact Top-Right */
+      #perf-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid #4ecdc4;
+        border-radius: 6px;
+        padding: 6px 10px;
+        width: 160px;
+        display: none;
+        pointer-events: auto;
+        z-index: 400;
+        font-family: monospace;
+      }
+      
+      #perf-panel.open {
+        display: block;
+      }
+      
+      #perf-panel h3 {
+        color: #4ecdc4;
+        font-size: 10px;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+      }
+      
+      .perf-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2px 8px;
+        margin-bottom: 6px;
+      }
+      
+      .perf-item {
+        font-size: 9px;
+        line-height: 1;
+        color: #aaa;
+        display: flex;
+        justify-content: space-between;
+      }
+      
+      .perf-data {
+        color: #fff;
+      }
+      
+      #perf-graph {
+        width: 100%;
+        height: 30px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 2px;
+        margin-bottom: 4px;
+      }
+      
+      .perf-legend {
+        display: flex;
+        gap: 6px;
+        font-size: 8px;
+        color: #888;
+      }
+      
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      
+      .legend-color {
+        width: 4px;
+        height: 4px;
+        border-radius: 1px;
+      }
+
+      .perf-debug-toggle {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 6px;
+        padding-top: 4px;
+        border-top: 1px solid rgba(78, 205, 196, 0.3);
+        font-size: 9px;
+        color: #aaa;
+      }
+
+      /* Block Debug Panel */
+      #block-debug-panel {
+        position: absolute;
+        top: 150px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid #ff6b6b;
+        border-radius: 6px;
+        padding: 6px 10px;
+        width: 260px;
+        display: none;
+        pointer-events: auto;
+        z-index: 400;
+        font-family: monospace;
+      }
+
+      #block-debug-panel.open {
+        display: block;
+      }
+
+      #block-debug-panel h3 {
+        color: #ff6b6b;
+        font-size: 10px;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-CaEccH-e.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/three-D4D5j67r.js">
+    <link rel="modulepreload" crossorigin href="./assets/rapier-DeOqvUG4.js">
+  </head>
+  <body>
+    <div id="app">
+      <!-- Loading Screen -->
+      <div id="loading">
+        <h1>⛏️ DEEP CORE</h1>
+        <div id="loading-bar-container">
+          <div id="loading-bar"></div>
+        </div>
+        <p id="loading-text">Initializing...</p>
+      </div>
+      
+      <!-- Game Canvas -->
+      <canvas id="game-canvas"></canvas>
+      
+      <!-- UI Overlay -->
+      <div id="ui-overlay" class="hidden">
+        <!-- Depth Counter -->
+        <div id="depth-counter">⬇️ Depth: <span id="depth-value">0</span>m</div>
+        
+        <!-- Hero HUD -->
+        <div id="hero-hud">
+          <div id="hero-portrait">⛏️</div>
+          <div id="fuel-bar-container">
+            <div id="fuel-bar"></div>
+          </div>
+        </div>
+        
+        <!-- Gold Counter -->
+        <div id="gold-counter">
+          <span id="gold-icon">🪙</span>
+          <span id="gold-value">0</span>
+        </div>
+        
+        <!-- Shop Button -->
+        <button id="shop-btn">🛒</button>
+        
+        <!-- Tool Belt -->
+        <div id="tool-belt">
+          <div class="tool-slot active" data-tool="pickaxe">⛏️</div>
+          <div class="tool-slot" data-tool="shovel">🪓</div>
+          <div class="tool-slot" data-tool="drill">🔧</div>
+        </div>
+        
+        <!-- Turbo Button -->
+        <button id="turbo-btn">TURBO</button>
+      </div>
+      
+      <!-- Shop Modal -->
+      <div id="shop-modal">
+        <div id="shop-content">
+          <h2>🛒 UPGRADES</h2>
+          <div class="shop-item">
+            <div class="shop-item-info">
+              <div class="shop-item-name">⛏️ Power Up</div>
+              <div class="shop-item-desc">+25% Tool Damage</div>
+            </div>
+            <button class="shop-item-btn" data-upgrade="damage">💰 50</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-info">
+              <div class="shop-item-name">⚡ Turbo Fuel</div>
+              <div class="shop-item-desc">Refill Turbo Mode</div>
+            </div>
+            <button class="shop-item-btn" data-upgrade="turbo">💰 30</button>
+          </div>
+          <div class="shop-item">
+            <div class="shop-item-info">
+              <div class="shop-item-name">🤖 Auto Drone</div>
+              <div class="shop-item-desc">Auto-collect loot</div>
+            </div>
+            <button class="shop-item-btn" data-upgrade="drone">💰 100</button>
+          </div>
+          <button id="shop-close">Close</button>
+        </div>
+      </div>
+      
+      <!-- Debug Panel -->
+      <div id="debug-panel">
+        <h2>🔧 LIGHT DEBUG</h2>
+        
+        <div class="debug-control">
+          <div class="debug-label">
+            <span>Hemi Intensity</span>
+            <span class="debug-value" id="debug-hemi-intensity">0.6</span>
+          </div>
+          <input type="range" class="debug-slider" id="debug-hemi-intensity-slider" min="0" max="3" step="0.1" value="0.6">
+        </div>
+        
+        <div class="debug-control">
+          <div class="debug-label">
+            <span>Hemi Sky Color</span>
+          </div>
+          <input type="color" class="debug-color-picker" id="debug-hemi-color" value="#b1e1ff">
+        </div>
+        
+        <div class="debug-control">
+          <div class="debug-label">
+            <span>Sun Intensity</span>
+            <span class="debug-value" id="debug-sun-intensity">1.15</span>
+          </div>
+          <input type="range" class="debug-slider" id="debug-sun-intensity-slider" min="0" max="3" step="0.05" value="1.15">
+        </div>
+        
+        <div class="debug-control">
+          <div class="debug-label">
+            <span>Sun Color</span>
+          </div>
+          <input type="color" class="debug-color-picker" id="debug-sun-color" value="#fff1dd">
+        </div>
+        
+        <div class="debug-control">
+          <div class="debug-label">
+            <span>Rim Intensity</span>
+            <span class="debug-value" id="debug-rim-intensity">0.35</span>
+          </div>
+          <input type="range" class="debug-slider" id="debug-rim-intensity-slider" min="0" max="2" step="0.05" value="0.35">
+        </div>
+        
+        <div class="debug-control">
+          <div class="debug-label">
+            <span>Rim Color</span>
+          </div>
+          <input type="color" class="debug-color-picker" id="debug-rim-color" value="#88aaff">
+        </div>
+        
+        <div class="debug-control">
+          <div class="debug-label">
+            <span>Exposure</span>
+            <span class="debug-value" id="debug-exposure">1.0</span>
+          </div>
+          <input type="range" class="debug-slider" id="debug-exposure-slider" min="0.5" max="3" step="0.1" value="1.0">
+        </div>
+        
+        <button id="debug-close">Close</button>
+      </div>
+
+      <!-- Performance Panel (Separate and Compact) -->
+      <div id="perf-panel">
+        <h3>Performance</h3>
+        
+        <div class="perf-stats">
+          <div class="perf-item">
+            <span>FPS</span>
+            <span class="perf-data" id="perf-fps">0</span>
+          </div>
+          <div class="perf-item">
+            <span>Draws</span>
+            <span class="perf-data" id="perf-meshes">0</span>
+          </div>
+          <div class="perf-item">
+            <span>Polys</span>
+            <span class="perf-data" id="perf-polys">0</span>
+          </div>
+          <div class="perf-item">
+            <span>RAM</span>
+            <span class="perf-data" id="perf-memory">0MB</span>
+          </div>
+        </div>
+        
+        <canvas id="perf-graph"></canvas>
+        
+        <div class="perf-legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background: #4ecdc4;"></div>
+            <span>Frame</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #ff6b6b;"></div>
+            <span>Phys</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background: #f7c531;"></div>
+            <span>Render</span>
+          </div>
+        </div>
+
+        <div class="perf-debug-toggle">
+          <span>Show Debug</span>
+          <input type="checkbox" id="perf-visuals-checkbox">
+        </div>
+      </div>
+
+      <!-- Block Debug Panel -->
+      <div id="block-debug-panel" class="hidden">
+        <h3>Block Info</h3>
+        <div class="perf-stats">
+          <div class="perf-item">
+            <span>Type</span>
+            <span class="perf-data" id="debug-block-type">-</span>
+          </div>
+          <div class="perf-item">
+            <span>Pos</span>
+            <span class="perf-data" id="debug-block-pos">-</span>
+          </div>
+          <div class="perf-item">
+            <span>HP</span>
+            <span class="perf-data" id="debug-block-hp">-</span>
+          </div>
+          <div class="perf-item">
+            <span>Stability</span>
+            <span class="perf-data" id="debug-block-stability">-</span>
+          </div>
+          <div class="perf-item">
+            <span>Wobble</span>
+            <span class="perf-data" id="debug-block-wobble">-</span>
+          </div>
+          <div class="perf-item">
+            <span>Neighbors</span>
+            <span class="perf-data" id="debug-block-neighbors">-</span>
+          </div>
+          <div class="perf-item">
+            <span>Cluster</span>
+            <span class="perf-data" id="debug-block-cluster">-</span>
+          </div>
+          <div class="perf-item">
+            <span>Grip</span>
+            <span class="perf-data" id="debug-block-grip">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </body>
+</html>

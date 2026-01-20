@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="fav-generic.png">
     
     <!-- Open Graph Tags -->
     <meta property="og:title" content="Jira Solitaire: Канбан-пасьянс">
@@ -13,6 +12,30 @@
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
 
+    <!-- Favicon -->
+    <link rel="icon" href="fav-generic.png">
+
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function (m, e, t, r, i, k, a) {
+            m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+            m[i].l = 1 * new Date();
+            for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+            k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+        })
+            (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+        ym(98653129, "init", {
+            clickmap: true,
+            trackLinks: true,
+            accurateTrackBounce: true
+        });
+    </script>
+    <noscript>
+        <div><img src="https://mc.yandex.ru/watch/98653129" style="position:absolute; left:-9999px;" alt="" /></div>
+    </noscript>
+    <!-- /Yandex.Metrika counter -->
+
     <title>Jira Board - Sprint 42</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,46 +43,138 @@
 
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: #F4F5F7; /* Jira background color */
+            background-color: #ffffff; /* White outer background like Jira app */
             color: #172B4D;
             overflow: hidden;
             user-select: none;
         }
 
-        /* Card (Ticket) Styling */
+        /* --- Layout Grid --- */
+        #game-layout {
+            display: flex;
+            height: calc(100vh - 56px);
+        }
+
+        #game-container {
+            flex-grow: 1;
+            padding: 24px;
+            overflow-y: auto;
+            background-color: #ffffff;
+            /* Center the board content */
+            display: flex;
+            flex-direction: column;
+            align-items: center; 
+        }
+
+        .board-wrapper {
+            width: 100%;
+            max-width: 1600px; /* Prevent it from getting too wide on ultrawide monitors */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Top Row (Stock & Foundations) */
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0 10px; /* Align with columns padding */
+        }
+
+        .stock-group {
+            display: flex;
+            gap: 16px;
+        }
+
+        .foundation-group {
+            display: flex;
+            gap: 16px;
+        }
+
+        /* Tableau Grid */
+        .tableau-area {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr); /* 7 Equal Columns */
+            gap: 16px; /* Spacing between columns */
+            width: 100%;
+            flex-grow: 1;
+        }
+
+        /* Kanban Column Styling */
+        .column {
+            background-color: #F4F5F7; /* Jira Column Grey */
+            border-radius: 6px;
+            min-height: 500px;
+            padding: 8px 8px 40px 8px; /* Extra bottom padding */
+            position: relative;
+            transition: background-color 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .column:hover {
+            background-color: #EBECF0;
+        }
+
+        .column-header {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #5E6C84;
+            margin-bottom: 12px;
+            padding-left: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* --- Card Styling --- */
         .card {
-            width: 130px;
-            height: 170px;
+            /* Fluid width! */
+            width: 100%; 
+            height: 140px; /* Slightly shorter for better density */
             background-color: white;
             border-radius: 3px;
             box-shadow: 0 1px 2px rgba(9, 30, 66, 0.25);
-            position: absolute;
+            position: absolute; /* Still absolute for stacking logic */
             transition: box-shadow 0.2s;
             cursor: grab;
             display: flex;
             flex-direction: column;
-            padding: 8px;
+            padding: 10px;
             box-sizing: border-box;
             font-size: 12px;
+            left: 0; /* Align inside relative parent */
+        }
+
+        /* Slots (Stock/Foundation) need fixed dimensions to look good, 
+           OR we make them match the grid. Let's keep them fixed size 
+           but slightly larger to match the feel. */
+        .slot {
+            width: 140px;
+            height: 140px;
+            border: 2px dashed #DFE1E6;
+            border-radius: 3px;
+            position: relative;
+            background-color: rgba(244, 245, 247, 0.5);
+            flex-shrink: 0;
+        }
+        
+        .card.dragging {
+            cursor: grabbing;
+            z-index: 1000 !important;
+            box-shadow: 0 10px 20px rgba(9, 30, 66, 0.3);
+            transform: scale(1.02) rotate(2deg); /* Nice effect */
+            position: fixed; /* Fixed relative to viewport when dragging */
         }
 
         .card:hover {
             background-color: #EBECF0;
         }
 
-        .card.dragging {
-            cursor: grabbing;
-            z-index: 1000 !important;
-            box-shadow: 0 5px 10px rgba(9, 30, 66, 0.3);
-            transform: scale(1.02);
-        }
-
-        /* Loading Skeleton (Card Back) */
+        /* Loading Skeleton */
         .card-back {
             background-color: #ffffff;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
             border: 1px solid #DFE1E6;
         }
         
@@ -67,7 +182,7 @@
             height: 8px;
             background-color: #EBECF0;
             border-radius: 4px;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             animation: pulse 1.5s infinite ease-in-out;
         }
         
@@ -86,7 +201,6 @@
             100% { opacity: 0.6; }
         }
 
-        /* Side border for priority */
         .priority-strip {
             position: absolute;
             left: 0;
@@ -95,16 +209,6 @@
             width: 4px;
             border-top-left-radius: 3px;
             border-bottom-left-radius: 3px;
-        }
-
-        /* Drop Zones */
-        .slot {
-            width: 130px;
-            height: 170px;
-            border: 2px dashed #DFE1E6;
-            border-radius: 3px;
-            position: relative;
-            background-color: rgba(235, 236, 240, 0.3);
         }
 
         .foundation-slot::before {
@@ -116,61 +220,9 @@
             color: #A5ADBA;
             font-weight: bold;
         }
-        
-        .tableau-slot::before {
-            content: 'Drop';
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #A5ADBA;
-            font-size: 10px;
-        }
 
-        /* Game Area Layout */
-        #game-board {
-            display: flex;
-            padding: 20px;
-            gap: 20px;
-            height: calc(100vh - 60px);
-        }
-
-        .top-row {
-            display: flex;
-            gap: 24px; /* Increased gap */
-            margin-bottom: 20px;
-        }
-
-        .stock-waste-area {
-            display: flex;
-            gap: 24px; /* Increased gap */
-            min-width: 280px;
-        }
-
-        .foundations-area {
-            display: flex;
-            gap: 24px; /* Increased gap from 14px to 24px */
-        }
-
-        .tableau-area {
-            display: flex;
-            gap: 24px; /* Increased gap from 14px to 24px */
-            position: relative;
-            flex-grow: 1;
-        }
-
-        .column {
-            width: 130px;
-            position: relative;
-            min-height: 400px;
-        }
-        
         /* Icons */
-        .icon-sm { width: 14px; height: 14px; }
-        .priority-icon {
-            width: 20px;
-            height: 20px;
-        }
+        .priority-icon { width: 18px; height: 18px; }
         .avatar {
             width: 24px;
             height: 24px;
@@ -182,15 +234,9 @@
             font-weight: bold;
             font-size: 10px;
             text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+            flex-shrink: 0;
         }
 
-        /* Specific Colors */
-        .bg-jira-blue { background-color: #0052CC; }
-        .bg-jira-red { background-color: #FF5630; }
-        .bg-jira-orange { background-color: #FFAB00; }
-        .bg-jira-green { background-color: #36B37E; }
-        .text-jira-gray { color: #5E6C84; }
-        
         /* Sidebar Simulation */
         .sidebar-item {
             padding: 10px 16px;
@@ -199,9 +245,11 @@
             gap: 10px;
             color: #42526E;
             cursor: pointer;
+            border-radius: 3px;
+            margin: 0 8px;
         }
         .sidebar-item:hover { background-color: #EBECF0; }
-        .sidebar-item.active { background-color: #DEEBFF; color: #0052CC; }
+        .sidebar-item.active { background-color: #E6EFFC; color: #0052CC; }
         
         /* SLA Panel */
         .sla-panel {
@@ -223,16 +271,15 @@
         }
 
         /* Ticket Content */
-        .ticket-id { font-size: 10px; color: #5E6C84; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;} /* Changed align-items to center */
-        .ticket-summary { font-size: 11px; color: #172B4D; font-weight: 500; line-height: 1.4; flex-grow: 1; overflow: hidden; padding-right: 2px; }
+        .ticket-id { font-size: 10px; color: #5E6C84; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;}
+        .ticket-summary { font-size: 12px; color: #172B4D; font-weight: 500; line-height: 1.4; flex-grow: 1; overflow: hidden; padding-right: 4px; margin-bottom: 4px; }
         .ticket-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
         .story-points { 
             background: #DFE1E6; 
-            /* Color removed here, setting dynamically */ 
-            border-radius: 6px; 
+            border-radius: 10px; 
             padding: 2px 8px; 
-            font-size: 14px; /* Increased size */
-            font-weight: 800; /* Extra Bold */
+            font-size: 11px;
+            font-weight: 700;
             min-width: 24px;
             text-align: center;
             display: flex;
@@ -273,29 +320,9 @@
     </style>
 </head>
 <body>
-      <!-- Yandex.Metrika counter -->
-  <script type="text/javascript">
-    (function (m, e, t, r, i, k, a) {
-      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
-      m[i].l = 1 * new Date();
-      for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
-      k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
-    })
-      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-
-    ym(98653129, "init", {
-      clickmap: true,
-      trackLinks: true,
-      accurateTrackBounce: true
-    });
-  </script>
-  <noscript>
-    <div><img src="https://mc.yandex.ru/watch/98653129" style="position:absolute; left:-9999px;" alt="" /></div>
-  </noscript>
-  <!-- /Yandex.Metrika counter -->
 
     <!-- Fake Navbar -->
-    <nav class="h-[56px] bg-white border-b border-[#DFE1E6] flex items-center px-4 justify-between z-50 relative">
+    <nav class="h-[56px] bg-white border-b border-[#DFE1E6] flex items-center px-4 justify-between z-50 relative shadow-sm">
         <div class="flex items-center gap-6">
             <div class="flex items-center gap-2 font-bold text-[#0052CC] text-xl">
                 <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M11 2H2v20h9V2zm2 0v20h9V2h-9z"/></svg>
@@ -306,14 +333,13 @@
                 <span class="cursor-pointer hover:text-[#0052CC]">Projects</span>
                 <span class="cursor-pointer hover:text-[#0052CC]">Filters</span>
                 <span class="cursor-pointer hover:text-[#0052CC]">Dashboards</span>
-                <button onclick="newGame()" class="bg-[#0052CC] text-white px-3 py-1 rounded hover:bg-blue-700 transition">Create Sprint</button>
+                <button onclick="newGame()" class="bg-[#0052CC] text-white px-3 py-1 rounded hover:bg-blue-700 transition font-medium">Create Sprint</button>
             </div>
         </div>
         <div class="flex items-center gap-4">
              <div class="relative hidden sm:block">
                 <input type="text" placeholder="Search" class="border border-[#DFE1E6] rounded px-2 py-1 text-sm w-40 focus:outline-none focus:border-[#0052CC]">
              </div>
-             <!-- Share Button (Jira Style) -->
              <button onclick="shareGame()" class="flex items-center gap-2 text-[#42526E] hover:bg-[#EBECF0] px-2 py-1 rounded transition text-sm font-medium">
                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
                  Share
@@ -322,11 +348,11 @@
         </div>
     </nav>
 
-    <div class="flex h-full">
+    <div id="game-layout">
         <!-- Fake Sidebar -->
-        <div class="w-[240px] bg-[#F4F5F7] border-r border-[#DFE1E6] hidden lg:flex flex-col h-[calc(100vh-56px)] pt-6">
-            <div class="px-4 mb-4 flex items-center gap-3">
-                <div class="w-8 h-8 bg-[#FF5630] rounded flex items-center justify-center text-white font-bold">P1</div>
+        <div class="w-[240px] bg-[#F4F5F7] border-r border-[#DFE1E6] hidden lg:flex flex-col pt-6 flex-shrink-0">
+            <div class="px-6 mb-6 flex items-center gap-3">
+                <div class="w-8 h-8 bg-[#FF5630] rounded flex items-center justify-center text-white font-bold shadow-sm">P1</div>
                 <div>
                     <div class="font-bold text-sm text-[#172B4D]">Project X</div>
                     <div class="text-xs text-[#5E6C84]">Software Project</div>
@@ -334,21 +360,26 @@
             </div>
             <div class="sidebar-item active">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                Board
+                Sprint Board
             </div>
             <div class="sidebar-item">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
                 Backlog
             </div>
-            <div class="mt-6 px-4 text-xs font-bold text-[#5E6C84] uppercase">Filters</div>
             <div class="sidebar-item">
-                <span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span> My Issues
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Reports
+            </div>
+            
+            <div class="mt-8 px-6 text-xs font-bold text-[#5E6C84] uppercase tracking-wide">Quick Filters</div>
+            <div class="sidebar-item mt-2">
+                <span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span> Only My Issues
             </div>
              <div class="sidebar-item">
                 <span class="w-2 h-2 rounded-full bg-green-500 mr-2"></span> Recently Updated
             </div>
 
-            <!-- SLA Panel (New) -->
+            <!-- SLA Panel -->
             <div class="sla-panel">
                 <div class="flex justify-between items-center mb-1">
                     <span class="text-xs font-bold text-[#42526E]">SLA STATUS</span>
@@ -359,11 +390,11 @@
                     <div id="sla-bar" class="sla-fill" style="width: 0%"></div>
                 </div>
                 <div class="mt-4 flex gap-2">
-                    <div class="flex-1 bg-white p-2 rounded border border-[#DFE1E6] text-center">
+                    <div class="flex-1 bg-white p-2 rounded border border-[#DFE1E6] text-center shadow-sm">
                         <div class="text-[10px] text-[#5E6C84]">Velocity</div>
                         <div class="text-xs font-bold text-[#172B4D]">High</div>
                     </div>
-                    <div class="flex-1 bg-white p-2 rounded border border-[#DFE1E6] text-center">
+                    <div class="flex-1 bg-white p-2 rounded border border-[#DFE1E6] text-center shadow-sm">
                         <div class="text-[10px] text-[#5E6C84]">Bugs</div>
                         <div class="text-xs font-bold text-[#FF5630]">Critical</div>
                     </div>
@@ -372,66 +403,103 @@
         </div>
 
         <!-- Main Game Board -->
-        <div class="flex-grow p-6 overflow-hidden relative" id="game-container">
-            <div class="flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-medium text-[#172B4D]">Sprint 42 Board</h1>
-                <div class="text-sm text-[#5E6C84]">Double click foundation to auto-complete</div>
-            </div>
-
-            <!-- Top Area: Stock/Waste & Foundations -->
-            <div class="top-row">
-                <!-- Stock (Backlog) -->
-                <div class="stock-waste-area">
+        <div id="game-container">
+            <div class="board-wrapper">
+                
+                <div class="flex justify-between items-end px-2">
                     <div>
-                        <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase">Backlog</div>
-                        <div id="stock" class="slot cursor-pointer flex items-center justify-center text-[#5E6C84] text-xs font-bold bg-white border border-[#DFE1E6]">
-                            <div class="text-center">
-                                <div>RELOAD</div>
-                                <svg class="w-6 h-6 mx-auto mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <div class="text-sm text-[#5E6C84] mb-1">Projects / Project X / Sprint 42</div>
+                        <h1 class="text-2xl font-semibold text-[#172B4D]">Sprint 42 Active Board</h1>
+                    </div>
+                    <div class="text-sm text-[#5E6C84] bg-[#F4F5F7] px-3 py-1 rounded">
+                        Double click to auto-complete
+                    </div>
+                </div>
+
+                <!-- Top Area: Stock/Waste & Foundations -->
+                <div class="top-row">
+                    <!-- Stock (Backlog) -->
+                    <div class="stock-group">
+                        <div>
+                            <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Backlog</div>
+                            <div id="stock" class="slot cursor-pointer flex items-center justify-center text-[#5E6C84] text-xs font-bold bg-white border border-[#DFE1E6]">
+                                <div class="text-center">
+                                    <div>RELOAD</div>
+                                    <svg class="w-6 h-6 mx-auto mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                </div>
                             </div>
                         </div>
+                        <div>
+                            <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">In Review</div>
+                            <div id="waste" class="slot"></div>
+                        </div>
                     </div>
-                    <div>
-                        <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase">Selected for Dev</div>
-                        <div id="waste" class="slot"></div>
+
+                    <!-- Foundations (Done) -->
+                    <div class="foundation-group">
+                        <div>
+                             <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Blocker</div>
+                             <div id="foundation-0" class="slot foundation-slot" data-suit="h"></div>
+                        </div>
+                        <div>
+                             <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Critical</div>
+                             <div id="foundation-1" class="slot foundation-slot" data-suit="d"></div>
+                        </div>
+                        <div>
+                             <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Major</div>
+                             <div id="foundation-2" class="slot foundation-slot" data-suit="s"></div>
+                        </div>
+                        <div>
+                             <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Minor</div>
+                             <div id="foundation-3" class="slot foundation-slot" data-suit="c"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Spacer -->
-                <div class="flex-grow"></div>
-
-                <!-- Foundations (Done) -->
-                <div class="foundations-area">
-                    <div>
-                         <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Blocker</div>
-                         <div id="foundation-0" class="slot foundation-slot" data-suit="h"></div>
-                    </div>
-                    <div>
-                         <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Critical</div>
-                         <div id="foundation-1" class="slot foundation-slot" data-suit="d"></div>
-                    </div>
-                    <div>
-                         <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Major</div>
-                         <div id="foundation-2" class="slot foundation-slot" data-suit="s"></div>
-                    </div>
-                    <div>
-                         <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase text-center">Minor</div>
-                         <div id="foundation-3" class="slot foundation-slot" data-suit="c"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tableau (Columns) -->
-            <div>
-                <div class="text-xs font-bold text-[#5E6C84] mb-2 uppercase">In Progress</div>
+                <!-- Tableau (Columns) -->
                 <div class="tableau-area">
-                    <div id="tableau-0" class="column"></div>
-                    <div id="tableau-1" class="column"></div>
-                    <div id="tableau-2" class="column"></div>
-                    <div id="tableau-3" class="column"></div>
-                    <div id="tableau-4" class="column"></div>
-                    <div id="tableau-5" class="column"></div>
-                    <div id="tableau-6" class="column"></div>
+                    <div id="tableau-0" class="column">
+                        <div class="column-header">
+                            <span>To Do</span>
+                            <span class="bg-[#DFE1E6] rounded-full px-2 text-[10px] py-0.5">2</span>
+                        </div>
+                    </div>
+                    <div id="tableau-1" class="column">
+                        <div class="column-header">
+                            <span>Analysis</span>
+                            <span class="bg-[#DFE1E6] rounded-full px-2 text-[10px] py-0.5">3</span>
+                        </div>
+                    </div>
+                    <div id="tableau-2" class="column">
+                        <div class="column-header">
+                            <span>In Progress</span>
+                            <span class="bg-[#DFE1E6] rounded-full px-2 text-[10px] py-0.5">5</span>
+                        </div>
+                    </div>
+                    <div id="tableau-3" class="column">
+                        <div class="column-header">
+                            <span>Code Review</span>
+                            <span class="bg-[#DFE1E6] rounded-full px-2 text-[10px] py-0.5">8</span>
+                        </div>
+                    </div>
+                    <div id="tableau-4" class="column">
+                        <div class="column-header">
+                            <span>Testing</span>
+                            <span class="bg-[#DFE1E6] rounded-full px-2 text-[10px] py-0.5">3</span>
+                        </div>
+                    </div>
+                    <div id="tableau-5" class="column">
+                        <div class="column-header">
+                            <span>UAT</span>
+                            <span class="bg-[#DFE1E6] rounded-full px-2 text-[10px] py-0.5">2</span>
+                        </div>
+                    </div>
+                    <div id="tableau-6" class="column">
+                        <div class="column-header">
+                            <span>Ready to Prod</span>
+                            <span class="bg-[#DFE1E6] rounded-full px-2 text-[10px] py-0.5">1</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -475,8 +543,6 @@
             minor: `<svg viewBox="0 0 24 24" fill="currentColor" class="priority-icon text-[#00875A]"><path d="M7 10l5 5 5-5z"/></svg>`  // Arrow Down
         };
 
-        // Unified colors for Solitaire gameplay (Red vs Blue)
-        // Icons remain distinct colors, but strips and avatars follow the 2-color rule
         const suitConfig = {
             'h': { color: 'red', label: 'Blocker', svg: icons.blocker, strip: '#FF5630' },   // Red
             'd': { color: 'red', label: 'Critical', svg: icons.critical, strip: '#FF5630' },  // Red (was Orange-ish)
@@ -488,18 +554,10 @@
         const rankLabels = {
             1: 'A', 11: 'J', 12: 'Q', 13: 'K'
         };
-        const rankTitles = {
-            1: 'Intern Task',
-            11: 'Dev Task',
-            12: 'QA Task',
-            13: 'PO Task'
-        };
         const avatarInitials = {
             11: 'JD', 12: 'QA', 13: 'PO', 1: 'IN'
         };
-        // Removed static avatarColors, we will use suit colors now
 
-        // Funny Jira-like summaries
         const summaries = [
             "Fix alignment in footer", "Update React dependency", "Meeting about meetings", 
             "Refactor legacy spaghetti", "Change button color", "Investigate slow query",
@@ -507,7 +565,9 @@
             "Update documentation", "Center the div", "Resolve merge conflict",
             "Optimize images", "Fix mobile layout", "Update API schema",
             "Customer reported bug", "Feature flag cleanup", "Remove console.log",
-            "Upgrade database", "Fix typo in header"
+            "Upgrade database", "Fix typo in header", "Refactor Auth module",
+            "Implement Dark Mode", "Update 3rd party libs", "Design new logo",
+            "Setup CI/CD pipeline", "Fix memory leak", "Add infinite scroll"
         ];
 
         let deck = [];
@@ -517,8 +577,8 @@
         let tableau = [[], [], [], [], [], [], []];
 
         // Drag State
-        let dragSource = null; // { type: 'waste' | 'tableau' | 'foundation', index: int, cardIndex: int }
-        let draggedCards = []; // Array of DOM elements
+        let dragSource = null; 
+        let draggedCards = [];
         let dragStartPos = { x: 0, y: 0 };
         let dragOffset = { x: 0, y: 0 };
 
@@ -528,12 +588,8 @@
             const url = "https://gritsenko.biz/jira/";
             const text = "Я закрыл спринт в Jira Solitaire! Попробуй и ты: ";
             
-            // Try to copy to clipboard
-            // Fallback for older browsers or if navigator.clipboard is blocked
             const textArea = document.createElement("textarea");
             textArea.value = url;
-            
-            // Avoid scrolling to bottom
             textArea.style.top = "0";
             textArea.style.left = "0";
             textArea.style.position = "fixed";
@@ -624,14 +680,9 @@
             const rankLabel = rankLabels[card.rank] || card.rank;
             const isFace = card.rank > 10 || card.rank === 1;
             
-            // Updated Avatar Logic: 
-            // 1. Always use suit color for background to make Priority visible
-            // 2. Use 'PM' for non-face cards
             const avatarColor = config.strip; 
             const avatarTextColor = 'white';
             const initials = isFace ? avatarInitials[card.rank] : 'PM';
-            
-            // Use the strip color (Red/Blue) for the rank text as well
             const rankColor = config.strip;
             
             el.className = 'card';
@@ -644,14 +695,12 @@
                 <div class="pl-2 h-full flex flex-col">
                     <div class="ticket-id">
                         <span>${card.id}</span>
-                        <!-- Rank (Story Points) moved to header for visibility in stacks -->
                         <div class="story-points" title="Story Points" style="color: ${rankColor}">${rankLabel}</div>
                     </div>
                     <div class="ticket-summary">
                         ${card.summary}
                     </div>
                     <div class="ticket-footer">
-                        <!-- Priority Icon moved to footer -->
                         <span title="${config.label}">${config.svg}</span>
                         <div class="avatar" style="background-color: ${avatarColor}; color: ${avatarTextColor}">${initials}</div>
                     </div>
@@ -663,24 +712,25 @@
         // --- Rendering ---
 
         function renderBoard() {
-            // Update SLA Panel
             updateStats();
 
             // Render Stock
             const stockEl = document.getElementById('stock');
             stockEl.innerHTML = '';
             if (stock.length > 0) {
-                // Show a card back
                 const cardBack = document.createElement('div');
                 cardBack.className = 'card card-back';
                 cardBack.style.position = 'relative';
+                // Reset card styles for slot
+                cardBack.style.width = '100%';
+                cardBack.style.height = '100%';
                 cardBack.style.top = '0';
                 cardBack.style.left = '0';
+                
                 cardBack.innerHTML = `<div style="padding: 10px;"><div class="skeleton-line" style="width:50%"></div></div>`;
                 stockEl.appendChild(cardBack);
                 stockEl.onclick = drawCard;
             } else {
-                // Empty stock symbol
                 stockEl.innerHTML = `
                     <div class="text-center">
                         <div>RELOAD</div>
@@ -695,6 +745,12 @@
             if (waste.length > 0) {
                 const card = waste[waste.length - 1];
                 const cardEl = createCardElement(card);
+                // Adjust style for slot
+                cardEl.style.position = 'relative';
+                cardEl.style.width = '100%';
+                cardEl.style.height = '100%';
+                cardEl.style.top = '0';
+                
                 makeDraggable(cardEl, 'waste', waste.length - 1);
                 wasteEl.appendChild(cardEl);
             }
@@ -706,21 +762,47 @@
                 if (pile.length > 0) {
                     const card = pile[pile.length - 1];
                     const cardEl = createCardElement(card);
-                    // Disable dragging from foundation for simplicity in this version, or enable if desired
-                    // makeDraggable(cardEl, 'foundation', index); 
+                    // Adjust style for slot
+                    cardEl.style.position = 'relative';
+                    cardEl.style.width = '100%';
+                    cardEl.style.height = '100%';
+                    cardEl.style.top = '0';
+                    
                     container.appendChild(cardEl);
                 }
             });
 
             // Render Tableau
             tableau.forEach((col, colIndex) => {
+                // Keep header!
                 const container = document.getElementById(`tableau-${colIndex}`);
+                // Save header
+                const header = container.querySelector('.column-header');
                 container.innerHTML = '';
+                if(header) container.appendChild(header);
+
+                // Update badge count
+                if(header) {
+                     const badge = header.querySelector('span:last-child');
+                     if(badge) badge.innerText = col.length;
+                }
+                
+                // Add cards container area below header
+                // We'll just append absolute cards relative to column
                 
                 col.forEach((card, cardIndex) => {
                     const cardEl = createCardElement(card);
-                    // Increased spacing from 30px to 40px for better visibility
-                    cardEl.style.top = `${cardIndex * 40}px`; 
+                    // Position relative to the column padding
+                    // Top offset needs to account for header (~30px) + 8px padding
+                    const startTop = 38; 
+                    const overlap = 40; 
+                    cardEl.style.top = `${startTop + (cardIndex * overlap)}px`;
+                    // Left/Width is handled by CSS (width: 100%, left: 0) but we need to respect padding
+                    // Actually .card is absolute, so width: 100% takes full column width.
+                    // We want it to respect column padding.
+                    // Best way: set left: 8px, right: 8px (or width: calc(100% - 16px))
+                    cardEl.style.left = '8px';
+                    cardEl.style.width = 'calc(100% - 16px)';
                     
                     if (card.faceUp) {
                         makeDraggable(cardEl, 'tableau', colIndex, cardIndex);
@@ -738,13 +820,9 @@
         function updateStats() {
             let totalDone = 0;
             foundations.forEach(f => totalDone += f.length);
-            
             document.getElementById('resolved-count').innerText = totalDone;
-            
             const percent = (totalDone / 52) * 100;
             document.getElementById('sla-bar').style.width = `${percent}%`;
-            
-            // Change SLA status text based on progress
             const slaText = document.getElementById('sla-timer');
             if(percent === 100) {
                 slaText.innerText = "SPRINT DONE";
@@ -784,12 +862,13 @@
 
                 dragSource = { type, listIndex, cardIndex: cardIndexInList };
                 
-                // Identify elements to hide (original cards being dragged)
                 const hiddenElements = [];
                 hiddenElements.push(el);
                 
-                // If Tableau, we might be dragging a stack, so hide siblings underneath (visually on top)
                 if (type === 'tableau') {
+                    // In tableau, cards are siblings. Find next siblings.
+                    // But wait, our column structure might have header.
+                    // 'el' is the card div.
                     let sibling = el.nextElementSibling;
                     while(sibling) {
                         hiddenElements.push(sibling);
@@ -797,16 +876,13 @@
                     }
                 }
                 
-                // Hide originals immediately
                 hiddenElements.forEach(elem => elem.style.opacity = '0');
 
-                // If Tableau, we might be dragging a stack
                 draggedCards = [];
                 let cardsData = [];
 
                 if (type === 'tableau') {
                     const col = tableau[listIndex];
-                    // Get all cards from cardIndex to end
                     for(let i = cardIndexInList; i < col.length; i++) {
                         cardsData.push(col[i]);
                     }
@@ -814,41 +890,36 @@
                     cardsData.push(waste[listIndex]);
                 }
 
-                // Create visual clones
-                const container = document.getElementById('game-container');
+                // Important: Calculate exact width for the clone
+                // Because 'width: 100%' in the clone (attached to body) means screen width
                 const rect = el.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
                 
                 dragOffset = {
                     x: e.clientX - rect.left,
                     y: e.clientY - rect.top
                 };
 
-                dragStartPos = {
-                    x: rect.left - containerRect.left,
-                    y: rect.top - containerRect.top
-                };
-
-                cardsData.forEach((c, i) => {
+                draggedCards = cardsData.map((c, i) => {
                     const clone = createCardElement(c);
                     clone.classList.add('dragging');
-                    clone.style.left = (dragStartPos.x) + 'px';
-                    // Match spacing in drag preview
-                    clone.style.top = (dragStartPos.y + (i * 40)) + 'px'; 
-                    clone.style.pointerEvents = 'none'; // Pass through events to underlay
-                    container.appendChild(clone);
-                    draggedCards.push(clone);
+                    // Force exact dimensions
+                    clone.style.width = rect.width + 'px';
+                    clone.style.height = rect.height + 'px';
+                    
+                    clone.style.left = (rect.left) + 'px';
+                    clone.style.top = (rect.top + (i * 40)) + 'px';
+                    
+                    clone.style.pointerEvents = 'none';
+                    document.body.appendChild(clone);
+                    return clone;
                 });
 
-                // Helper for moving
                 function moveAt(pageX, pageY) {
-                    const containerRect = container.getBoundingClientRect();
-                    const x = pageX - containerRect.left - dragOffset.x;
-                    const y = pageY - containerRect.top - dragOffset.y;
+                    const x = pageX - dragOffset.x;
+                    const y = pageY - dragOffset.y;
                     
                     draggedCards.forEach((cardEl, i) => {
                         cardEl.style.left = x + 'px';
-                        // Match spacing in drag movement
                         cardEl.style.top = (y + (i * 40)) + 'px';
                     });
                 }
@@ -861,18 +932,12 @@
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
 
-                    // Check drop
                     handleDrop(e.clientX, e.clientY);
 
-                    // Remove visual clones
                     draggedCards.forEach(c => c.remove());
                     draggedCards = [];
                     dragSource = null;
                     
-                    // Show originals again.
-                    // If the move was successful, renderBoard() has already replaced these elements, 
-                    // so this affects detached nodes (harmless).
-                    // If the move was invalid, this restores the card visibility at the source.
                     hiddenElements.forEach(elem => elem.style.opacity = '1');
                 }
 
@@ -880,28 +945,27 @@
                 document.addEventListener('mouseup', onMouseUp);
             };
             
-            // Auto-move on double click
             el.ondblclick = function(e) {
                 e.stopPropagation();
-                // Simple auto move to foundation logic
                 let card;
                 if(type === 'waste') card = waste[waste.length-1];
                 if(type === 'tableau') card = tableau[listIndex][tableau[listIndex].length-1];
-                if(type === 'tableau' && cardIndexInList !== tableau[listIndex].length-1) return; // Can only double click top card
+                if(type === 'tableau' && cardIndexInList !== tableau[listIndex].length-1) return; 
 
                 if(card) {
-                    // Find suitable foundation
                     for(let i=0; i<4; i++) {
                         const pile = foundations[i];
                         if(pile.length === 0) {
-                            if(card.rank === 1) { // Ace
-                                moveCard(type, listIndex, 'foundation', i);
+                            if(card.rank === 1) { 
+                                // FIX: Pass cardIndexInList for tableau moves!
+                                moveCard(type, listIndex, 'foundation', i, cardIndexInList);
                                 return;
                             }
                         } else {
                             const top = pile[pile.length-1];
                             if(top.suit === card.suit && top.rank === card.rank - 1) {
-                                moveCard(type, listIndex, 'foundation', i);
+                                // FIX: Pass cardIndexInList for tableau moves!
+                                moveCard(type, listIndex, 'foundation', i, cardIndexInList);
                                 return;
                             }
                         }
@@ -911,25 +975,23 @@
         }
 
         function handleDrop(x, y) {
-            // Hide clones momentarily to find element below
             draggedCards.forEach(c => c.style.display = 'none');
             let elemBelow = document.elementFromPoint(x, y);
             draggedCards.forEach(c => c.style.display = 'block');
 
             if (!elemBelow) return;
 
-            // Find closest slot
+            // Find closest slot or column
             const slot = elemBelow.closest('.column') || elemBelow.closest('.foundation-slot');
             if (!slot) return;
 
-            // Identify Target
             let targetType = null;
             let targetIndex = null;
 
-            if (slot.id.startsWith('tableau')) {
+            if (slot.classList.contains('column')) {
                 targetType = 'tableau';
                 targetIndex = parseInt(slot.id.split('-')[1]);
-            } else if (slot.id.startsWith('foundation')) {
+            } else if (slot.classList.contains('foundation-slot')) {
                 targetType = 'foundation';
                 targetIndex = parseInt(slot.id.split('-')[1]);
             }
@@ -946,7 +1008,6 @@
                 ? waste[waste.length - 1] 
                 : tableau[dragSource.listIndex][dragSource.cardIndex];
 
-            // Can't move stack to foundation
             if (toType === 'foundation' && dragSource.type === 'tableau') {
                 if (dragSource.cardIndex !== tableau[dragSource.listIndex].length - 1) return false;
             }
@@ -954,7 +1015,7 @@
             if (toType === 'foundation') {
                 const pile = foundations[toIndex];
                 if (pile.length === 0) {
-                    return movingCard.rank === 1; // Must be Ace
+                    return movingCard.rank === 1; 
                 } else {
                     const top = pile[pile.length - 1];
                     return top.suit === movingCard.suit && top.rank === movingCard.rank - 1;
@@ -962,13 +1023,11 @@
             } else if (toType === 'tableau') {
                 const col = tableau[toIndex];
                 if (col.length === 0) {
-                    return movingCard.rank === 13; // King (PO) for empty column
+                    return movingCard.rank === 13; 
                 } else {
                     const top = col[col.length - 1];
                     const movingConfig = suitConfig[movingCard.suit];
                     const topConfig = suitConfig[top.suit];
-                    
-                    // Solitaire Rule: Alternating colors, Descending rank
                     return (movingConfig.color !== topConfig.color) && (top.rank === movingCard.rank + 1);
                 }
             }
@@ -978,20 +1037,16 @@
         function moveCard(fromType, fromIndex, toType, toIndex, cardIndexInList = null) {
             let cardsToMove = [];
             
-            // Extract Cards
             if (fromType === 'waste') {
                 cardsToMove.push(waste.pop());
             } else if (fromType === 'tableau') {
                 const col = tableau[fromIndex];
-                cardsToMove = col.splice(cardIndexInList); // remove from here to end
-                
-                // Reveal new top card if exists
+                cardsToMove = col.splice(cardIndexInList); 
                 if (col.length > 0) {
                     col[col.length - 1].faceUp = true;
                 }
             }
 
-            // Insert Cards
             if (toType === 'foundation') {
                 foundations[toIndex].push(cardsToMove[0]);
             } else if (toType === 'tableau') {
@@ -1016,7 +1071,6 @@
             renderBoard();
         }
 
-        // Start
         newGame();
 
     </script>

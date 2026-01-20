@@ -167,6 +167,13 @@
             transform: scale(1.02) rotate(2deg); /* Nice effect */
             position: fixed; /* Fixed relative to viewport when dragging */
         }
+        
+        /* Auto-move animation class */
+        .card.flying {
+            z-index: 2000 !important;
+            box-shadow: 0 15px 30px rgba(9, 30, 66, 0.4);
+            transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); /* Smooth easing */
+        }
 
         .card:hover {
             background-color: #EBECF0;
@@ -199,6 +206,29 @@
             0% { opacity: 0.6; }
             50% { opacity: 1; }
             100% { opacity: 0.6; }
+        }
+        
+        /* Attention Animation (Wiggle) */
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-3deg); }
+            50% { transform: rotate(3deg); }
+        }
+        
+        .attention-please {
+            color: #DE350B !important;
+            font-weight: bold !important;
+            animation: wiggle 0.5s ease-in-out infinite;
+            background-color: #FFEBE6 !important;
+        }
+
+        /* Soft Pulse Animation (Share) */
+        @keyframes soft-pulse {
+            0%, 100% { background-color: transparent; color: #42526E; }
+            50% { background-color: #DEEBFF; color: #0052CC; } /* Jira Blue selection color */
+        }
+        
+        .animate-soft-pulse {
+            animation: soft-pulse 2s ease-in-out;
         }
 
         .priority-strip {
@@ -247,6 +277,7 @@
             cursor: pointer;
             border-radius: 3px;
             margin: 0 8px;
+            transition: all 0.3s;
         }
         .sidebar-item:hover { background-color: #EBECF0; }
         .sidebar-item.active { background-color: #E6EFFC; color: #0052CC; }
@@ -366,11 +397,17 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
                 Backlog
             </div>
-            <div class="sidebar-item">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Reports
-            </div>
             
+            <div class="mt-8 px-6 text-xs font-bold text-[#5E6C84] uppercase tracking-wide">Help & Tools</div>
+            <div id="call-tl-btn" class="sidebar-item mt-2 text-[#DE350B]" onclick="callTeamLead()">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                Call Team Lead
+            </div>
+            <div id="share-btn" class="sidebar-item mt-1" onclick="shareGame()">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                 Share Game
+            </div>
+
             <div class="mt-8 px-6 text-xs font-bold text-[#5E6C84] uppercase tracking-wide">Quick Filters</div>
             <div class="sidebar-item mt-2">
                 <span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span> Only My Issues
@@ -400,6 +437,11 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Banner -->
+            <a href="https://adsadvisor.io?from=gritsenko" target="_blank" class="block mx-4 mb-4 mt-4 transition hover:opacity-90">
+                <img src="https://gritsenko.biz/jira/Banner.jpg" alt="AdsAdvisor" class="w-full rounded border border-[#DFE1E6] shadow-sm">
+            </a>
         </div>
 
         <!-- Main Game Board -->
@@ -527,6 +569,36 @@
         </div>
     </div>
 
+    <!-- Google Meet Modal (Call Team Lead) -->
+    <!-- Updated with semi-transparent background and new avatar -->
+    <div id="meet-modal" class="fixed inset-0 bg-gray-900/85 backdrop-blur-sm hidden flex flex-col items-center justify-center z-[3000]">
+        <!-- Main Video Area -->
+        <div class="w-full max-w-3xl h-[60vh] bg-[#3c4043] rounded-lg overflow-hidden relative flex items-center justify-center p-4">
+            <div class="text-center">
+                <!-- New Avatar -->
+                <img src="https://avatars.githubusercontent.com/u/2227312?v=4" class="w-32 h-32 rounded-full mx-auto mb-4 border-4 border-[#8ab4f8] object-cover" alt="Team Lead">
+                <h2 id="meet-status" class="text-white text-xl font-sans">Connecting to Team Lead...</h2>
+            </div>
+            
+            <!-- Controls Overlay -->
+            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4">
+                <div class="w-12 h-12 rounded-full bg-[#ea4335] flex items-center justify-center text-white cursor-pointer hover:bg-opacity-80 transition" onclick="closeMeet()">
+                    <!-- Hang up icon -->
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.7-9.3l-1.4-1.4L12 11.6 9.7 9.3l-1.4 1.4 2.3 2.3-2.3 2.3 1.4 1.4 2.3-2.3 2.3 2.3 1.4-1.4-2.3-2.3z"/></svg>
+                </div>
+                 <div class="w-12 h-12 rounded-full bg-[#3c4043] border border-[#5f6368] flex items-center justify-center text-white opacity-50 cursor-not-allowed">
+                    <!-- Mic off -->
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                </div>
+                 <div class="w-12 h-12 rounded-full bg-[#3c4043] border border-[#5f6368] flex items-center justify-center text-white opacity-50 cursor-not-allowed">
+                    <!-- Camera off -->
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 text-[#9aa0a6] text-sm">Google Meet (Simulated)</div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast">Ссылка скопирована в буфер обмена!</div>
 
@@ -581,6 +653,283 @@
         let draggedCards = [];
         let dragStartPos = { x: 0, y: 0 };
         let dragOffset = { x: 0, y: 0 };
+        
+        // Idle Timer
+        let idleTimer;
+
+        // Sounds
+        const sounds = {
+            drop: new Audio('drop.mp3'),
+            pop: new Audio('pop.mp3'),
+            swipe: new Audio('swipe.mp3'),
+            teamlead: new Audio('teamlead.mp3')
+        };
+
+        function playSound(name) {
+            const sound = sounds[name];
+            if(sound) {
+                sound.currentTime = 0;
+                sound.play().catch(e => console.log("Audio play failed", e));
+            }
+        }
+
+        // --- Helper: Stats Update ---
+        function updateStats() {
+            let totalDone = 0;
+            foundations.forEach(f => totalDone += f.length);
+            document.getElementById('resolved-count').innerText = totalDone;
+            const percent = (totalDone / 52) * 100;
+            document.getElementById('sla-bar').style.width = `${percent}%`;
+            const slaText = document.getElementById('sla-timer');
+            if(percent === 100) {
+                slaText.innerText = "SPRINT DONE";
+                slaText.style.color = "#36B37E";
+            } else if (percent > 50) {
+                 slaText.innerText = "ON TRACK";
+                 slaText.style.color = "#0052CC";
+            } else {
+                 slaText.innerText = "AT RISK";
+                 slaText.style.color = "#FF5630";
+            }
+        }
+
+        // --- Idle Timer Logic ---
+        function resetIdleTimer() {
+            const btn = document.getElementById('call-tl-btn');
+            if(btn) {
+                btn.classList.remove('attention-please');
+            }
+
+            clearTimeout(idleTimer);
+            // 30 seconds idle time
+            idleTimer = setTimeout(() => {
+                if(btn) {
+                    btn.classList.add('attention-please');
+                }
+            }, 30000); 
+        }
+
+        // Attach idle listeners
+        ['mousemove', 'mousedown', 'keydown', 'scroll', 'click'].forEach(evt => {
+            document.addEventListener(evt, resetIdleTimer);
+        });
+
+        // --- Team Lead / Meet Logic ---
+
+        function callTeamLead() {
+            playSound('teamlead');
+            const modal = document.getElementById('meet-modal');
+            const status = document.getElementById('meet-status');
+            modal.classList.remove('hidden');
+            status.innerText = "Team Lead is joining...";
+            resetIdleTimer(); // Clear attention if clicked
+
+            // Simulate call sequence
+            setTimeout(() => {
+                status.innerText = "Team Lead is looking at your screen...";
+                setTimeout(() => {
+                    const move = findBestMove();
+                    if (move) {
+                        status.innerText = "TL: \"Ah, I found a blocker. Fixing it...\"";
+                        setTimeout(() => {
+                            // Close modal FIRST
+                            closeMeet();
+                            // Then delay slightly and animate
+                            setTimeout(() => {
+                                 animateAndExecute(move, () => {
+                                    showToast("Team Lead moved a card for you!");
+                                });
+                            }, 300);
+                        }, 1500);
+                    } else {
+                        status.innerText = "TL: \"Looks blocked. Try reloading the backlog.\"";
+                        setTimeout(() => closeMeet(), 2500);
+                    }
+                }, 1500);
+            }, 1000);
+        }
+
+        function closeMeet() {
+            document.getElementById('meet-modal').classList.add('hidden');
+        }
+
+        // Animated Auto-Move
+        function animateAndExecute(move, callback) {
+            playSound('swipe');
+            // 1. Identify Source Element
+            let sourceEl = null;
+            if (move.fromType === 'waste') {
+                const wasteEl = document.getElementById('waste');
+                sourceEl = wasteEl.lastElementChild;
+            } else if (move.fromType === 'tableau') {
+                const colEl = document.getElementById(`tableau-${move.fromIndex}`);
+                const allCards = colEl.querySelectorAll('.card');
+                sourceEl = allCards[move.cardIndex];
+            }
+
+            // 2. Identify Target Element (Destination Slot)
+            let targetEl = null;
+            if (move.toType === 'foundation') {
+                targetEl = document.getElementById(`foundation-${move.toIndex}`);
+            } else if (move.toType === 'tableau') {
+                targetEl = document.getElementById(`tableau-${move.toIndex}`);
+            }
+
+            if (!sourceEl || !targetEl) {
+                // Fallback if visual not found
+                executeMove(move.fromType, move.fromIndex, move.toType, move.toIndex, move.cardIndex);
+                if(callback) callback();
+                return;
+            }
+
+            // 3. Create Flying Clone
+            const rect = sourceEl.getBoundingClientRect();
+            const clone = sourceEl.cloneNode(true);
+            
+            // Fix sizes and positions for the clone
+            clone.style.width = rect.width + 'px';
+            clone.style.height = rect.height + 'px';
+            clone.style.left = rect.left + 'px';
+            clone.style.top = rect.top + 'px';
+            clone.style.position = 'fixed';
+            clone.style.margin = '0';
+            clone.style.opacity = '1'; // Ensure visibility
+            clone.classList.add('flying');
+            
+            document.body.appendChild(clone);
+            
+            // Hide original immediately
+            sourceEl.style.opacity = '0';
+
+            // 4. Calculate Destination Coordinates
+            // For tableau, we need to append to the bottom list
+            let destRect;
+            if (move.toType === 'tableau') {
+                const targetCards = targetEl.querySelectorAll('.card');
+                if (targetCards.length > 0) {
+                    const lastCard = targetCards[targetCards.length - 1];
+                    const lastRect = lastCard.getBoundingClientRect();
+                    // Calculate next overlap position (40px down)
+                    destRect = {
+                        left: lastRect.left,
+                        top: lastRect.top + 40,
+                        width: lastRect.width,
+                        height: lastRect.height
+                    };
+                } else {
+                    // Empty column
+                    const colRect = targetEl.getBoundingClientRect();
+                    // Account for header and padding (approx 38px down, 8px left padding)
+                    destRect = {
+                        left: colRect.left + 8,
+                        top: colRect.top + 38,
+                        width: rect.width, // keep original width
+                        height: rect.height
+                    };
+                }
+            } else {
+                // Foundation
+                destRect = targetEl.getBoundingClientRect();
+            }
+
+            // 5. Trigger Animation
+            // Force reflow
+            void clone.offsetWidth; 
+            
+            clone.style.left = destRect.left + 'px';
+            clone.style.top = destRect.top + 'px';
+
+            // 6. Cleanup and Execute Logic
+            setTimeout(() => {
+                clone.remove();
+                executeMove(move.fromType, move.fromIndex, move.toType, move.toIndex, move.cardIndex);
+                playSound('drop');
+                if(callback) callback();
+            }, 600); // Matches CSS transition time
+        }
+
+        // AI Logic to find a move
+        function findBestMove() {
+            // Priority 1: Move from Waste to Foundation
+            if (waste.length > 0) {
+                const card = waste[waste.length - 1];
+                const fIndex = getFoundationTarget(card);
+                if (fIndex !== -1) return { fromType: 'waste', fromIndex: waste.length - 1, toType: 'foundation', toIndex: fIndex, cardIndex: null };
+            }
+            // Priority 2: Move from Tableau to Foundation
+            for (let i = 0; i < 7; i++) {
+                if (tableau[i].length > 0) {
+                    const card = tableau[i][tableau[i].length - 1];
+                    const fIndex = getFoundationTarget(card);
+                    if (fIndex !== -1) return { fromType: 'tableau', fromIndex: i, toType: 'foundation', toIndex: fIndex, cardIndex: tableau[i].length - 1 };
+                }
+            }
+
+            // Priority 3: Move from Waste to Tableau
+            if (waste.length > 0) {
+                const card = waste[waste.length - 1];
+                const tIndex = getTableauTarget(card);
+                if (tIndex !== -1) return { fromType: 'waste', fromIndex: waste.length - 1, toType: 'tableau', toIndex: tIndex, cardIndex: null };
+            }
+            
+            // Priority 4: Move from Tableau to Tableau (only if it reveals a card or moves King to empty)
+            for (let i = 0; i < 7; i++) {
+                const col = tableau[i];
+                if (col.length === 0) continue;
+                
+                // Find deepest face-up card
+                let startIndex = 0;
+                for (let j = 0; j < col.length; j++) {
+                    if (col[j].faceUp) { startIndex = j; break; }
+                }
+
+                // Optimization: Don't move a King from an empty spot to another empty spot
+                // (Only move if there are face-down cards beneath it)
+                if (startIndex === 0 && col[startIndex].rank === 13) continue;
+
+                const card = col[startIndex];
+                const tIndex = getTableauTarget(card, i); // pass current col index to ignore self
+                if (tIndex !== -1) {
+                     return { fromType: 'tableau', fromIndex: i, toType: 'tableau', toIndex: tIndex, cardIndex: startIndex };
+                }
+            }
+
+            return null;
+        }
+
+        function getFoundationTarget(card) {
+            for (let i = 0; i < 4; i++) {
+                const pile = foundations[i];
+                if (pile.length === 0) {
+                    if (card.rank === 1) return i;
+                } else {
+                    const top = pile[pile.length - 1];
+                    if (top.suit === card.suit && top.rank === card.rank - 1) return i;
+                }
+            }
+            return -1;
+        }
+
+        function getTableauTarget(card, ignoreColIndex = -1) {
+            for (let i = 0; i < 7; i++) {
+                if (i === ignoreColIndex) continue;
+                const col = tableau[i];
+                if (col.length === 0) {
+                    if (card.rank === 13) return i;
+                } else {
+                    const top = col[col.length - 1];
+                    const movingConfig = suitConfig[card.suit];
+                    const topConfig = suitConfig[top.suit];
+                    // Solitaire Rule: Alt color + rank-1
+                    if (movingConfig.color !== topConfig.color && top.rank === card.rank + 1) return i;
+                }
+            }
+            return -1;
+        }
+
+        function executeMove(fromType, fromIndex, toType, toIndex, cardIndexInList) {
+             moveCard(fromType, fromIndex, toType, toIndex, cardIndexInList);
+        }
 
         // --- Sharing Logic ---
         
@@ -713,6 +1062,7 @@
 
         function renderBoard() {
             updateStats();
+            resetIdleTimer(); // Reset timer on render (interaction)
 
             // Render Stock
             const stockEl = document.getElementById('stock');
@@ -815,30 +1165,10 @@
             checkWin();
         }
 
-        // --- Stats & SLA ---
-        
-        function updateStats() {
-            let totalDone = 0;
-            foundations.forEach(f => totalDone += f.length);
-            document.getElementById('resolved-count').innerText = totalDone;
-            const percent = (totalDone / 52) * 100;
-            document.getElementById('sla-bar').style.width = `${percent}%`;
-            const slaText = document.getElementById('sla-timer');
-            if(percent === 100) {
-                slaText.innerText = "SPRINT DONE";
-                slaText.style.color = "#36B37E";
-            } else if (percent > 50) {
-                 slaText.innerText = "ON TRACK";
-                 slaText.style.color = "#0052CC";
-            } else {
-                 slaText.innerText = "AT RISK";
-                 slaText.style.color = "#FF5630";
-            }
-        }
-
         // --- Interaction ---
 
         function drawCard() {
+            playSound('pop');
             if (stock.length > 0) {
                 const card = stock.pop();
                 card.faceUp = true;
@@ -848,6 +1178,7 @@
         }
 
         function resetStock() {
+            playSound('pop');
             if (stock.length === 0 && waste.length > 0) {
                 stock = waste.reverse().map(c => { c.faceUp = false; return c; });
                 waste = [];
@@ -955,19 +1286,25 @@
                 if(card) {
                     for(let i=0; i<4; i++) {
                         const pile = foundations[i];
-                        if(pile.length === 0) {
-                            if(card.rank === 1) { 
-                                // FIX: Pass cardIndexInList for tableau moves!
-                                moveCard(type, listIndex, 'foundation', i, cardIndexInList);
-                                return;
-                            }
+                        let valid = false;
+                        if (pile.length === 0) {
+                            if (card.rank === 1) valid = true;
                         } else {
-                            const top = pile[pile.length-1];
-                            if(top.suit === card.suit && top.rank === card.rank - 1) {
-                                // FIX: Pass cardIndexInList for tableau moves!
-                                moveCard(type, listIndex, 'foundation', i, cardIndexInList);
-                                return;
-                            }
+                            const top = pile[pile.length - 1];
+                            if (top.suit === card.suit && top.rank === card.rank - 1) valid = true;
+                        }
+
+                        if (valid) {
+                            // Create move object for animation
+                            const move = {
+                                fromType: type,
+                                fromIndex: listIndex,
+                                toType: 'foundation',
+                                toIndex: i,
+                                cardIndex: cardIndexInList
+                            };
+                            animateAndExecute(move);
+                            return; // Stop after finding first valid move
                         }
                     }
                 }
@@ -999,6 +1336,7 @@
             if (targetType) {
                 if(isValidMove(targetType, targetIndex)) {
                     moveCard(dragSource.type, dragSource.listIndex, targetType, targetIndex, dragSource.cardIndex);
+                    playSound('drop');
                 }
             }
         }
@@ -1070,6 +1408,18 @@
             deal();
             renderBoard();
         }
+        
+        // Start Idle Timer on load
+        resetIdleTimer();
+
+        // Periodic Share Reminder
+        setInterval(() => {
+            const btn = document.getElementById('share-btn');
+            if (btn) {
+                btn.classList.add('animate-soft-pulse');
+                setTimeout(() => btn.classList.remove('animate-soft-pulse'), 2000);
+            }
+        }, 45000); // Every 45 seconds
 
         newGame();
 

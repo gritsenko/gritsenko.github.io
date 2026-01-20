@@ -306,10 +306,10 @@
         .ticket-summary { font-size: 12px; color: #172B4D; font-weight: 500; line-height: 1.4; flex-grow: 1; overflow: hidden; padding-right: 4px; margin-bottom: 4px; }
         .ticket-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
         .story-points { 
-            background: #DFE1E6; 
+            background: #ecedef; 
             border-radius: 10px; 
             padding: 2px 8px; 
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
             min-width: 24px;
             text-align: center;
@@ -440,7 +440,7 @@
 
             <!-- Banner -->
             <a href="https://adsadvisor.io?from=gritsenko" target="_blank" class="block mx-4 mb-4 mt-4 transition hover:opacity-90">
-                <img src="https://gritsenko.biz/jira/Banner.jpg" alt="AdsAdvisor" class="w-full rounded border border-[#DFE1E6] shadow-sm">
+                <img src="Banner.jpg" alt="AdsAdvisor" class="w-full rounded border border-[#DFE1E6] shadow-sm">
             </a>
         </div>
 
@@ -1263,13 +1263,21 @@
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
 
-                    handleDrop(e.clientX, e.clientY);
+                    // Check drop
+                    const success = handleDrop(e.clientX, e.clientY);
 
+                    // Remove visual clones
                     draggedCards.forEach(c => c.remove());
                     draggedCards = [];
                     dragSource = null;
                     
+                    // Show originals again.
                     hiddenElements.forEach(elem => elem.style.opacity = '1');
+                    
+                    // Play swipe sound if move failed (cancelled)
+                    if (!success) {
+                        playSound('swipe');
+                    }
                 }
 
                 document.addEventListener('mousemove', onMouseMove);
@@ -1316,11 +1324,11 @@
             let elemBelow = document.elementFromPoint(x, y);
             draggedCards.forEach(c => c.style.display = 'block');
 
-            if (!elemBelow) return;
+            if (!elemBelow) return false;
 
             // Find closest slot or column
             const slot = elemBelow.closest('.column') || elemBelow.closest('.foundation-slot');
-            if (!slot) return;
+            if (!slot) return false;
 
             let targetType = null;
             let targetIndex = null;
@@ -1337,8 +1345,10 @@
                 if(isValidMove(targetType, targetIndex)) {
                     moveCard(dragSource.type, dragSource.listIndex, targetType, targetIndex, dragSource.cardIndex);
                     playSound('drop');
+                    return true;
                 }
             }
+            return false;
         }
 
         function isValidMove(toType, toIndex) {

@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Cinematic Globe Studio</title>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/dark/main.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/lucide-react.min.js"></script>
+
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #050505;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #viewDiv canvas {
+            filter: saturate(1.1) contrast(1.1);
+        }
+
+        /* UI Overlays */
+        .overlay-panel {
+            background: rgba(15, 15, 20, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            z-index: 10;
+        }
+
+        .checkpoint-item {
+            transition: all 0.2s ease;
+        }
+        .checkpoint-item:hover { background: rgba(255, 255, 255, 0.05); }
+
+        .btn-primary {
+            background: #3b82f6;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-primary:disabled { background: #1e293b; color: #64748b; }
+
+        .scroll-custom::-webkit-scrollbar { width: 6px; }
+        .scroll-custom::-webkit-scrollbar-track { background: transparent; }
+        .scroll-custom::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+
+        .recording-pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* Loading indicator */
+        #loader {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            border-radius: 20px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            font-size: 14px;
+            display: none;
+            z-index: 100;
+        }
+
+        .esri-ui-inner-container { display: none !important; }
+    </style>
+</head>
+
+<body>
+    <div id="loader">Waiting for tiles...</div>
+    
+    <!-- Main Map View -->
+    <div id="viewDiv"></div>
+
+    <!-- Controls Sidebar -->
+    <div class="overlay-panel fixed left-6 top-6 bottom-6 w-80 rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+        <div class="p-5 border-b border-white/10">
+            <h1 class="text-xl font-bold tracking-tight">Globe Animator</h1>
+            <p class="text-xs text-white/50">Create cinematic fly-throughs</p>
+        </div>
+
+        <!-- Scrollable content -->
+        <div class="flex-1 overflow-y-auto p-5 scroll-custom">
+            
+            <!-- Camera Settings -->
+            <section class="mb-8">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-white/40 mb-4">Animation Settings</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs mb-1.5">Segment Duration (ms)</label>
+                        <input type="number" id="durationInput" value="4000" class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs mb-1.5">Movement Easing</label>
+                        <select id="easingInput" class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm">
+                            <option value="in-out-cubic">Smooth In-Out</option>
+                            <option value="out-expo">Fast Start, Slow End</option>
+                            <option value="linear">Linear</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs">Wait for tiles</label>
+                        <input type="checkbox" id="waitForTilesInput" checked class="w-4 h-4 rounded border-white/10">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs">Show markers on map</label>
+                        <input type="checkbox" id="showMarkersInput" checked class="w-4 h-4 rounded border-white/10">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Checkpoints List -->
+            <section class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-white/40">Checkpoints</h2>
+                    <button id="addBtn" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition">Add Current</button>
+                </div>
+                <div id="checkpointList" class="space-y-2">
+                    <!-- Checkpoints appear here -->
+                    <p id="emptyMsg" class="text-center text-xs text-white/30 py-4">Click "Add Current" or click on the map to add checkpoints</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Action Footer -->
+        <div class="p-5 border-t border-white/10 bg-black/20 space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+                <button id="previewBtn" class="btn-primary flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium">
+                    <span>Preview</span>
+                </button>
+                <button id="recordBtn" class="bg-red-600 hover:bg-red-700 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium">
+                    <span>Record</span>
+                </button>
+            </div>
+            <button id="clearBtn" class="w-full py-2 text-xs text-white/40 hover:text-white/100 transition">Clear All</button>
+        </div>
+    </div>
+
+    <!-- Recording Status -->
+    <div id="recordingStatus" class="hidden fixed top-6 right-6 bg-red-600 px-4 py-2 rounded-full flex items-center gap-2 text-white font-bold text-sm shadow-lg z-50">
+        <div class="w-3 h-3 bg-white rounded-full recording-pulse"></div>
+        RECORDING IN PROGRESS
+    </div>
+
+    <script src="https://js.arcgis.com/4.22/"></script>
+    <script>
+        require([
+            "esri/config",
+            "esri/intl",
+            "esri/Map",
+            "esri/views/SceneView",
+            "esri/layers/ElevationLayer",
+            "esri/layers/BaseElevationLayer",
+            "esri/layers/GraphicsLayer",
+            "esri/Graphic",
+            "esri/geometry/Point",
+            "esri/geometry/Mesh",
+            "esri/core/watchUtils"
+        ], function (
+            esriConfig, intl, Map, SceneView, ElevationLayer, BaseElevationLayer, GraphicsLayer, Graphic, Point, Mesh, watchUtils
+        ) {
+            
+            // Initialization
+            esriConfig.locale = "en";
+            intl.setLocale("en");
+
+            const ExaggeratedElevationLayer = BaseElevationLayer.createSubclass({
+                properties: { exaggerationTopography: null, exaggerationBathymetry: null },
+                load: function () {
+                    this._elevation = new ElevationLayer({
+                        url: "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/TopoBathy3D/ImageServer"
+                    });
+                    this.addResolvingPromise(this._elevation.load());
+                },
+                fetchTile: function (level, row, col) {
+                    return this._elevation.fetchTile(level, row, col).then((data) => {
+                        for (let i = 0; i < data.values.length; i++) {
+                            if (data.values[i] >= 0) {
+                                data.values[i] = data.values[i] * this.exaggerationTopography;
+                            } else {
+                                data.values[i] = data.values[i] * this.exaggerationBathymetry;
+                            }
+                        }
+                        return data;
+                    });
+                }
+            });
+
+            const R = 6358137;
+            const map = new Map({ basemap: "hybrid", ground: "world-elevation" });
+            
+            // Layer for markers and labels
+            const markersLayer = new GraphicsLayer();
+            map.add(markersLayer);
+
+            const view = new SceneView({
+                container: "viewDiv",
+                map: map,
+                qualityProfile: "high",
+                camera: { position: [37.6, 55.7, 15000000], heading: 0, tilt: 0 },
+                environment: {
+                    background: { type: "color", color: [5, 5, 8, 1] },
+                    starsEnabled: true,
+                    atmosphereEnabled: true,
+                    atmosphere: { quality: "high" },
+                    lighting: { cameraTrackingEnabled: true, ambientOcclusionEnabled: true }
+                }
+            });
+
+            map.ground.layers = [new ExaggeratedElevationLayer({ exaggerationBathymetry: 20, exaggerationTopography: 15 })];
+
+            // App State
+            let checkpoints = [];
+            let isAnimating = false;
+            let mediaRecorder = null;
+            let recordedChunks = [];
+
+            // UI Elements
+            const checkpointListEl = document.getElementById("checkpointList");
+            const emptyMsg = document.getElementById("emptyMsg");
+            const addBtn = document.getElementById("addBtn");
+            const previewBtn = document.getElementById("previewBtn");
+            const recordBtn = document.getElementById("recordBtn");
+            const clearBtn = document.getElementById("clearBtn");
+            const loader = document.getElementById("loader");
+            const statusIndicator = document.getElementById("recordingStatus");
+            const showMarkersInput = document.getElementById("showMarkersInput");
+
+            // --- Core Functions ---
+
+            function addCheckpoint(cam) {
+                const id = Date.now();
+                const checkpoint = {
+                    id: id,
+                    camera: cam ? cam.clone() : view.camera.clone(),
+                    name: `Checkpoint ${checkpoints.length + 1}`
+                };
+                checkpoints.push(checkpoint);
+                renderCheckpoints();
+                updateMapMarkers();
+            }
+
+            function renderCheckpoints() {
+                checkpointListEl.innerHTML = "";
+                if (checkpoints.length === 0) {
+                    emptyMsg.style.display = "block";
+                    checkpointListEl.appendChild(emptyMsg);
+                    return;
+                }
+                emptyMsg.style.display = "none";
+
+                checkpoints.forEach((cp, index) => {
+                    const div = document.createElement("div");
+                    div.className = "checkpoint-item group flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 mb-2";
+                    
+                    // Container for info and name input
+                    const infoContainer = document.createElement("div");
+                    infoContainer.className = "flex items-center gap-3 flex-1";
+                    
+                    const indexLabel = document.createElement("span");
+                    indexLabel.className = "text-[10px] text-white/30 font-mono flex-shrink-0";
+                    indexLabel.innerText = index + 1;
+                    
+                    const nameInput = document.createElement("input");
+                    nameInput.className = "bg-transparent border-none text-sm font-medium focus:ring-1 focus:ring-blue-500 rounded px-1 w-full text-white";
+                    nameInput.value = cp.name;
+                    nameInput.oninput = (e) => {
+                        cp.name = e.target.value;
+                        updateMapMarkers(); // Update map labels in real-time
+                    };
+
+                    infoContainer.appendChild(indexLabel);
+                    infoContainer.appendChild(nameInput);
+
+                    // Actions
+                    const actionsDiv = document.createElement("div");
+                    actionsDiv.className = "flex gap-1 opacity-0 group-hover:opacity-100 transition flex-shrink-0 ml-2";
+                    actionsDiv.innerHTML = `
+                         <button onclick="gotoCP(${index})" class="p-1.5 hover:bg-blue-500 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg></button>
+                         <button onclick="moveCP(${index}, -1)" class="p-1.5 hover:bg-white/10 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg></button>
+                         <button onclick="moveCP(${index}, 1)" class="p-1.5 hover:bg-white/10 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+                         <button onclick="removeCP(${index})" class="p-1.5 hover:bg-red-500 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+                    `;
+
+                    div.appendChild(infoContainer);
+                    div.appendChild(actionsDiv);
+                    checkpointListEl.appendChild(div);
+                });
+            }
+
+            function updateMapMarkers() {
+                markersLayer.removeAll();
+                if (!showMarkersInput.checked) return;
+
+                checkpoints.forEach((cp, index) => {
+                    const point = new Point({
+                        longitude: cp.camera.position.longitude,
+                        latitude: cp.camera.position.latitude,
+                        z: cp.camera.position.z // Position it at the height the camera was at, or 0 for ground
+                    });
+
+                    // Marker (Dot)
+                    const markerGraphic = new Graphic({
+                        geometry: point,
+                        symbol: {
+                            type: "simple-marker",
+                            color: [59, 130, 246], // Blue-500
+                            outline: { color: [255, 255, 255, 0.8], width: 1.5 },
+                            size: "8px"
+                        }
+                    });
+
+                    // Label
+                    const labelGraphic = new Graphic({
+                        geometry: point,
+                        symbol: {
+                            type: "text",
+                            color: "white",
+                            haloColor: [0, 0, 0, 0.7],
+                            haloSize: "2px",
+                            text: `${index + 1}. ${cp.name}`,
+                            xoffset: 0,
+                            yoffset: 12,
+                            font: { size: 10, weight: "bold", family: "sans-serif" }
+                        }
+                    });
+
+                    markersLayer.addMany([markerGraphic, labelGraphic]);
+                });
+            }
+
+            window.gotoCP = (idx) => view.goTo(checkpoints[idx].camera);
+            window.removeCP = (idx) => { 
+                checkpoints.splice(idx, 1); 
+                renderCheckpoints(); 
+                updateMapMarkers();
+            };
+            window.moveCP = (idx, dir) => {
+                const target = idx + dir;
+                if (target < 0 || target >= checkpoints.length) return;
+                const temp = checkpoints[idx];
+                checkpoints[idx] = checkpoints[target];
+                checkpoints[target] = temp;
+                renderCheckpoints();
+                updateMapMarkers();
+            };
+
+            // --- Animation Logic ---
+
+            async function runAnimationSequence(isRecording = false) {
+                if (checkpoints.length < 2) {
+                    alert("Please add at least 2 checkpoints to create a sequence.");
+                    return;
+                }
+
+                isAnimating = true;
+                const duration = parseInt(document.getElementById("durationInput").value) || 4000;
+                const easing = document.getElementById("easingInput").value;
+                const wait = document.getElementById("waitForTilesInput").checked;
+
+                if (isRecording) startRecording();
+
+                // Move to first checkpoint instantly
+                await view.goTo(checkpoints[0].camera, { animate: false });
+                
+                for (let i = 1; i < checkpoints.length; i++) {
+                    if (!isAnimating) break;
+
+                    // Option: wait for initial load
+                    if (wait) {
+                        loader.style.display = "block";
+                        await watchUtils.whenFalseOnce(view, "updating");
+                        await new Promise(r => setTimeout(r, 500)); // small buffer
+                        loader.style.display = "none";
+                    }
+
+                    await view.goTo(checkpoints[i].camera, {
+                        duration: duration,
+                        easing: easing
+                    });
+                }
+
+                if (isRecording) stopRecording();
+                isAnimating = false;
+            }
+
+            // --- Recording Implementation ---
+
+            function startRecording() {
+                recordedChunks = [];
+                const canvas = document.querySelector("#viewDiv canvas");
+                const stream = canvas.captureStream(60); // 60 FPS
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'video/webm;codecs=vp9',
+                    videoBitsPerSecond: 5000000 // 5Mbps
+                });
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = exportVideo;
+                
+                statusIndicator.classList.remove("hidden");
+                mediaRecorder.start();
+            }
+
+            function stopRecording() {
+                if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                    statusIndicator.classList.add("hidden");
+                }
+            }
+
+            function exportVideo() {
+                const blob = new Blob(recordedChunks, { type: "video/webm" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `globe-cinematic-${Date.now()}.webm`;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            }
+
+            // --- Event Listeners ---
+
+            view.on("click", (event) => {
+                if (!view.interacting) {
+                    addCheckpoint();
+                }
+            });
+
+            showMarkersInput.addEventListener("change", () => updateMapMarkers());
+            addBtn.addEventListener("click", () => addCheckpoint());
+            previewBtn.addEventListener("click", () => runAnimationSequence(false));
+            recordBtn.addEventListener("click", () => runAnimationSequence(true));
+            clearBtn.addEventListener("click", () => {
+                if (confirm("Clear all checkpoints?")) {
+                    checkpoints = [];
+                    renderCheckpoints();
+                    updateMapMarkers();
+                }
+            });
+
+            // Handle ESC to cancel animation
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && isAnimating) {
+                    isAnimating = false;
+                    stopRecording();
+                }
+            });
+
+        });
+    </script>
+</body>
+
+</html>

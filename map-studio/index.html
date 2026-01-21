@@ -9,23 +9,55 @@
     <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/dark/main.css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/lucide-react.min.js"></script>
+    <!-- Whammy.js for direct WebM encoding -->
+    <script src="https://cdn.jsdelivr.net/gh/antimatter15/whammy/whammy.js"></script>
 
     <style>
-        html, body, #viewDiv {
+        html, body {
             padding: 0;
             margin: 0;
             height: 100%;
             width: 100%;
             background-color: #050505;
-            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #viewContainer {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        #viewDiv {
+            height: 100%;
+            width: 100%;
+            transition: width 0.3s, height 0.3s;
+            position: relative;
         }
 
         #viewDiv canvas {
             filter: saturate(1.1) contrast(1.1);
+            transition: opacity 0.5s ease-in-out;
+        }
+        
+        body.is-recording #viewDiv canvas {
+            transition: none !important;
         }
 
-        /* UI Overlays */
+        #aimCross {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0.7;
+        }
+
         .overlay-panel {
             background: rgba(15, 15, 20, 0.85);
             backdrop-filter: blur(12px);
@@ -34,10 +66,25 @@
             z-index: 10;
         }
 
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+        }
+        .modal-content {
+            background: #18181b;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
         .checkpoint-item {
             transition: all 0.2s ease;
+            border: 1px solid transparent;
         }
         .checkpoint-item:hover { background: rgba(255, 255, 255, 0.05); }
+        .checkpoint-item.active-point {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
 
         .btn-primary {
             background: #3b82f6;
@@ -59,7 +106,6 @@
             100% { opacity: 1; }
         }
 
-        /* Loading indicator */
         #loader {
             position: fixed;
             top: 20px;
@@ -74,6 +120,65 @@
             z-index: 100;
         }
 
+        /* Progress Bar for Frame-by-Frame Recording */
+        #renderProgress {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+            background: rgba(0,0,0,0.9);
+            padding: 15px;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+            font-size: 12px;
+            display: none;
+            z-index: 101;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        #renderProgressBar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        #renderProgressFill {
+            height: 100%;
+            background: #3b82f6;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        #cancelRenderBtn {
+            margin-top: 10px;
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        #cancelRenderBtn:hover {
+            background: rgba(239, 68, 68, 0.4);
+            color: white;
+        }
+
+        .esri-search { width: 100% !important; box-shadow: none !important; background: transparent !important; }
+        .esri-search__container { background-color: rgba(0, 0, 0, 0.3) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 6px !important; transition: border-color 0.2s; }
+        .esri-search__container:hover, .esri-search__container:focus-within { border-color: rgba(59, 130, 246, 0.5) !important; }
+        .esri-input { background-color: transparent !important; color: white !important; font-family: inherit !important; font-size: 0.875rem !important; }
+        .esri-input::placeholder { color: rgba(255, 255, 255, 0.4) !important; }
+        .esri-search__submit-button, .esri-search__clear-button { background-color: transparent !important; color: rgba(255, 255, 255, 0.6) !important; border: none !important; }
+        .esri-search__submit-button:hover, .esri-search__clear-button:hover { color: white !important; background-color: rgba(255, 255, 255, 0.1) !important; }
+        .esri-menu { background-color: #18181b !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; color: white !important; margin-top: 4px !important; border-radius: 6px !important; padding: 4px 0 !important; }
+        .esri-menu__list-item { background-color: transparent !important; padding: 8px 12px !important; }
+        .esri-menu__list-item--active, .esri-menu__list-item:hover { background-color: rgba(59, 130, 246, 0.2) !important; }
+        .esri-search__sources-button { display: none !important; }
         .esri-ui-inner-container { display: none !important; }
     </style>
 </head>
@@ -81,77 +186,117 @@
 <body>
     <div id="loader">Waiting for tiles...</div>
     
-    <!-- Main Map View -->
-    <div id="viewDiv"></div>
+    <!-- Render Progress for High Quality Recording -->
+    <div id="renderProgress">
+        <div id="renderText">Rendering Frame: 0/0</div>
+        <div id="renderProgressBar"><div id="renderProgressFill"></div></div>
+        <button id="cancelRenderBtn">Cancel Recording</button>
+    </div>
 
-    <!-- Controls Sidebar -->
+    <div id="viewContainer">
+        <div id="viewDiv">
+            <svg id="aimCross" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 0V40M0 20H40" stroke="white" stroke-width="1.5" stroke-opacity="0.8"/>
+                <circle cx="20" cy="20" r="10" stroke="white" stroke-width="1.5" stroke-opacity="0.5"/>
+            </svg>
+        </div>
+    </div>
+
     <div class="overlay-panel fixed left-6 top-6 bottom-6 w-80 rounded-2xl flex flex-col shadow-2xl overflow-hidden">
         <div class="p-5 border-b border-white/10">
             <h1 class="text-xl font-bold tracking-tight">Globe Animator</h1>
-            <p class="text-xs text-white/50">Create cinematic fly-throughs</p>
+            <div class="flex justify-between items-center mt-1 mb-4">
+                <p class="text-xs text-white/50">Cinematic Studio</p>
+                <p id="zoomDisplay" class="text-xs font-mono text-blue-400">Zoom: --</p>
+            </div>
+            <div id="searchWidgetDiv" class="w-full"></div>
         </div>
 
-        <!-- Scrollable content -->
         <div class="flex-1 overflow-y-auto p-5 scroll-custom">
-            
-            <!-- Camera Settings -->
             <section class="mb-8">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-white/40 mb-4">Animation Settings</h2>
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-white/40 mb-4">Settings</h2>
                 <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs mb-1.5">Output Resolution</label>
+                        <select id="viewportSizeInput" class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm">
+                            <option value="window">Full Window (Low)</option>
+                            <option value="1280x720">HD (1280x720)</option>
+                            <option value="1920x1080">Full HD (1920x1080)</option>
+                        </select>
+                    </div>
+
                     <div>
                         <label class="block text-xs mb-1.5">Segment Duration (ms)</label>
                         <input type="number" id="durationInput" value="4000" class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs mb-1.5">Movement Easing</label>
+                        <label class="block text-xs mb-1.5">Animation Style</label>
                         <select id="easingInput" class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm">
-                            <option value="in-out-cubic">Smooth In-Out</option>
-                            <option value="out-expo">Fast Start, Slow End</option>
-                            <option value="linear">Linear</option>
+                            <option value="in-out-quadratic">Cinematic (Smooth)</option>
+                            <option value="linear">Linear (Robot)</option>
                         </select>
                     </div>
+                    <div>
+                        <label class="block text-xs mb-1.5">Label Font Size (pt)</label>
+                        <input type="number" id="fontSizeInput" value="11" min="6" max="36" class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-sm">
+                    </div>
                     <div class="flex items-center justify-between">
-                        <label class="text-xs">Wait for tiles</label>
+                        <label class="text-xs">Show markers</label>
+                        <input type="checkbox" id="showMarkersInput" checked class="w-4 h-4 rounded border-white/10">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs">Wait for tiles (Preview)</label>
                         <input type="checkbox" id="waitForTilesInput" checked class="w-4 h-4 rounded border-white/10">
                     </div>
                     <div class="flex items-center justify-between">
-                        <label class="text-xs">Show markers on map</label>
-                        <input type="checkbox" id="showMarkersInput" checked class="w-4 h-4 rounded border-white/10">
+                        <label class="text-xs">Quick mode (fast canvas)</label>
+                        <input type="checkbox" id="quickModeInput" class="w-4 h-4 rounded border-white/10">
                     </div>
                 </div>
             </section>
 
-            <!-- Checkpoints List -->
             <section class="mb-8">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-sm font-semibold uppercase tracking-wider text-white/40">Checkpoints</h2>
-                    <button id="addBtn" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition">Add Current</button>
+                    <button id="addBtn" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition">Add Center</button>
                 </div>
                 <div id="checkpointList" class="space-y-2">
-                    <!-- Checkpoints appear here -->
-                    <p id="emptyMsg" class="text-center text-xs text-white/30 py-4">Click "Add Current" or click on the map to add checkpoints</p>
+                    <p id="emptyMsg" class="text-center text-xs text-white/30 py-4">Position aim cross and click "Add Center"</p>
                 </div>
             </section>
         </div>
 
-        <!-- Action Footer -->
         <div class="p-5 border-t border-white/10 bg-black/20 space-y-3">
             <div class="grid grid-cols-2 gap-2">
                 <button id="previewBtn" class="btn-primary flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium">
                     <span>Preview</span>
                 </button>
                 <button id="recordBtn" class="bg-red-600 hover:bg-red-700 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium">
-                    <span>Record</span>
+                    <span>Record (HQ)</span>
                 </button>
             </div>
-            <button id="clearBtn" class="w-full py-2 text-xs text-white/40 hover:text-white/100 transition">Clear All</button>
+            <div class="grid grid-cols-2 gap-2">
+                <button id="importExportBtn" class="text-xs bg-white/10 hover:bg-white/20 py-2 rounded transition">Import / Export</button>
+                <button id="clearBtn" class="text-xs text-white/40 hover:text-red-400 hover:bg-white/5 py-2 rounded transition">Clear All</button>
+            </div>
         </div>
     </div>
 
-    <!-- Recording Status -->
-    <div id="recordingStatus" class="hidden fixed top-6 right-6 bg-red-600 px-4 py-2 rounded-full flex items-center gap-2 text-white font-bold text-sm shadow-lg z-50">
-        <div class="w-3 h-3 bg-white rounded-full recording-pulse"></div>
-        RECORDING IN PROGRESS
+    <div id="jsonModal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center p-4">
+        <div class="modal-content w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-white/10 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white">Import / Export</h3>
+                <button id="closeModalBtn" class="text-white/50 hover:text-white"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            </div>
+            <div class="p-4 flex-1 overflow-hidden flex flex-col">
+                <p class="text-xs text-white/50 mb-2">Copy this JSON to save, or paste JSON here to load points.</p>
+                <textarea id="jsonInput" class="w-full flex-1 bg-black/50 border border-white/10 rounded-lg p-3 text-xs font-mono text-white/80 resize-none focus:ring-1 focus:ring-blue-500 outline-none" spellcheck="false"></textarea>
+            </div>
+            <div class="p-4 border-t border-white/10 flex gap-2 justify-end">
+                <button id="copyJsonBtn" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs text-white">Copy to Clipboard</button>
+                <button id="importJsonBtn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs text-white font-medium">Import Points</button>
+            </div>
+        </div>
     </div>
 
     <script src="https://js.arcgis.com/4.22/"></script>
@@ -161,20 +306,25 @@
             "esri/intl",
             "esri/Map",
             "esri/views/SceneView",
+            "esri/widgets/Search",
+            "esri/tasks/Locator",
             "esri/layers/ElevationLayer",
             "esri/layers/BaseElevationLayer",
             "esri/layers/GraphicsLayer",
             "esri/Graphic",
             "esri/geometry/Point",
-            "esri/geometry/Mesh",
-            "esri/core/watchUtils"
+            "esri/core/watchUtils",
+            "esri/Camera"
         ], function (
-            esriConfig, intl, Map, SceneView, ElevationLayer, BaseElevationLayer, GraphicsLayer, Graphic, Point, Mesh, watchUtils
+            esriConfig, intl, Map, SceneView, Search, Locator, ElevationLayer, BaseElevationLayer, GraphicsLayer, Graphic, Point, watchUtils, Camera
         ) {
             
-            // Initialization
             esriConfig.locale = "en";
             intl.setLocale("en");
+
+            const locatorTask = new Locator({
+                url: "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer"
+            });
 
             const ExaggeratedElevationLayer = BaseElevationLayer.createSubclass({
                 properties: { exaggerationTopography: null, exaggerationBathymetry: null },
@@ -198,34 +348,97 @@
                 }
             });
 
-            const R = 6358137;
-            const map = new Map({ basemap: "hybrid", ground: "world-elevation" });
+            const map = new Map({ 
+                basemap: "hybrid", 
+                ground: "world-elevation" 
+            });
             
-            // Layer for markers and labels
-            const markersLayer = new GraphicsLayer();
+            const markersLayer = new GraphicsLayer({ elevationInfo: { mode: "relative-to-ground" }});
             map.add(markersLayer);
 
             const view = new SceneView({
                 container: "viewDiv",
                 map: map,
-                qualityProfile: "high",
+                qualityProfile: "high", 
                 camera: { position: [37.6, 55.7, 15000000], heading: 0, tilt: 0 },
                 environment: {
                     background: { type: "color", color: [5, 5, 8, 1] },
                     starsEnabled: true,
                     atmosphereEnabled: true,
                     atmosphere: { quality: "high" },
-                    lighting: { cameraTrackingEnabled: true, ambientOcclusionEnabled: true }
-                }
+                    lighting: { cameraTrackingEnabled: true, ambientOcclusionEnabled: true, directShadowsEnabled: false }
+                },
+                viewingMode: "global",
+                alphaCompositingEnabled: true
+            });
+
+            const GLOBE_OVERVIEW_ALTITUDE = 42000000;
+            const GLOBE_OVERVIEW_DURATION = 1800;
+
+            function getMidpoint(a, b) {
+                if (!a) return b ? b.clone() : null;
+                if (!b) return a.clone();
+                const latitude = (a.latitude + b.latitude) / 2;
+                const longitude = (a.longitude + b.longitude) / 2;
+                return new Point({ latitude, longitude, spatialReference: a.spatialReference || b.spatialReference });
+            }
+
+            function createGlobeCamera(targetPoint, heading = 0) {
+                const point = targetPoint ? targetPoint.clone() : new Point({ latitude: 0, longitude: 0 });
+                return new Camera({
+                    position: {
+                        latitude: point.latitude,
+                        longitude: point.longitude,
+                        z: GLOBE_OVERVIEW_ALTITUDE
+                    },
+                    heading,
+                    tilt: 0
+                });
+            }
+
+            async function zoomOutToGlobe(targetPoint, heading = view.camera.heading, duration = GLOBE_OVERVIEW_DURATION) {
+                if (!targetPoint) return;
+                await view.goTo({
+                    target: targetPoint.clone(),
+                    zoom: 4,
+                    heading,
+                    tilt: 0
+                }, { duration, easing: "in-out-quadratic" });
+            }
+
+            async function goToCheckpointWithGlobalZoom(cp, fromTarget, goToOptions = {}, overviewDuration = GLOBE_OVERVIEW_DURATION) {
+                if (!cp) return;
+                const overviewTarget = getMidpoint(fromTarget, cp.target);
+                await zoomOutToGlobe(overviewTarget, cp.heading, overviewDuration);
+                return view.goTo({
+                    target: cp.target,
+                    zoom: 15,
+                    heading: cp.heading,
+                    tilt: cp.tilt
+                }, goToOptions);
+            }
+
+            const searchWidget = new Search({
+                view: view,
+                container: "searchWidgetDiv",
+                locationEnabled: false, 
+                popupEnabled: false, 
+                resultGraphicEnabled: false 
+            });
+
+            view.when(() => {
+                const basemapLayer = map.basemap.baseLayers.getItemAt(0);
+                if (basemapLayer) basemapLayer.interpolation = "bilinear";
+                
+                // Load from storage after view is ready
+                loadFromLocalStorage();
             });
 
             map.ground.layers = [new ExaggeratedElevationLayer({ exaggerationBathymetry: 20, exaggerationTopography: 15 })];
 
-            // App State
             let checkpoints = [];
             let isAnimating = false;
-            let mediaRecorder = null;
-            let recordedChunks = [];
+            let whammyEncoder = null; // Changed from mediaRecorder
 
             // UI Elements
             const checkpointListEl = document.getElementById("checkpointList");
@@ -235,21 +448,156 @@
             const recordBtn = document.getElementById("recordBtn");
             const clearBtn = document.getElementById("clearBtn");
             const loader = document.getElementById("loader");
-            const statusIndicator = document.getElementById("recordingStatus");
             const showMarkersInput = document.getElementById("showMarkersInput");
+            const fontSizeInput = document.getElementById("fontSizeInput");
+            const zoomDisplay = document.getElementById("zoomDisplay");
+            const viewportSizeInput = document.getElementById("viewportSizeInput");
+            const viewDiv = document.getElementById("viewDiv");
+            const easingInput = document.getElementById("easingInput");
+            const durationInput = document.getElementById("durationInput");
+            const renderProgress = document.getElementById("renderProgress");
+            const renderText = document.getElementById("renderText");
+            const renderProgressFill = document.getElementById("renderProgressFill");
+            const cancelRenderBtn = document.getElementById("cancelRenderBtn");
+            
+            // Modal Elements
+            const importExportBtn = document.getElementById("importExportBtn");
+            const jsonModal = document.getElementById("jsonModal");
+            const closeModalBtn = document.getElementById("closeModalBtn");
+            const jsonInput = document.getElementById("jsonInput");
+            const copyJsonBtn = document.getElementById("copyJsonBtn");
+            const importJsonBtn = document.getElementById("importJsonBtn");
+            const quickModeInput = document.getElementById("quickModeInput");
+
+            view.watch("zoom", (value) => {
+                zoomDisplay.innerText = `Zoom: ${value.toFixed(2)}`;
+            });
+
+            function getCenterLocation() {
+                return view.center.clone();
+            }
+
+            viewportSizeInput.addEventListener("change", (e) => {
+                const val = e.target.value;
+                if (val === "window") {
+                    viewDiv.style.width = "100%";
+                    viewDiv.style.height = "100%";
+                } else {
+                    const [w, h] = val.split("x");
+                    viewDiv.style.width = `${w}px`;
+                    viewDiv.style.height = `${h}px`;
+                }
+            });
+
+            // --- Local Storage Functions ---
+            
+            function saveToLocalStorage() {
+                try {
+                    // Convert Points to simple JSON objects
+                    const data = checkpoints.map(cp => ({
+                        ...cp,
+                        target: cp.target.toJSON()
+                    }));
+                    localStorage.setItem('globe_animator_checkpoints', JSON.stringify(data));
+                } catch(e) {
+                    console.error("Save failed", e);
+                }
+            }
+
+            function loadFromLocalStorage() {
+                try {
+                    const str = localStorage.getItem('globe_animator_checkpoints');
+                    if (str) {
+                        const data = JSON.parse(str);
+                        checkpoints = data.map(cp => ({
+                            ...cp,
+                            target: Point.fromJSON(cp.target)
+                        }));
+                        renderCheckpoints();
+                        updateMapMarkers();
+                    }
+                } catch(e) {
+                    console.error("Load failed", e);
+                }
+            }
+
+            // --- Modal Functions ---
+            importExportBtn.addEventListener("click", () => {
+                jsonInput.value = JSON.stringify(checkpoints, null, 2);
+                jsonModal.classList.remove("hidden");
+            });
+
+            closeModalBtn.addEventListener("click", () => {
+                jsonModal.classList.add("hidden");
+            });
+
+            copyJsonBtn.addEventListener("click", () => {
+                jsonInput.select();
+                document.execCommand("copy");
+                const originalText = copyJsonBtn.innerText;
+                copyJsonBtn.innerText = "Copied!";
+                setTimeout(() => copyJsonBtn.innerText = originalText, 1500);
+            });
+
+            importJsonBtn.addEventListener("click", () => {
+                try {
+                    const data = JSON.parse(jsonInput.value);
+                    if (!Array.isArray(data)) throw new Error("Data must be an array");
+                    
+                    checkpoints = data.map(cp => {
+                        return {
+                            ...cp,
+                            target: Point.fromJSON(cp.target)
+                        };
+                    });
+                    
+                    saveToLocalStorage(); // Save on import
+                    renderCheckpoints();
+                    setTimeout(updateMapMarkers, 100);
+                    jsonModal.classList.add("hidden");
+                } catch (e) {
+                    alert("Invalid JSON format. Please check your data.");
+                    console.error(e);
+                }
+            });
 
             // --- Core Functions ---
 
-            function addCheckpoint(cam) {
+            function addCheckpoint() {
+                if (!view.ready) return;
+
+                const center = getCenterLocation();
                 const id = Date.now();
                 const checkpoint = {
                     id: id,
-                    camera: cam ? cam.clone() : view.camera.clone(),
-                    name: `Checkpoint ${checkpoints.length + 1}`
+                    target: center,
+                    heading: view.camera.heading,
+                    tilt: view.camera.tilt,
+                    name: `Point ${checkpoints.length + 1}`
                 };
                 checkpoints.push(checkpoint);
+                
+                saveToLocalStorage(); // Save on add
                 renderCheckpoints();
                 updateMapMarkers();
+
+                locatorTask.locationToAddress({ location: center }).then(function(response) {
+                    if (response && response.attributes) {
+                        const attrs = response.attributes;
+                        let name = attrs.City || attrs.PlaceName || attrs.Region || attrs.Match_addr;
+                        if (name) {
+                            checkpoint.name = name;
+                            const exists = checkpoints.find(cp => cp.id === id);
+                            if (exists) {
+                                saveToLocalStorage(); // Save name update
+                                renderCheckpoints();
+                                updateMapMarkers();
+                            }
+                        }
+                    }
+                }).catch(function(err) {
+                    console.log("No address found", err);
+                });
             }
 
             function renderCheckpoints() {
@@ -263,32 +611,27 @@
 
                 checkpoints.forEach((cp, index) => {
                     const div = document.createElement("div");
+                    div.id = `cp-item-${index}`;
                     div.className = "checkpoint-item group flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 mb-2";
                     
-                    // Container for info and name input
                     const infoContainer = document.createElement("div");
                     infoContainer.className = "flex items-center gap-3 flex-1";
-                    
-                    const indexLabel = document.createElement("span");
-                    indexLabel.className = "text-[10px] text-white/30 font-mono flex-shrink-0";
-                    indexLabel.innerText = index + 1;
                     
                     const nameInput = document.createElement("input");
                     nameInput.className = "bg-transparent border-none text-sm font-medium focus:ring-1 focus:ring-blue-500 rounded px-1 w-full text-white";
                     nameInput.value = cp.name;
                     nameInput.oninput = (e) => {
                         cp.name = e.target.value;
-                        updateMapMarkers(); // Update map labels in real-time
+                        saveToLocalStorage(); // Save on rename
+                        updateMapMarkers();
                     };
 
-                    infoContainer.appendChild(indexLabel);
                     infoContainer.appendChild(nameInput);
 
-                    // Actions
                     const actionsDiv = document.createElement("div");
                     actionsDiv.className = "flex gap-1 opacity-0 group-hover:opacity-100 transition flex-shrink-0 ml-2";
                     actionsDiv.innerHTML = `
-                         <button onclick="gotoCP(${index})" class="p-1.5 hover:bg-blue-500 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg></button>
+                         <button onclick="gotoCP(${index})" class="p-1.5 hover:bg-blue-500 rounded transition" title="Go to view"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg></button>
                          <button onclick="moveCP(${index}, -1)" class="p-1.5 hover:bg-white/10 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg></button>
                          <button onclick="moveCP(${index}, 1)" class="p-1.5 hover:bg-white/10 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
                          <button onclick="removeCP(${index})" class="p-1.5 hover:bg-red-500 rounded transition"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
@@ -303,37 +646,39 @@
             function updateMapMarkers() {
                 markersLayer.removeAll();
                 if (!showMarkersInput.checked) return;
+                
+                const fontSize = parseInt(fontSizeInput.value) || 12;
 
                 checkpoints.forEach((cp, index) => {
-                    const point = new Point({
-                        longitude: cp.camera.position.longitude,
-                        latitude: cp.camera.position.latitude,
-                        z: cp.camera.position.z // Position it at the height the camera was at, or 0 for ground
-                    });
+                    const point = cp.target.clone();
+                    point.z = 100; // Lift marker slightly off ground to avoid clipping
 
-                    // Marker (Dot)
+                    const pinPath = "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z";
+
                     const markerGraphic = new Graphic({
                         geometry: point,
                         symbol: {
                             type: "simple-marker",
-                            color: [59, 130, 246], // Blue-500
-                            outline: { color: [255, 255, 255, 0.8], width: 1.5 },
-                            size: "8px"
+                            style: "path",
+                            path: pinPath,
+                            color: [59, 130, 246], 
+                            outline: { color: [255, 255, 255, 0.9], width: 1 },
+                            size: "26px",
+                            yoffset: 12 
                         }
                     });
 
-                    // Label
                     const labelGraphic = new Graphic({
                         geometry: point,
                         symbol: {
                             type: "text",
                             color: "white",
-                            haloColor: [0, 0, 0, 0.7],
+                            haloColor: [0, 0, 0, 0.8],
                             haloSize: "2px",
-                            text: `${index + 1}. ${cp.name}`,
+                            text: cp.name, 
                             xoffset: 0,
-                            yoffset: 12,
-                            font: { size: 10, weight: "bold", family: "sans-serif" }
+                            yoffset: 28, 
+                            font: { size: fontSize, weight: "bold", family: "sans-serif" }
                         }
                     });
 
@@ -341,9 +686,25 @@
                 });
             }
 
-            window.gotoCP = (idx) => view.goTo(checkpoints[idx].camera);
+            async function gotoCP(idx, animate = true) {
+                const cp = checkpoints[idx];
+                if (!cp) return;
+                const startTarget = getCenterLocation();
+                if (!animate) {
+                    return view.goTo({
+                        target: cp.target,
+                        zoom: 15,
+                        heading: cp.heading,
+                        tilt: cp.tilt
+                    }, { animate: false });
+                }
+                return goToCheckpointWithGlobalZoom(cp, startTarget);
+            }
+            window.gotoCP = gotoCP;
+
             window.removeCP = (idx) => { 
                 checkpoints.splice(idx, 1); 
+                saveToLocalStorage();
                 renderCheckpoints(); 
                 updateMapMarkers();
             };
@@ -353,113 +714,301 @@
                 const temp = checkpoints[idx];
                 checkpoints[idx] = checkpoints[target];
                 checkpoints[target] = temp;
+                saveToLocalStorage();
                 renderCheckpoints();
                 updateMapMarkers();
             };
 
-            // --- Animation Logic ---
+            function highlightCheckpoint(index) {
+                document.querySelectorAll('.checkpoint-item').forEach(el => el.classList.remove('active-point'));
+                const el = document.getElementById(`cp-item-${index}`);
+                if (el) el.classList.add('active-point');
+            }
 
-            async function runAnimationSequence(isRecording = false) {
-                if (checkpoints.length < 2) {
-                    alert("Please add at least 2 checkpoints to create a sequence.");
+            // --- ANIMATION CONTROLLERS ---
+
+            async function startPreview() {
+                if (checkpoints.length < 1) {
+                    alert("Please add at least 1 checkpoint.");
                     return;
                 }
-
                 isAnimating = true;
-                const duration = parseInt(document.getElementById("durationInput").value) || 4000;
-                const easing = document.getElementById("easingInput").value;
+                const duration = parseInt(durationInput.value) || 5000;
+                const easing = easingInput.value;
                 const wait = document.getElementById("waitForTilesInput").checked;
 
-                if (isRecording) startRecording();
+                // 1. Move from CURRENT CAMERA to FIRST POINT
+                const firstCP = checkpoints[0];
+                highlightCheckpoint(0);
+                const startTarget = getCenterLocation();
 
-                // Move to first checkpoint instantly
-                await view.goTo(checkpoints[0].camera, { animate: false });
-                
-                for (let i = 1; i < checkpoints.length; i++) {
+                await goToCheckpointWithGlobalZoom(firstCP, startTarget, {
+                    duration: 3000, // Intro duration
+                    easing: "in-out-quadratic"
+                });
+
+                if (wait) await waitForTiles();
+
+                // 2. Loop through rest
+                for (let i = 0; i < checkpoints.length - 1; i++) {
                     if (!isAnimating) break;
+                    const endCP = checkpoints[i+1];
+                    highlightCheckpoint(i + 1);
 
-                    // Option: wait for initial load
-                    if (wait) {
-                        loader.style.display = "block";
-                        await watchUtils.whenFalseOnce(view, "updating");
-                        await new Promise(r => setTimeout(r, 500)); // small buffer
-                        loader.style.display = "none";
-                    }
-
-                    await view.goTo(checkpoints[i].camera, {
+                    const segmentStart = checkpoints[i].target;
+                    await goToCheckpointWithGlobalZoom(endCP, segmentStart, {
                         duration: duration,
                         easing: easing
                     });
+
+                    if (wait && isAnimating) await waitForTiles();
                 }
 
-                if (isRecording) stopRecording();
+                highlightCheckpoint(-1);
                 isAnimating = false;
             }
 
-            // --- Recording Implementation ---
-
-            function startRecording() {
-                recordedChunks = [];
-                const canvas = document.querySelector("#viewDiv canvas");
-                const stream = canvas.captureStream(60); // 60 FPS
+            // --- FRAME-BY-FRAME RECORDER ENGINE (WHAMMY.JS + SCREENSHOTS) ---
+            
+            async function startRecordingFrameByFrame() {
+                if (checkpoints.length < 1) return;
                 
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'video/webm;codecs=vp9',
-                    videoBitsPerSecond: 5000000 // 5Mbps
-                });
+                isAnimating = true;
+                document.body.classList.add("is-recording");
+                renderProgress.style.display = "block";
+                
+                const fps = 30;
+                whammyEncoder = new Whammy.Video(fps);
 
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) recordedChunks.push(e.data);
+                const tempCanvas = document.createElement("canvas");
+                // Use willReadFrequently to optimize readback operations as warned by browser
+                const tempCtx = tempCanvas.getContext("2d", { willReadFrequently: true });
+                
+                const sizeVal = viewportSizeInput.value;
+                let width = view.width;
+                let height = view.height;
+                
+                if (sizeVal !== "window") {
+                    const parts = sizeVal.split("x");
+                    const parsedWidth = parseInt(parts[0]);
+                    const parsedHeight = parseInt(parts[1]);
+                    if (!isNaN(parsedWidth)) width = parsedWidth;
+                    if (!isNaN(parsedHeight)) height = parsedHeight;
+                }
+
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+
+                const userDuration = parseInt(durationInput.value) || 5000;
+                const introDuration = 3000;
+
+                const ease = (t) => t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+                const getFrameCount = (durationMs) => Math.max(1, Math.round((durationMs / 1000) * fps));
+
+                const splitTransitionDurations = (totalDuration) => {
+                    const overview = Math.min(2000, Math.floor(totalDuration * 0.35));
+                    const travel = Math.max(200, totalDuration - overview);
+                    return { overview, travel };
                 };
 
-                mediaRecorder.onstop = exportVideo;
+                const introSplit = splitTransitionDurations(introDuration);
+                const segmentSplit = splitTransitionDurations(userDuration);
+
+                const introOverviewFrames = getFrameCount(introSplit.overview);
+                const introTravelFrames = getFrameCount(introSplit.travel);
+                const transitionOverviewFrames = getFrameCount(segmentSplit.overview);
+                const transitionTravelFrames = getFrameCount(segmentSplit.travel);
+
+                let totalFrames = introOverviewFrames + introTravelFrames;
+                if (checkpoints.length > 1) {
+                    totalFrames += (checkpoints.length - 1) * (transitionOverviewFrames + transitionTravelFrames);
+                }
+                if (totalFrames === 0) totalFrames = 1;
+
+                let currentFrameIndex = 0;
+
+                const captureFrame = async (useQuick = false) => {
+                    // Fill background with black to avoid transparency issues
+                    tempCtx.fillStyle = "#000000";
+                    tempCtx.fillRect(0, 0, width, height);
+
+                    if (useQuick) {
+                        // Quick mode: try to get the WebGL canvas
+                        let canvas = null;
+                        // Try standard property or fallback to container lookup (common in 3D libraries)
+                        if (view.canvas) {
+                            canvas = view.canvas;
+                        } else {
+                            canvas = view.container.querySelector("canvas");
+                        }
+
+                        if (canvas) {
+                            tempCtx.drawImage(canvas, 0, 0, width, height);
+                        } else {
+                            // Fallback if canvas not found: simple text
+                            tempCtx.fillStyle = "red";
+                            tempCtx.innerText = "Canvas not found";
+                        }
+                        whammyEncoder.add(tempCanvas);
+                    } else {
+                        const screenshot = await view.takeScreenshot({ width: width, height: height, format: 'jpg', quality: 90 });
+                        tempCtx.putImageData(screenshot.data, 0, 0);
+                        whammyEncoder.add(tempCanvas);
+                    }
+                    currentFrameIndex++;
+                    updateProgress(currentFrameIndex, totalFrames);
+                };
+
+                const animateSegment = async (startCam, endCam, durationMs, useArc = false) => {
+                    const frameCount = getFrameCount(durationMs);
+                    if (frameCount <= 0) return;
+                    const useQuick = quickModeInput.checked;
+                    for (let f = 0; f < frameCount && isAnimating; f++) {
+                        const rawProgress = frameCount === 1 ? 1 : f / (frameCount - 1);
+                        const t = ease(rawProgress);
+                        const cam = interpolateCamera(startCam, endCam, t, useArc);
+                        view.camera = cam;
+                        if (!useQuick) await waitForTiles();
+                        await captureFrame(useQuick);
+                    }
+                };
+
+                const startCam = view.camera.clone();
+                const firstCP = checkpoints[0];
+                const startTarget = getCenterLocation();
+                await view.goTo({ target: firstCP.target, zoom: 15, heading: firstCP.heading, tilt: firstCP.tilt }, { animate: false });
+                const cp0Cam = view.camera.clone();
+
+                view.camera = startCam.clone();
+                const introMidpoint = getMidpoint(startTarget, firstCP.target);
+                const introGlobeCam = createGlobeCamera(introMidpoint, firstCP.heading);
+                await animateSegment(startCam, introGlobeCam, introSplit.overview);
+                await animateSegment(introGlobeCam, cp0Cam, introSplit.travel);
+
+                for (let i = 0; i < checkpoints.length - 1; i++) {
+                    if (!isAnimating) break;
+
+                    const cpStartCam = view.camera.clone();
+                    const endCP = checkpoints[i + 1];
+                    await view.goTo({ target: endCP.target, zoom: 15, heading: endCP.heading, tilt: endCP.tilt }, { animate: false });
+                    const cpEndCam = view.camera.clone();
+
+                    highlightCheckpoint(i + 1);
+
+                    view.camera = cpStartCam.clone();
+                    const segmentMidpoint = getMidpoint(checkpoints[i].target, endCP.target);
+                    const globeCam = createGlobeCamera(segmentMidpoint, endCP.heading);
+                    await animateSegment(cpStartCam, globeCam, segmentSplit.overview);
+                    await animateSegment(globeCam, cpEndCam, segmentSplit.travel, true);
+                }
+
+                highlightCheckpoint(-1);
+
+                if (isAnimating) {
+                    finishRecording();
+                } else {
+                    document.body.classList.remove("is-recording");
+                    renderProgress.style.display = "none";
+                }
+                isAnimating = false;
+            }
+
+            function finishRecording() {
+                renderText.innerText = "Compiling Video...";
+                try {
+                    // Whammy.js compile(outputAsArray, callback)
+                    whammyEncoder.compile(false, function(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `globe-cinematic-${Date.now()}.webm`;
+                        a.click();
+                        setTimeout(() => URL.revokeObjectURL(url), 100);
+                        
+                        document.body.classList.remove("is-recording");
+                        renderProgress.style.display = "none";
+                    });
+                } catch (err) {
+                    console.error("Video compilation failed:", err);
+                    document.body.classList.remove("is-recording");
+                    renderProgress.style.display = "none";
+                }
+            }
+
+            // Basic Linear Interpolation for Camera
+            function interpolateCamera(c1, c2, t, useArc = false) {
+                const newCam = c1.clone();
                 
-                statusIndicator.classList.remove("hidden");
-                mediaRecorder.start();
-            }
-
-            function stopRecording() {
-                if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                    mediaRecorder.stop();
-                    statusIndicator.classList.add("hidden");
+                // Linear lat/lon/heading/tilt
+                newCam.position.longitude = c1.position.longitude + (c2.position.longitude - c1.position.longitude) * t;
+                newCam.position.latitude = c1.position.latitude + (c2.position.latitude - c1.position.latitude) * t;
+                newCam.heading = c1.heading + (c2.heading - c1.heading) * t;
+                newCam.tilt = c1.tilt + (c2.tilt - c1.tilt) * t;
+                
+                // Altitude interpolation
+                if (useArc) {
+                    // Simple Sine Arc to simulate flight
+                    // Base linear height
+                    const linearZ = c1.position.z + (c2.position.z - c1.position.z) * t;
+                    // Add arc. Max height depends on distance.
+                    // Rough distance approx in degrees
+                    const dist = Math.sqrt(Math.pow(c2.position.longitude - c1.position.longitude, 2) + Math.pow(c2.position.latitude - c1.position.latitude, 2));
+                    const arcHeight = dist * 20000; 
+                    const arcZ = Math.sin(t * Math.PI) * arcHeight;
+                    newCam.position.z = linearZ + arcZ;
+                } else {
+                    newCam.position.z = c1.position.z + (c2.position.z - c1.position.z) * t;
                 }
+
+                return newCam;
             }
 
-            function exportVideo() {
-                const blob = new Blob(recordedChunks, { type: "video/webm" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `globe-cinematic-${Date.now()}.webm`;
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-            }
-
-            // --- Event Listeners ---
-
-            view.on("click", (event) => {
-                if (!view.interacting) {
-                    addCheckpoint();
+            async function waitForTiles() {
+                if (view.updating) {
+                    await watchUtils.whenFalseOnce(view, "updating");
                 }
+                // Buffer for visual pop-in
+                await new Promise(r => setTimeout(r, 200)); 
+            }
+
+            function updateProgress(current, total) {
+                renderText.innerText = `Rendering Frame: ${current}/${Math.ceil(total)}`;
+                renderProgressFill.style.width = `${(current/total)*100}%`;
+            }
+
+            // --- EVENT HANDLERS ---
+            
+            cancelRenderBtn.addEventListener("click", () => {
+                isAnimating = false; // This breaks the loops
             });
 
+            fontSizeInput.addEventListener("input", () => updateMapMarkers());
             showMarkersInput.addEventListener("change", () => updateMapMarkers());
             addBtn.addEventListener("click", () => addCheckpoint());
-            previewBtn.addEventListener("click", () => runAnimationSequence(false));
-            recordBtn.addEventListener("click", () => runAnimationSequence(true));
+            previewBtn.addEventListener("click", () => startPreview());
+            recordBtn.addEventListener("click", () => startRecordingFrameByFrame());
+            
             clearBtn.addEventListener("click", () => {
                 if (confirm("Clear all checkpoints?")) {
                     checkpoints = [];
+                    saveToLocalStorage();
                     renderCheckpoints();
                     updateMapMarkers();
                 }
             });
 
-            // Handle ESC to cancel animation
             window.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && isAnimating) {
-                    isAnimating = false;
-                    stopRecording();
+                if (e.key === 'Escape') {
+                    if (!jsonModal.classList.contains("hidden")) {
+                        jsonModal.classList.add("hidden");
+                    }
+                    if (isAnimating) {
+                        isAnimating = false;
+                        document.body.classList.remove("is-recording");
+                        renderProgress.style.display = "none";
+                        highlightCheckpoint(-1);
+                    }
                 }
             });
 

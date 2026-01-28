@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Географические координаты — Тренажер 5 класс</title>
+    
+    <!-- Open Graph Tags -->
+    <meta property="og:title" content="Географические координаты — Тренажер 5 класс">
+    <meta property="og:description" content="Интерактивная карточка-пятиминутка для проверки навыков работы с географической картой.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="./images.jpg">
+    <meta name="twitter:card" content="./images.jpg">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .task-input:disabled {
+            background-color: transparent;
+            cursor: not-allowed;
+        }
+        .correct-bg { background-color: #f0fdf4; border-color: #22c55e; }
+        .incorrect-bg { background-color: #fef2f2; border-color: #ef4444; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-800">
+
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="flex flex-col items-center mb-8 text-center">
+            <div class="bg-green-600 text-white px-6 py-2 rounded-full shadow-lg mb-4 flex items-center gap-2">
+                <i data-lucide="map" class="w-5 h-5"></i>
+                <h1 class="font-bold text-lg tracking-wide uppercase">Географические координаты</h1>
+            </div>
+            <p class="text-slate-500 text-sm italic">Карточка-пятиминутка по географии, 5 класс</p>
+        </div>
+
+        <!-- Card Navigator -->
+        <div class="flex items-center justify-between mb-6 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+            <button id="prevBtn" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <i data-lucide="chevron-left"></i>
+            </button>
+            <span id="variantLabel" class="font-bold text-slate-600 uppercase">Вариант 1 из 6</span>
+            <button id="nextBtn" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <i data-lucide="chevron-right"></i>
+            </button>
+        </div>
+
+        <!-- Main Card Container -->
+        <div id="cardApp" class="bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-green-500 relative">
+            <div class="bg-green-500 p-3 text-center">
+                <h2 id="cardTitle" class="text-white font-bold text-xl uppercase tracking-tighter italic">карточка 1</h2>
+            </div>
+
+            <div id="cardContent" class="p-6 md:p-8 space-y-8">
+                <!-- Content will be injected by JS -->
+            </div>
+
+            <!-- Controls -->
+            <div id="controls" class="bg-slate-50 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200">
+                <!-- Buttons injected by JS -->
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-slate-400 text-xs">
+            <p>Интерактивный тренажер на основе методической разработки</p>
+            <p>© География 5 класс — ФГОС соответствие</p>
+        </div>
+    </div>
+
+    <script>
+        const CARDS_DATA = [
+            { id: 1, task1: [ { id: "1.1", coords: "27° с.ш. 86° в.д.", answer: "Эверест" }, { id: "1.2", coords: "27° ю.ш. 109° з.д.", answer: "о. Пасхи" }, { id: "1.3", coords: "35° с.ш. 139° в.д.", answer: "Токио" } ], task2: [ { id: "2.1", object: "Новосибирск", lat: "55", latDir: "с.ш.", lon: "82", lonDir: "в.д." }, { id: "2.2", object: "Эльбрус", lat: "43", latDir: "с.ш.", lon: "42", lonDir: "в.д." }, { id: "2.3", object: "Оттава", lat: "45", latDir: "с.ш.", lon: "75", lonDir: "з.д." } ] },
+            { id: 2, task1: [ { id: "1.1", coords: "3° ю.ш. 37° в.д.", answer: "Килиманджаро" }, { id: "1.2", coords: "7° ю.ш. 111° в.д.", answer: "о. Ява" }, { id: "1.3", coords: "55° с.ш. 37° в.д.", answer: "Москва" } ], task2: [ { id: "2.1", object: "Челябинск", lat: "55", latDir: "с.ш.", lon: "61", lonDir: "в.д." }, { id: "2.2", object: "Тянь-Шань", lat: "42", latDir: "с.ш.", lon: "80", lonDir: "в.д." }, { id: "2.3", object: "Кейптаун", lat: "33", latDir: "ю.ш.", lon: "18", lonDir: "в.д." } ] },
+            { id: 3, task1: [ { id: "1.1", coords: "35° с.ш. 138° в.д.", answer: "Фудзияма" }, { id: "1.2", coords: "0° ю.ш. 101° в.д.", answer: "о. Суматра" }, { id: "1.3", coords: "30° с.ш. 31° в.д.", answer: "Каир" } ], task2: [ { id: "2.1", object: "Курск", lat: "51", latDir: "с.ш.", lon: "36", lonDir: "в.д." }, { id: "2.2", object: "оз. Байкал", lat: "53", latDir: "с.ш.", lon: "108", lonDir: "в.д." }, { id: "2.3", object: "Осло", lat: "59", latDir: "с.ш.", lon: "10", lonDir: "в.д." } ] },
+            { id: 4, task1: [ { id: "1.1", coords: "32° ю.ш. 70° з.д.", answer: "Аконкагуа" }, { id: "1.2", coords: "22° с.ш. 79° з.д.", answer: "о. Куба" }, { id: "1.3", coords: "35° с.ш. 51° в.д.", answer: "Тегеран" } ], task2: [ { id: "2.1", object: "Калининград", lat: "54", latDir: "с.ш.", lon: "20", lonDir: "в.д." }, { id: "2.2", object: "Хельсинки", lat: "60", latDir: "с.ш.", lon: "24", lonDir: "в.д." }, { id: "2.3", object: "о. Шри-Ланка", lat: "7", latDir: "с.ш.", lon: "80", lonDir: "в.д." } ] },
+            { id: 5, task1: [ { id: "1.1", coords: "43° с.ш. 42° в.д.", answer: "Эльбрус" }, { id: "1.2", coords: "64° с.ш. 51° з.д.", answer: "Гренландия" }, { id: "1.3", coords: "40° с.ш. 74° з.д.", answer: "Нью-Йорк" } ], task2: [ { id: "2.1", object: "Хабаровск", lat: "48", latDir: "с.ш.", lon: "135", lonDir: "в.д." }, { id: "2.2", object: "Сочи", lat: "43", latDir: "с.ш.", lon: "39", lonDir: "в.д." }, { id: "2.3", object: "Пекин", lat: "39", latDir: "с.ш.", lon: "116", lonDir: "в.д." } ] },
+            { id: 6, task1: [ { id: "1.1", coords: "38° с.ш. 15° в.д.", answer: "Этна" }, { id: "1.2", coords: "64° с.ш. 19° з.д.", answer: "о. Исландия" }, { id: "1.3", coords: "48° с.ш. 2° в.д.", answer: "Париж" } ], task2: [ { id: "2.1", object: "Ключевская Сопка", lat: "56", latDir: "с.ш.", lon: "160", lonDir: "в.д." }, { id: "2.2", object: "Сидней", lat: "33", latDir: "ю.ш.", lon: "151", lonDir: "в.д." }, { id: "2.3", object: "оз. Титикака", lat: "15", latDir: "ю.ш.", lon: "69", lonDir: "з.д." } ] }
+        ];
+
+        let currentIdx = 0;
+        let showResults = false;
+        let userAnswers = {};
+
+        function render() {
+            const card = CARDS_DATA[currentIdx];
+            document.getElementById('cardTitle').innerText = `карточка ${card.id}`;
+            document.getElementById('variantLabel').innerText = `Вариант ${card.id} из ${CARDS_DATA.length}`;
+            
+            const content = document.getElementById('cardContent');
+            const controls = document.getElementById('controls');
+            
+            // Task 1 Section
+            let html = `
+                <section class="space-y-4">
+                    <div class="flex gap-3">
+                        <span class="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold">1</span>
+                        <p class="text-sm font-medium leading-tight pt-1">Посмотрите на географические координаты. Укажите объект, соответствующий им.</p>
+                    </div>
+                    <div class="ml-0 sm:ml-11 space-y-3">
+            `;
+
+            card.task1.forEach(item => {
+                const val = userAnswers[`${currentIdx}-${item.id}-ans`] || "";
+                const isCorrect = val.toLowerCase().trim() === item.answer.toLowerCase().trim();
+                const inputClass = showResults 
+                    ? (isCorrect ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50')
+                    : 'border-slate-300 focus:border-green-500';
+
+                html += `
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span class="font-bold text-green-700 min-w-[10rem]">${item.id}) ${item.coords}</span>
+                        <div class="relative flex-grow">
+                            <input type="text" 
+                                data-task="${item.id}" data-field="ans"
+                                ${showResults ? 'disabled' : ''}
+                                class="w-full border-b-2 outline-none py-1 px-2 transition-all task-input ${inputClass}"
+                                value="${val}"
+                                placeholder="Напишите объект..."
+                                oninput="handleInput(this)"
+                            >
+                            ${showResults ? `
+                                <div class="absolute right-0 top-1">
+                                    ${isCorrect ? '<i data-lucide="check-circle" class="text-green-600 w-5 h-5"></i>' : `<span class="text-[10px] text-red-500 font-bold bg-white px-1">Ответ: ${item.answer}</span>`}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div></section>`;
+
+            // Task 2 Section
+            html += `
+                <section class="space-y-4">
+                    <div class="flex gap-3">
+                        <span class="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold">2</span>
+                        <p class="text-sm font-medium leading-tight pt-1">Найдите географические координаты объектов и запишите их.</p>
+                    </div>
+                    <div class="ml-0 sm:ml-11 space-y-4">
+            `;
+
+            card.task2.forEach(item => {
+                const uLat = userAnswers[`${currentIdx}-${item.id}-lat`] || "";
+                const uLatDir = userAnswers[`${currentIdx}-${item.id}-latDir`] || "с.ш.";
+                const uLon = userAnswers[`${currentIdx}-${item.id}-lon`] || "";
+                const uLonDir = userAnswers[`${currentIdx}-${item.id}-lonDir`] || "в.д.";
+                
+                const isCorrect = showResults && uLat === item.lat && uLatDir === item.latDir && uLon === item.lon && uLonDir === item.lonDir;
+                const rowClass = showResults ? (isCorrect ? 'bg-green-50' : 'bg-red-50') : '';
+
+                html += `
+                    <div class="flex flex-col gap-2">
+                        <span class="font-bold text-green-700">${item.id}) ${item.object}</span>
+                        <div class="flex flex-wrap items-center gap-2 p-2 rounded-lg border-2 border-transparent ${rowClass}">
+                            <div class="flex items-center gap-1">
+                                <input type="number" ${showResults ? 'disabled' : ''} 
+                                    data-task="${item.id}" data-field="lat"
+                                    class="w-12 border-b border-slate-400 outline-none text-center bg-transparent"
+                                    value="${uLat}" oninput="handleInput(this)">
+                                <span class="text-sm italic">°</span>
+                                <select ${showResults ? 'disabled' : ''} 
+                                    data-task="${item.id}" data-field="latDir"
+                                    class="bg-transparent border-b border-slate-400 outline-none text-sm"
+                                    onchange="handleInput(this)">
+                                    <option value="с.ш." ${uLatDir === 'с.ш.' ? 'selected' : ''}>с.ш.</option>
+                                    <option value="ю.ш." ${uLatDir === 'ю.ш.' ? 'selected' : ''}>ю.ш.</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <input type="number" ${showResults ? 'disabled' : ''} 
+                                    data-task="${item.id}" data-field="lon"
+                                    class="w-12 border-b border-slate-400 outline-none text-center bg-transparent"
+                                    value="${uLon}" oninput="handleInput(this)">
+                                <span class="text-sm italic">°</span>
+                                <select ${showResults ? 'disabled' : ''} 
+                                    data-task="${item.id}" data-field="lonDir"
+                                    class="bg-transparent border-b border-slate-400 outline-none text-sm"
+                                    onchange="handleInput(this)">
+                                    <option value="в.д." ${uLonDir === 'в.д.' ? 'selected' : ''}>в.д.</option>
+                                    <option value="з.д." ${uLonDir === 'з.д.' ? 'selected' : ''}>з.д.</option>
+                                </select>
+                            </div>
+                            ${showResults ? (isCorrect ? '<i data-lucide="check-circle" class="text-green-600 w-5 h-5 ml-2"></i>' : `<div class="text-[10px] text-red-600 font-bold ml-2">Верно: ${item.lat}° ${item.latDir} ${item.lon}° ${item.lonDir}</div>`) : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div></section>`;
+            content.innerHTML = html;
+
+            // Render Controls
+            if (!showResults) {
+                controls.innerHTML = `
+                    <button onclick="checkAnswers()" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-10 rounded-2xl shadow-lg transform transition active:scale-95 flex items-center justify-center gap-2">
+                        <i data-lucide="navigation" class="w-5 h-5"></i> Проверить ответы
+                    </button>
+                `;
+            } else {
+                const score = calculateScore();
+                const grade = score === 6 ? '5+' : score === 5 ? '5' : score === 4 ? '4' : '3';
+                controls.innerHTML = `
+                    <div class="flex flex-col sm:flex-row w-full items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="text-2xl font-black ${score >= 4 ? 'text-green-600' : 'text-orange-500'}">Результат: ${score}/6</div>
+                            <div class="text-sm text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">Оценка: ${grade}</div>
+                        </div>
+                        <button onclick="resetCard()" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-8 rounded-2xl transition">
+                            <i data-lucide="refresh-ccw" class="w-4 h-4"></i> Сбросить
+                        </button>
+                    </div>
+                `;
+            }
+
+            lucide.createIcons();
+        }
+
+        function handleInput(el) {
+            const taskId = el.getAttribute('data-task');
+            const field = el.getAttribute('data-field');
+            userAnswers[`${currentIdx}-${taskId}-${field}`] = el.value;
+        }
+
+        function calculateScore() {
+            const card = CARDS_DATA[currentIdx];
+            let score = 0;
+            card.task1.forEach(t => {
+                const val = (userAnswers[`${currentIdx}-${t.id}-ans`] || "").toLowerCase().trim();
+                if (val === t.answer.toLowerCase().trim()) score++;
+            });
+            card.task2.forEach(t => {
+                const lat = userAnswers[`${currentIdx}-${t.id}-lat`] || "";
+                const latDir = userAnswers[`${currentIdx}-${t.id}-latDir`] || "с.ш.";
+                const lon = userAnswers[`${currentIdx}-${t.id}-lon`] || "";
+                const lonDir = userAnswers[`${currentIdx}-${t.id}-lonDir`] || "в.д.";
+                if (lat === t.lat && latDir === t.latDir && lon === t.lon && lonDir === t.lonDir) score++;
+            });
+            return score;
+        }
+
+        function checkAnswers() {
+            showResults = true;
+            render();
+        }
+
+        function resetCard() {
+            showResults = false;
+            // Clear current card answers
+            const card = CARDS_DATA[currentIdx];
+            card.task1.forEach(t => delete userAnswers[`${currentIdx}-${t.id}-ans`]);
+            card.task2.forEach(t => {
+                delete userAnswers[`${currentIdx}-${t.id}-lat`];
+                delete userAnswers[`${currentIdx}-${t.id}-latDir`];
+                delete userAnswers[`${currentIdx}-${t.id}-lon`];
+                delete userAnswers[`${currentIdx}-${t.id}-lonDir`];
+            });
+            render();
+        }
+
+        document.getElementById('prevBtn').onclick = () => {
+            currentIdx = (currentIdx - 1 + CARDS_DATA.length) % CARDS_DATA.length;
+            showResults = false;
+            render();
+        };
+
+        document.getElementById('nextBtn').onclick = () => {
+            currentIdx = (currentIdx + 1) % CARDS_DATA.length;
+            showResults = false;
+            render();
+        };
+
+        // Initial render
+        window.onload = render;
+    </script>
+</body>
+</html>

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Win95: BTM@37*(431) - Radio Market Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @font-face {
+            font-family: 'Pixel';
+            src: url('https://fonts.cdnfonts.com/css/pixel-operator') format('woff2');
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Tahoma', sans-serif;
+        }
+
+        /* --- СТИЛИ МИРА (Undertale Style) --- */
+        #world-layer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #222;
+        }
+
+        #game-canvas {
+            background: #333; /* Пол рынка */
+            image-rendering: pixelated;
+            border: 4px solid #444;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .dialog-box {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 600px;
+            background: #000;
+            border: 4px solid #fff;
+            color: #fff;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            display: none;
+            z-index: 50;
+        }
+
+        /* --- СТИЛИ ОС (Windows 95 Mode) --- */
+        #os-layer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #008080; /* Teal */
+            display: none;
+            z-index: 100;
+            flex-direction: column;
+        }
+
+        .win95-border {
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            background: #c0c0c0;
+        }
+
+        .win95-inset {
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            background: #fff;
+        }
+
+        .title-bar {
+            background: linear-gradient(90deg, #000080, #1084d0);
+            color: white;
+            padding: 2px 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .taskbar {
+            height: 38px;
+            background: #c0c0c0;
+            border-top: 2px solid #ffffff;
+            display: flex;
+            align-items: center;
+            padding: 2px 5px;
+            margin-top: auto;
+        }
+
+        .start-btn {
+            font-weight: bold;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            padding: 2px 8px;
+            background: #c0c0c0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Эффект шума/ЭЛТ */
+        .crt::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 1000;
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="crt">
+
+    <!-- СЛОЙ 1: МИР (БРОДИЛКА) -->
+    <div id="world-layer">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="world-hud" class="absolute top-4 left-4 text-white font-mono text-sm bg-black/50 p-2 border border-white">
+            Филипп | Павильон 42<br>
+            Хаос: <span id="chaos-val">0</span>%
+        </div>
+
+        <div id="interaction-prompt" class="absolute bottom-32 left-1/2 -translate-x-1/2 text-white bg-black p-2 border-2 border-white text-xs hidden animate-bounce">
+            [ПРОБЕЛ] Взаимодействовать
+        </div>
+
+        <div id="dialog-box" class="dialog-box">
+            <div id="dialog-text">...</div>
+            <div class="text-[10px] mt-2 text-gray-400">Нажмите [ПРОБЕЛ], чтобы продолжить</div>
+        </div>
+    </div>
+
+    <!-- СЛОЙ 2: ОПЕРАЦИОННАЯ СИСТЕМА (КОМПЬЮТЕР) -->
+    <div id="os-layer">
+        <div class="p-8 grid grid-cols-1 gap-8 w-24">
+            <!-- Icons -->
+            <div class="flex flex-col items-center gap-1 cursor-pointer" onclick="openVirusWin()">
+                <div class="text-3xl">📁</div>
+                <span class="text-white text-xs text-center font-bold shadow-black">BTM_CORE</span>
+            </div>
+            <div class="flex flex-col items-center gap-1 cursor-pointer">
+                <div class="text-3xl">🗑️</div>
+                <span class="text-white text-xs text-center font-bold shadow-black">Корзина</span>
+            </div>
+        </div>
+
+        <!-- Window: Virus Control -->
+        <div id="virus-window" class="win95-border absolute top-20 left-40 w-80 shadow-xl hidden">
+            <div class="title-bar">
+                <span>BTM@37*(431) - Terminal</span>
+                <button class="bg-[#c0c0c0] text-black px-2 text-xs border border-white" onclick="closeOS()">X</button>
+            </div>
+            <div class="p-4 flex flex-col gap-4">
+                <div class="win95-inset bg-black text-[#0f0] p-2 font-mono text-xs h-32 overflow-y-auto" id="terminal-out">
+                    > ВАС ПРИВЕТСТВУЕТ BTM@37*(431)<br>
+                    > ОБНАРУЖЕН МАЙНИНГОВЫЙ ПОТЕНЦИАЛ...
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button class="btn-win95" onclick="cmd('TURBO')">ЗАПУСТИТЬ ТУРБО-МАЙНИНГ</button>
+                    <button class="btn-win95" onclick="cmd('SCAN')">СКАНИРОВАТЬ РЕАЛЬНОСТЬ</button>
+                    <button class="btn-win95" onclick="closeOS()">ВЫЙТИ В РЕАЛЬНОСТЬ</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Taskbar -->
+        <div class="taskbar">
+            <div class="start-btn">
+                <span class="text-lg">🪟</span> Пуск
+            </div>
+            <div class="win95-inset px-2 py-1 mx-2 text-xs font-bold bg-[#c0c0c0] flex-1">
+                BTM@37*(431) System Monitor
+            </div>
+            <div class="win95-inset px-4 py-1 text-xs">
+                15:43
+            </div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    const worldLayer = document.getElementById('world-layer');
+    const osLayer = document.getElementById('os-layer');
+    const dialogBox = document.getElementById('dialog-box');
+    const prompt = document.getElementById('interaction-prompt');
+
+    canvas.width = 640;
+    canvas.height = 480;
+
+    const state = {
+        mode: 'world', // 'world', 'dialog', 'os'
+        chaos: 0,
+        player: { x: 300, y: 350, w: 32, h: 48, speed: 4 },
+        keys: {},
+        objects: [
+            { id: 'pc', x: 280, y: 150, w: 80, h: 60, color: '#aaa', type: 'pc', name: 'Системник школьников', fleeSpeed: 5 },
+            { id: 'table', x: 100, y: 200, w: 120, h: 40, color: '#543', type: 'static', name: 'Стол с хламом' },
+            { id: 'npc_vasya', x: 500, y: 200, w: 32, h: 48, color: '#f0f', type: 'npc', name: 'Дядя Вася' }
+        ],
+        nearObject: null
+    };
+
+    // --- ЛОГИКА МИРА ---
+
+    function drawWorld() {
+        if (state.mode === 'os') return;
+
+        ctx.fillStyle = '#333';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Сетка пола
+        ctx.strokeStyle = '#444';
+        for(let i=0; i<canvas.width; i+=40) {
+            ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, canvas.height); ctx.stroke();
+        }
+        for(let j=0; j<canvas.height; j+=40) {
+            ctx.beginPath(); ctx.moveTo(0,j); ctx.lineTo(canvas.width, j); ctx.stroke();
+        }
+
+        // Объекты
+        state.objects.forEach(obj => {
+            let drawX = obj.x;
+            let drawY = obj.y;
+
+            // Дядя Вася начинает трястись, если Хаос > 0
+            if (obj.id === 'npc_vasya' && state.chaos > 0) {
+                const shakeIntensity = state.chaos / 10;
+                drawX += (Math.random() - 0.5) * shakeIntensity;
+                drawY += (Math.random() - 0.5) * shakeIntensity;
+            }
+
+            // Рендеринг объекта
+            const isEvilPC = (obj.id === 'pc' && state.chaos >= 100);
+            ctx.fillStyle = isEvilPC ? '#800' : obj.color;
+            ctx.fillRect(drawX, drawY, obj.w, obj.h);
+            ctx.strokeStyle = '#000';
+            ctx.strokeRect(drawX, drawY, obj.w, obj.h);
+
+            // Злобная рожица на системнике при 100% хаоса
+            if (isEvilPC) {
+                ctx.fillStyle = '#f00';
+                // Глаза
+                ctx.fillRect(drawX + 15, drawY + 15, 10, 5);
+                ctx.fillRect(drawX + obj.w - 25, drawY + 15, 10, 5);
+                // Оскал
+                ctx.strokeStyle = '#f00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(drawX + 20, drawY + 40);
+                ctx.lineTo(drawX + 30, drawY + 35);
+                ctx.lineTo(drawX + 40, drawY + 40);
+                ctx.lineTo(drawX + 50, drawY + 35);
+                ctx.lineTo(drawX + 60, drawY + 40);
+                ctx.stroke();
+            }
+            
+            // Названия
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px monospace';
+            ctx.fillText(obj.name, drawX, drawY - 5);
+        });
+
+        // Филипп
+        ctx.fillStyle = '#000080';
+        ctx.fillRect(state.player.x, state.player.y, state.player.w, state.player.h);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(state.player.x + 6, state.player.y + 10, 6, 6);
+        ctx.fillRect(state.player.x + 20, state.player.y + 10, 6, 6);
+    }
+
+    function updateWorld() {
+        if (state.mode !== 'world') return;
+
+        const p = state.player;
+        let dx = 0, dy = 0;
+
+        if (state.keys['ArrowUp'] || state.keys['w']) dy = -p.speed;
+        if (state.keys['ArrowDown'] || state.keys['s']) dy = p.speed;
+        if (state.keys['ArrowLeft'] || state.keys['a']) dx = -p.speed;
+        if (state.keys['ArrowRight'] || state.keys['d']) dx = p.speed;
+
+        const nextX = p.x + dx;
+        const nextY = p.y + dy;
+
+        if (nextX > 0 && nextX < canvas.width - p.w) p.x = nextX;
+        if (nextY > 0 && nextY < canvas.height - p.h) p.y = nextY;
+
+        // Логика побега системника при 100% хаоса
+        if (state.chaos >= 100) {
+            const pc = state.objects.find(o => o.id === 'pc');
+            const dist = Math.hypot((p.x + p.w/2) - (pc.x + pc.w/2), (p.y + p.h/2) - (pc.y + pc.h/2));
+            
+            if (dist < 150) {
+                // Вектор от игрока к системнику
+                let vX = pc.x - p.x;
+                let vY = pc.y - p.y;
+                const mag = Math.sqrt(vX*vX + vY*vY);
+                vX /= mag;
+                vY /= mag;
+
+                // Скорость побега
+                let moveX = vX * pc.fleeSpeed;
+                let moveY = vY * pc.fleeSpeed;
+
+                // --- ЛОГИКА ВЫТЕСНЕНИЯ ИЗ УГЛОВ ---
+                // Если мы слишком близко к краям, добавляем "силу", толкающую к центру
+                const margin = 60;
+                const centerPush = 3; // Сила выталкивания к центру
+
+                if (pc.x < margin) moveX += centerPush;
+                if (pc.x > canvas.width - pc.w - margin) moveX -= centerPush;
+                if (pc.y < margin) moveY += centerPush;
+                if (pc.y > canvas.height - pc.h - margin) moveY -= centerPush;
+
+                pc.x += moveX;
+                pc.y += moveY;
+
+                // Ограничение границами экрана
+                pc.x = Math.max(0, Math.min(canvas.width - pc.w, pc.x));
+                pc.y = Math.max(0, Math.min(canvas.height - pc.h, pc.y));
+                pc.name = "BTM@37*(431) В ПАНИКЕ!";
+            }
+        }
+
+        state.nearObject = null;
+        state.objects.forEach(obj => {
+            const dist = Math.hypot((p.x + p.w/2) - (obj.x + obj.w/2), (p.y + p.h/2) - (obj.y + obj.h/2));
+            if (dist < 70) state.nearObject = obj;
+        });
+
+        prompt.style.display = state.nearObject ? 'block' : 'none';
+    }
+
+    function interact(obj) {
+        if (!obj) return;
+        if (obj.type === 'pc') {
+            if (state.chaos >= 100) {
+                showDialog("Филипп: 'Эй! Куда ты?! Вернись, железка чертова! Мне нужно выключить этот майнинг!'");
+            } else {
+                enterOS();
+            }
+        } else if (obj.type === 'npc') {
+            if (state.chaos >= 100) {
+                showDialog("Дядя Вася: 'Филипп, твой компьютер только что укусил меня за ботинок и убежал в сторону рядов с дискетами! ЭТО КОНЕЦ!'");
+            } else if (state.chaos > 0) {
+                showDialog("Дядя Вася: 'Ф-ф-филипп... почему меня т-т-трясет? И почему в небе п-п-плывут огромные курсоры?!'");
+            } else {
+                showDialog("Дядя Вася: 'Слышь, Филипп, не трогай этот комп. Он гудит как проклятый. Школьники сказали, это для майнинга каких-то монет, но по-моему он майнит само зло.'");
+            }
+        } else {
+            showDialog("Филипп: 'Просто стол. На нем гора дохлых транзисторов и пустая банка из-под кофе.'");
+        }
+    }
+
+    function showDialog(text) {
+        state.mode = 'dialog';
+        dialogBox.style.display = 'block';
+        document.getElementById('dialog-text').innerText = text;
+    }
+
+    function enterOS() {
+        state.mode = 'os';
+        osLayer.style.display = 'flex';
+        worldLayer.style.display = 'none';
+        logTerminal("ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ...");
+        logTerminal("ПОДКЛЮЧЕНИЕ К ЯДРУ BTM@37*(431)...");
+    }
+
+    function closeOS() {
+        state.mode = 'world';
+        osLayer.style.display = 'none';
+        worldLayer.style.display = 'flex';
+        document.getElementById('virus-window').classList.add('hidden');
+    }
+
+    function openVirusWin() {
+        document.getElementById('virus-window').classList.remove('hidden');
+    }
+
+    function cmd(type) {
+        if (type === 'TURBO') {
+            state.chaos += 10;
+            logTerminal("ВНИМАНИЕ: ТУРБО-РЕЖИМ ВКЛЮЧЕН. ХАОС РЕАЛЬНОСТИ +10%");
+            checkChaos();
+        } else if (type === 'SCAN') {
+            logTerminal("СКАНИРОВАНИЕ... ОБНАРУЖЕНО: 13 ВЕРОЯТНЫХ КОНЦОВ СВЕТА.");
+        }
+        document.getElementById('chaos-val').innerText = state.chaos;
+    }
+
+    function logTerminal(msg) {
+        const out = document.getElementById('terminal-out');
+        out.innerHTML += `<br>> ${msg}`;
+        out.scrollTop = out.scrollHeight;
+    }
+
+    function checkChaos() {
+        if (state.chaos >= 100) {
+            showDialog("КРИТИЧЕСКАЯ ОШИБКА: СИСТЕМНЫЙ БЛОК ОБРЕЛ СОЗНАНИЕ И АГРЕССИВНО НАСТРОЕН К ПОЛЬЗОВАТЕЛЮ.");
+            closeOS();
+        }
+    }
+
+    function loop() {
+        updateWorld();
+        drawWorld();
+        requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('keydown', e => {
+        state.keys[e.key] = true;
+        if (e.key === ' ') {
+            e.preventDefault();
+            if (state.mode === 'dialog') {
+                state.mode = 'world';
+                dialogBox.style.display = 'none';
+            } else if (state.mode === 'world' && state.nearObject) {
+                interact(state.nearObject);
+            }
+        }
+        if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+            e.preventDefault();
+        }
+    });
+
+    window.addEventListener('keyup', e => {
+        state.keys[e.key] = false;
+    });
+
+    loop();
+</script>
+</body>
+</html>

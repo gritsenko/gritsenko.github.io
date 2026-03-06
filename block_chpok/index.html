@@ -9,6 +9,9 @@
     <meta property="og:description" content="Увлекательная головоломка с блоками">
     <meta property="og:image" content="og.jpg">
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://gritsenko.biz/block_chpok/">
+    <meta name="twitter:card" content="summary_large_image">
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
 
@@ -40,7 +43,7 @@
             padding: 0;
             font-family: 'Nunito', sans-serif;
             /* Затемняем основной фон всего окна */
-            background: linear-gradient(rgba(10, 15, 30, 0.8), rgba(10, 15, 30, 0.8)), url('block_chpok/background.jpg') center/cover no-repeat fixed;
+            background: linear-gradient(rgba(10, 15, 30, 0.8), rgba(10, 15, 30, 0.8)), url('background.jpg') center/cover no-repeat fixed;
             background-color: var(--bg-color);
             height: 100vh;
             display: flex;
@@ -61,21 +64,15 @@
             position: relative;
             z-index: 1;
             overflow: hidden; /* Обрезаем края псевдоэлемента с размытием */
-            background: transparent;
             box-shadow: 0 0 40px rgba(0, 0, 0, 0.6); /* Отделяем контейнер от темного фона */
             border-radius: 35px; /* Скругляем углы контейнера */
+            background: url('background.jpg');           
         }
 
-        /* Независимый яркий и размытый фон внутри контейнера */
-        .game-container::before {
-            content: '';
-            position: absolute;
-            top: -40px; left: -40px; right: -40px; bottom: -40px; /* Растягиваем, чтобы скрыть артефакты размытия */
-            background: url('block_chpok/background.jpg') center/cover no-repeat fixed;
-            filter: blur(25px);
-            z-index: -2;
+        .game-container.shake {
+            animation: cameraShake 0.35s cubic-bezier(0.36, 0.07, 0.10, 0.37);
         }
-
+       
         /* Легкое осветление контейнера для лучшей контрастности текста и игрового поля */
         .game-container::after {
             content: '';
@@ -212,6 +209,15 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
+        @keyframes cameraShake {
+            0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+            20% { transform: translate3d(-7px, 4px, 0) rotate(-0.7deg); }
+            40% { transform: translate3d(8px, -5px, 0) rotate(0.8deg); }
+            60% { transform: translate3d(-6px, -3px, 0) rotate(-0.5deg); }
+            80% { transform: translate3d(5px, 4px, 0) rotate(0.4deg); }
+            100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+        }
+
         /* Трей (панель с фигурами) */
         .tray {
             display: flex;
@@ -295,6 +301,13 @@
         .btn-yellow { background: #fbbf24; box-shadow: 0 5px 0 #d97706; color: #854d0e; }
         .btn-yellow:active { box-shadow: 0 2px 0 #d97706; }
 
+        .btn:disabled {
+            cursor: default;
+            opacity: 0.55;
+            transform: none;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.08), inset 0 2px 4px rgba(255,255,255,0.2);
+        }
+
         .btn-icon {
             width: 24px;
             height: 24px;
@@ -366,6 +379,20 @@
             font-size: 40px;
             margin-bottom: 10px;
         }
+
+        .game-over-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 0 0 24px;
+            text-align: center;
+            color: white;
+        }
+
+        .game-over-stats strong {
+            font-size: 30px;
+            color: #facc15;
+        }
         
         .restart-btn {
             flex: none; /* Убираем растягивание от базового класса .btn */
@@ -391,6 +418,58 @@
             100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(var(--rot)); opacity: 0; }
         }
 
+        /* Частицы для приземления */
+        .landing-particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1; /* Под фигурой */
+            animation: landing 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+
+        @keyframes landing {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.6; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(2); opacity: 0; }
+        }
+
+        /* Всплывающие очки */
+        .score-popup {
+            position: absolute;
+            font-size: 24px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 1000;
+            animation: scoreFloat 1s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+
+        @keyframes scoreFloat {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            30% { transform: translate(-50%, -100%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -180%) scale(1); opacity: 0; }
+        }
+
+        /* Хвалебные надписи */
+        .praise-popup {
+            position: absolute;
+            font-size: 32px;
+            font-weight: 900;
+            color: #fbbf24;
+            -webkit-text-stroke: 1.5px #fff;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+            pointer-events: none;
+            z-index: 1001;
+            animation: praisePop 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes praisePop {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; rotate: -10deg; }
+            20% { transform: translate(-50%, -120%) scale(1.4); opacity: 1; rotate: 5deg; }
+            40% { transform: translate(-50%, -120%) scale(1.2); opacity: 1; rotate: -5deg; }
+            100% { transform: translate(-50%, -250%) scale(1); opacity: 0; rotate: 0deg; }
+        }
+
     </style>
 </head>
 <body>
@@ -406,16 +485,16 @@
         <div class="stats-box">
             <div class="stat-row">
                 <svg class="stat-icon" viewBox="0 0 24 24" fill="#fbbf24"><path d="M20.2 4.6l-2-1.3C18 3.1 17.7 3 17.4 3H6.6c-.3 0-.6.1-.8.3l-2 1.3C3.3 5 3 5.5 3 6.1V8c0 2.2 1.8 4 4 4h.4c.5 2.1 2.3 3.8 4.6 4v2h-2c-.6 0-1 .4-1 1s.4 1 1 1h4c.6 0 1-.4 1-1s-.4-1-1-1h-2v-2c2.3-.2 4.1-1.9 4.6-4H17c2.2 0 4-1.8 4-4V6.1c0-.6-.3-1.1-.8-1.5zM7 10H5c-1.1 0-2-.9-2-2V6.4l1.2-.8h2.8V10zM19 10h-2V5.6h2.8l1.2.8V8C21 9.1 20.1 10 19 10z"/></svg>
-                <span id="score">0</span>
+                <span id="best-score">0</span>
             </div>
             <div class="stat-row">
                 <svg class="stat-icon" viewBox="0 0 24 24" fill="#facc15"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9h6M9 15h6" stroke="#ca8a04" stroke-width="2"/></svg>
-                <span>5,820</span>
+                <span id="score">0</span>
             </div>
         </div>
     </div>
 
-    <div class="level-text">Уровень 48</div>
+    <div class="level-text" id="main-score">0</div>
 
     <div class="board-container">
         <div class="board" id="board">
@@ -431,15 +510,15 @@
     </div>
 
     <div class="bottom-controls">
-        <button class="btn btn-blue">
+        <button class="btn btn-blue" id="undo-btn" type="button">
             <svg class="btn-icon" viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
             Отмена
         </button>
-        <button class="btn btn-blue">
+        <button class="btn btn-blue" type="button">
             <svg class="btn-icon" viewBox="0 0 24 24"><path d="M16 11V3H8v6H2v12h20V11h-6zm-6-6h4v14h-4V5zm-6 6h4v8H4v-8zm16 8h-4v-6h4v6z"/></svg>
             Рейтинг
         </button>
-        <button class="btn btn-yellow">
+        <button class="btn btn-yellow" type="button">
             <svg class="btn-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
             Подсказка
         </button>
@@ -447,6 +526,10 @@
     
     <div id="game-over">
         <h2>Игра Окончена!</h2>
+        <div class="game-over-stats">
+            <div>Счет: <strong id="game-over-score">0</strong></div>
+            <div>Рекорд: <strong id="game-over-best">0</strong></div>
+        </div>
         <button class="btn btn-yellow restart-btn" onclick="initGame()">Начать заново</button>
     </div>
 </div>
@@ -455,10 +538,12 @@
 <audio id="sound-click" src="click.mp3" preload="auto"></audio>
 <audio id="sound-pop" src="pop1.mp3" preload="auto"></audio>
 <audio id="sound-line" src="line.mp3" preload="auto"></audio>
+<audio id="sound-hard-pop" src="hard_pop.mp3" preload="auto"></audio>
 
 <script>
     // --- НАСТРОЙКИ И ДАННЫЕ ---
     const BOARD_SIZE = 8;
+    const BEST_SCORE_KEY = 'block-chpok-best-score';
     const COLORS = {
         orange: 'var(--color-orange)',
         blue: 'var(--color-blue)',
@@ -499,8 +584,17 @@
     let board = [];
     let trayPieces = [null, null, null];
     let score = 0;
-    
+    let bestScore = 0;
+    let displayedScore = 0;
+    let scoreAnimationToken = 0;
+    let undoHistory = [];
+    let refillTimeoutIds = [];
+    let gameOverTimeoutId = null;
+    let isRefillingTray = false;
+    let lastPlacementCoords = null; // Последняя точка установки фишки
+
     // Элементы DOM
+    const gameContainer = document.querySelector('.game-container');
     const boardEl = document.getElementById('board');
     const traySlots = [
         document.getElementById('slot-0'),
@@ -508,12 +602,17 @@
         document.getElementById('slot-2')
     ];
     const scoreEl = document.getElementById('score');
+    const bestScoreEl = document.getElementById('best-score');
     const comboDisplay = document.getElementById('combo-display');
     const gameOverScreen = document.getElementById('game-over');
+    const gameOverScoreEl = document.getElementById('game-over-score');
+    const gameOverBestEl = document.getElementById('game-over-best');
+    const undoBtn = document.getElementById('undo-btn');
     const soundPick = document.getElementById('sound-pick');
     const soundClick = document.getElementById('sound-click');
     const soundPop = document.getElementById('sound-pop');
     const soundLine = document.getElementById('sound-line');
+    const soundHardPop = document.getElementById('sound-hard-pop');
 
     function playSound(sound) {
         if (!sound) return;
@@ -542,6 +641,133 @@
         'var(--color-yellow)': { light: '#FFF29C', dark: '#D19200', centerL: '#FFCC14', centerD: '#A87200', strokeL: '#FFF5B0', strokeD: '#EBB000', outline: '#593A00' },
         'var(--color-red)': { light: '#FFA8A8', dark: '#A80C0C', centerL: '#F04141', centerD: '#7D0707', strokeL: '#FFBCBC', strokeD: '#CC1414', outline: '#420303' }
     };
+
+    function cloneBoardState(sourceBoard) {
+        return sourceBoard.map(row => row.slice());
+    }
+
+    function cloneShape(shape) {
+        if (!shape) return null;
+        return {
+            matrix: shape.matrix.map(row => row.slice()),
+            color: shape.color
+        };
+    }
+
+    function cloneTrayState(sourceTray) {
+        return sourceTray.map(piece => cloneShape(piece));
+    }
+
+    function clearPendingRefill() {
+        refillTimeoutIds.forEach(id => clearTimeout(id));
+        refillTimeoutIds = [];
+        isRefillingTray = false;
+    }
+
+    function clearPendingGameOver() {
+        if (gameOverTimeoutId !== null) {
+            clearTimeout(gameOverTimeoutId);
+            gameOverTimeoutId = null;
+        }
+    }
+
+    function loadBestScore() {
+        try {
+            const savedValue = window.localStorage.getItem(BEST_SCORE_KEY);
+            const parsedValue = Number(savedValue);
+            bestScore = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 0;
+        } catch (error) {
+            bestScore = 0;
+        }
+        updateBestScoreDisplay();
+    }
+
+    function saveBestScore(nextBestScore) {
+        bestScore = nextBestScore;
+        try {
+            window.localStorage.setItem(BEST_SCORE_KEY, String(bestScore));
+        } catch (error) {
+            // Игнорируем недоступный storage и просто обновляем UI.
+        }
+        updateBestScoreDisplay();
+    }
+
+    function updateBestScoreDisplay() {
+        const formattedBestScore = bestScore.toLocaleString('en-US');
+        bestScoreEl.textContent = formattedBestScore;
+        gameOverBestEl.textContent = formattedBestScore;
+    }
+
+    function updateUndoButtonState() {
+        undoBtn.disabled = undoHistory.length === 0 || isAnimating || isDragging || isRefillingTray;
+    }
+
+    function resetUndoHistory() {
+        undoHistory = [];
+        updateUndoButtonState();
+    }
+
+    function pushUndoState() {
+        undoHistory.push({
+            board: cloneBoardState(board),
+            trayPieces: cloneTrayState(trayPieces),
+            score,
+            displayedScore
+        });
+        updateUndoButtonState();
+    }
+
+    function isThreeByThreeSquare(shape) {
+        return Boolean(shape)
+            && shape.matrix.length === 3
+            && shape.matrix[0].length === 3
+            && shape.matrix.every(row => row.every(cell => cell === 1));
+    }
+
+    function triggerCameraShake() {
+        gameContainer.classList.remove('shake');
+        void gameContainer.offsetWidth;
+        gameContainer.classList.add('shake');
+    }
+
+    function finalizeBestScore() {
+        if (score > bestScore) {
+            saveBestScore(score);
+        } else {
+            updateBestScoreDisplay();
+        }
+    }
+
+    function showGameOver() {
+        finalizeBestScore();
+        gameOverScoreEl.textContent = score.toLocaleString('en-US');
+        gameOverScreen.classList.add('show');
+    }
+
+    function undoLastMove() {
+        if (undoHistory.length === 0 || isAnimating || isDragging || isRefillingTray) {
+            return;
+        }
+
+        clearPendingRefill();
+        clearPendingGameOver();
+
+        const previousState = undoHistory.pop();
+        board = cloneBoardState(previousState.board);
+        trayPieces = cloneTrayState(previousState.trayPieces);
+        score = previousState.score;
+        displayedScore = previousState.displayedScore;
+
+        comboDisplay.style.animation = 'none';
+        comboDisplay.classList.add('fade-out');
+        gameOverScreen.classList.remove('show');
+
+        updateScore();
+        renderBoard();
+        renderTray();
+        updateUndoButtonState();
+        checkGameOver();
+    }
 
     // --- ГЕНЕРАЦИЯ SVG БЛОКА ---
     // Создаем максимально реалистичный 3D блок на основе вашего SVG
@@ -617,11 +843,25 @@
 
     // --- ИНИЦИАЛИЗАЦИЯ ---
     function initGame() {
+        clearPendingRefill();
+        clearPendingGameOver();
+        if (dragElement) {
+            dragElement.remove();
+            dragElement = null;
+        }
+        gameContainer.classList.remove('shake');
         board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null));
         trayPieces = [null, null, null];
         score = 0;
+        displayedScore = 0;
+        isAnimating = false;
+        isDragging = false;
+        dragPieceIndex = -1;
+        resetUndoHistory();
         updateScore();
         gameOverScreen.classList.remove('show');
+        comboDisplay.style.animation = 'none';
+        comboDisplay.classList.add('fade-out');
         boardEl.innerHTML = ''; // Очищаем поле для полного перезапуска
         renderBoard();
         fillTray();
@@ -694,21 +934,58 @@
         
         // Заполняем только если все 3 пустые
         if (emptyCount === 3) {
-            for (let i = 0; i < 3; i++) {
-                const randomShape = SHAPES_DATA[Math.floor(Math.random() * SHAPES_DATA.length)];
-                trayPieces[i] = randomShape;
-            }
+            clearPendingRefill();
+            resetUndoHistory();
+            isRefillingTray = true;
+            updateUndoButtonState();
+            renderTray(true); // Рендерим пустые слоты
+            
+            // Задержка перед началом появления новой партии блоков
+            const refillStartTimeoutId = setTimeout(() => {
+                for (let i = 0; i < 3; i++) {
+                    const randomShape = SHAPES_DATA[Math.floor(Math.random() * SHAPES_DATA.length)];
+                    
+                    // Задержка появления и фигур, и частиц
+                    const slotFillTimeoutId = setTimeout(() => {
+                        trayPieces[i] = randomShape;
+                        renderTray(); // Обновляем лоток, чтобы показать фигуру
+                        
+                        // Звук появления блока
+                        playSound(soundClick);
+                        
+                        const slot = traySlots[i];
+                        if (slot) {
+                            const rect = slot.getBoundingClientRect();
+                            // Частицы в 3 раза больше (14 * 3 = 42)
+                            createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, randomShape.color, 42);
+                        }
+                        
+                        // После заполнения последнего слота проверяем возможность хода
+                        if (i === 2) {
+                            isRefillingTray = false;
+                            refillTimeoutIds = [];
+                            updateUndoButtonState();
+                            checkGameOver();
+                        }
+                    }, i * 150); 
+                    refillTimeoutIds.push(slotFillTimeoutId);
+                }
+            }, 300);
+            refillTimeoutIds.push(refillStartTimeoutId);
+        } else {
+            renderTray();
+            checkGameOver();
         }
-
-        renderTray();
-        checkGameOver();
     }
 
-    function renderTray() {
+    function renderTray(forceEmpty = false) {
         for (let i = 0; i < 3; i++) {
             const slot = traySlots[i];
+            const piece = forceEmpty ? null : trayPieces[i];
+            
             slot.innerHTML = '';
-            const piece = trayPieces[i];
+            slot.onmousedown = null;
+            slot.ontouchstart = null;
             
             if (piece) {
                 const rows = piece.matrix.length;
@@ -753,10 +1030,12 @@
                 slot.appendChild(shapeEl);
                 
                 // Добавляем обработчики событий
-                slot.addEventListener('mousedown', (e) => startDrag(e, i));
-                slot.addEventListener('touchstart', (e) => startDrag(e, i), {passive: false});
+                slot.onmousedown = (e) => startDrag(e, i);
+                slot.ontouchstart = (e) => startDrag(e, i);
             }
         }
+
+        updateUndoButtonState();
     }
 
     // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ ---
@@ -769,6 +1048,7 @@
         e.preventDefault();
         isDragging = true;
         dragPieceIndex = index;
+        updateUndoButtonState();
         
         const piece = trayPieces[index];
         const cellRect = document.querySelector('.cell').getBoundingClientRect();
@@ -873,43 +1153,62 @@
         const coords = getBoardCoordinates();
         const piece = trayPieces[dragPieceIndex];
         
-        let placed = false;
-        if (coords && canPlace(piece, coords.r, coords.c)) {
-            placeShape(piece, coords.r, coords.c);
-            trayPieces[dragPieceIndex] = null;
-            placed = true;
-        }
+        const savedDragPieceIndex = dragPieceIndex;
         
-        // Удаляем клон
+        // Удаляем клон СРАЗУ при отпускании
         if (dragElement) {
             dragElement.remove();
             dragElement = null;
         }
         
-        // Возвращаем видимость фигуры или очищаем слот
-        if (placed) {
-            traySlots[dragPieceIndex].innerHTML = '';
-        } else {
-            // Звук при возврате в слот
-            playSound(soundClick);
-            if (traySlots[dragPieceIndex].firstElementChild) {
-                traySlots[dragPieceIndex].firstElementChild.style.opacity = '1';
-            }
-        }
-        
-        // На всякий случай сбрасываем прозрачность самого слота
-        traySlots[dragPieceIndex].style.opacity = '1';
-        
         clearPreview();
         isDragging = false;
         dragPieceIndex = -1;
+        updateUndoButtonState();
+        
+        if (coords && canPlace(piece, coords.r, coords.c)) {
+            pushUndoState();
+            lastPlacementCoords = { r: coords.r, c: coords.c };
+            const blocksPlaced = placeShape(piece, coords.r, coords.c);
+            trayPieces[savedDragPieceIndex] = null;
 
-        if (placed) {
+            // Рендерим доску СРАЗУ, чтобы новые блоки появились
             renderBoard();
-            await checkLines(); // Ждем завершения всех анимаций взрывов
+
+            if (isThreeByThreeSquare(piece)) {
+                triggerCameraShake();
+                playSound(soundHardPop);
+            }
+            
+            // Получаем координаты центра каждого блока фигуры на доске для эффекта приземления
+            for (let r = 0; r < piece.matrix.length; r++) {
+                for (let c = 0; c < piece.matrix[0].length; c++) {
+                    if (piece.matrix[r][c]) {
+                        const cellR = coords.r + r;
+                        const cellC = coords.c + c;
+                        const cell = document.getElementById(`cell-${cellR}-${cellC}`);
+                        if (cell) {
+                            const rect = cell.getBoundingClientRect();
+                            createLandingParticles(rect.left + rect.width/2, rect.top + rect.height/2, piece.color);
+                        }
+                    }
+                }
+            }
+
+            traySlots[savedDragPieceIndex].innerHTML = '';
+            
+            await checkLines(blocksPlaced); // Ждем завершения всех анимаций взрывов
             renderTray();
             fillTray();
+        } else {
+            // Звук при возврате в слот
+            playSound(soundClick);
+            if (traySlots[savedDragPieceIndex].firstElementChild) {
+                traySlots[savedDragPieceIndex].firstElementChild.style.opacity = '1';
+            }
         }
+        
+        traySlots[savedDragPieceIndex].style.opacity = '1';
     }
 
     // --- ЛОГИКА ИГРЫ ---
@@ -947,11 +1246,11 @@
         // Звук установки
         playSound(soundPop);
 
-        score += blocksPlaced; // Базовые очки за выставление
-        updateScore();
+        // Очки начисляются в checkLines после учета сброшенных линий
+        return blocksPlaced;
     }
 
-    async function checkLines() {
+    async function checkLines(blocksPlaced) {
         const rowsToClear = [];
         const colsToClear = [];
 
@@ -989,10 +1288,43 @@
 
         const totalLines = linesToClear.length;
 
+        // Начисление очков: 10 * ячейки * (линии + 1)
+        const initialPoints = 10 * blocksPlaced * (totalLines + 1);
+        score += initialPoints;
+        updateScore();
+
+        // Показываем заработанные очки в точке установки
+        if (lastPlacementCoords) {
+            const centerR = lastPlacementCoords.r;
+            const centerC = lastPlacementCoords.c;
+            const cell = document.getElementById(`cell-${centerR}-${centerC}`);
+            if (cell) {
+                const rect = cell.getBoundingClientRect();
+                createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${initialPoints}`);
+            }
+        }
+
         if (totalLines > 0) {
             isAnimating = true; // Блокируем взаимодействие с новыми фигурами
+            
+            // СРАЗУ рендерим доску, чтобы новые блоки (которые могли создать линию) стали видимы
+            renderBoard();
+
             const cellsToClear = new Set();
             comboDisplay.classList.remove('fade-out');
+
+            // Хвалебная надпись
+            if (lastPlacementCoords && totalLines >= 1) {
+                const centerR = lastPlacementCoords.r;
+                const centerC = lastPlacementCoords.c;
+                const cell = document.getElementById(`cell-${centerR}-${centerC}`);
+                if (cell) {
+                    const rect = cell.getBoundingClientRect();
+                    const praiseLines = ['Good!', 'Great!', 'Super!', 'Excellent!', 'Amazing!', 'Incredible!', 'Unbelievable!', 'Godlike!'];
+                    const praise = praiseLines[Math.min(totalLines - 1, praiseLines.length - 1)];
+                    createPraisePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, praise);
+                }
+            }
 
             for (let i = 0; i < totalLines; i++) {
                 const currentLine = linesToClear[i];
@@ -1000,15 +1332,17 @@
                 // Звук сброса линии
                 playSound(soundLine);
 
-                // Анимация текста Комбо
-                if (i === 0) {
-                    comboDisplay.textContent = 'Combo';
-                } else {
-                    comboDisplay.textContent = `Combo x${i + 1}`;
+                // Анимация текста Комбо (только от 2-х линий)
+                if (totalLines >= 2) {
+                    if (i === 0) {
+                        comboDisplay.textContent = 'Combo';
+                    } else {
+                        comboDisplay.textContent = `Combo x${i + 1}`;
+                    }
+                    comboDisplay.style.animation = 'none';
+                    void comboDisplay.offsetWidth; // Триггер рефлоу для перезапуска анимации
+                    comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
                 }
-                comboDisplay.style.animation = 'none';
-                void comboDisplay.offsetWidth; // Триггер рефлоу для перезапуска анимации
-                comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
 
                 // Последовательная анимация ячеек в линии
                 for (let j = 0; j < currentLine.length; j++) {
@@ -1021,7 +1355,7 @@
                         
                         // Создаем частицы
                         const rect = cell.getBoundingClientRect();
-                        createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr);
+                        createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr, 14);
 
                         const svgCont = cell.querySelector('.block-svg-container');
                         if (svgCont) {
@@ -1044,9 +1378,25 @@
             comboDisplay.classList.add('fade-out');
 
             // Очки за линии
-            score += totalLines * 100;
-            if (totalLines > 1) score += (totalLines - 1) * 50; // Бонус за комбо
+            const linePoints = totalLines * 100;
+            const comboBonus = totalLines > 1 ? (totalLines - 1) * 50 : 0;
+            const extraPoints = linePoints + comboBonus;
+            
+            score += extraPoints;
             updateScore();
+            
+            // Дополнительные всплывающие очки за линии в той же точке
+            if (lastPlacementCoords && extraPoints > 0) {
+                const centerR = lastPlacementCoords.r;
+                const centerC = lastPlacementCoords.c;
+                const cell = document.getElementById(`cell-${centerR}-${centerC}`);
+                if (cell) {
+                    const rect = cell.getBoundingClientRect();
+                    setTimeout(() => {
+                        createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${extraPoints}`);
+                    }, 400); // Небольшая задержка чтобы не сливалось с первыми очками
+                }
+            }
 
             // Очищаем массив логически и рендерим
             cellsToClear.forEach(coord => {
@@ -1058,10 +1408,31 @@
             isAnimating = false; // Разблокируем игру
         }
 
+        lastPlacementCoords = null; // Сбрасываем после обработки
         return totalLines;
     }
 
-    function createParticles(x, y, colorStr) {
+    function createScorePopup(x, y, text) {
+        const p = document.createElement('div');
+        p.className = 'score-popup';
+        p.textContent = text;
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 1000);
+    }
+
+    function createPraisePopup(x, y, text) {
+        const p = document.createElement('div');
+        p.className = 'praise-popup';
+        p.textContent = text;
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 1200);
+    }
+
+    function createParticles(x, y, colorStr, particleSize = 14) {
         const pal = BLOCK_PALETTES[colorStr] || BLOCK_PALETTES['var(--color-purple)'];
         const color = pal.light; // Используем светлый оттенок из нашей палитры для эффекта ярких осколков
         
@@ -1073,6 +1444,8 @@
             p.style.boxShadow = `0 0 6px ${color}`;
             p.style.left = x + 'px';
             p.style.top = y + 'px';
+            p.style.width = particleSize + 'px';
+            p.style.height = particleSize + 'px';
             
             // Рандомный вектор разлета осколков
             const angle = Math.random() * Math.PI * 2;
@@ -1092,12 +1465,71 @@
         }
     }
 
+    function createLandingParticles(x, y, colorStr) {
+        const pal = BLOCK_PALETTES[colorStr] || BLOCK_PALETTES['var(--color-purple)'];
+        const color = pal.light;
+        
+        for (let i = 0; i < 5; i++) {
+            const p = document.createElement('div');
+            p.className = 'landing-particle';
+            p.style.backgroundColor = color;
+            p.style.opacity = '0.3'; // Более прозрачные
+            p.style.left = x + 'px';
+            p.style.top = y + 'px';
+            p.style.width = '12px';
+            p.style.height = '12px';
+            
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * 40 + 10;
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+            
+            p.style.setProperty('--tx', `calc(-50% + ${tx}px)`);
+            p.style.setProperty('--ty', `calc(-50% + ${ty}px)`);
+            
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 600);
+        }
+    }
+
     function updateScore() {
         // Форматирование числа с запятыми
         scoreEl.textContent = score.toLocaleString('en-US');
+
+        // Анимированный счетчик для центрального табло
+        const mainScoreEl = document.getElementById('main-score');
+        const duration = 1000; // мс
+        const startVal = displayedScore;
+        const endVal = score;
+        const startTime = performance.now();
+        const currentAnimationToken = ++scoreAnimationToken;
+
+        function animate(now) {
+            if (currentAnimationToken !== scoreAnimationToken) {
+                return;
+            }
+
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // easeOutQuad
+            const ease = progress * (2 - progress);
+            displayedScore = Math.floor(startVal + (endVal - startVal) * ease);
+            mainScoreEl.textContent = displayedScore.toLocaleString('en-US');
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                displayedScore = endVal;
+                mainScoreEl.textContent = displayedScore.toLocaleString('en-US');
+            }
+        }
+        requestAnimationFrame(animate);
     }
 
     function checkGameOver() {
+        clearPendingGameOver();
+
         // Проверяем, есть ли хотя бы одно место для любой из оставшихся фигур
         for (let i = 0; i < 3; i++) {
             const piece = trayPieces[i];
@@ -1113,12 +1545,15 @@
         }
         
         // Если места нет
-        setTimeout(() => {
-            gameOverScreen.classList.add('show');
+        gameOverTimeoutId = setTimeout(() => {
+            showGameOver();
+            gameOverTimeoutId = null;
         }, 500);
     }
 
     // Запуск игры
+    loadBestScore();
+    undoBtn.addEventListener('click', undoLastMove);
     window.onload = initGame;
 
     // Предотвращаем скролл при касании лотка (глобально для ios)

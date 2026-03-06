@@ -475,12 +475,55 @@
         /* ===== RESPONSIVE: Narrow / phone screens ===== */
         @media (max-width: 430px) {
             body {
-                background-image: none; /* убираем градиент и фото-фон */
+                height: 100svh; /* Динамическая высота viewport для iOS */
             }
             .game-container {
                 border-radius: 0;
                 box-shadow: none;
                 max-height: 100svh; /* dynamic viewport height (notch-safe) */
+            }
+        }
+
+        /* ===== RESPONSIVE: Square / wide screens ===== */
+        @media (min-aspect-ratio: 1 / 1) {
+            body {
+                padding: 12px 0;
+            }
+            .game-container {
+                width: min(100%, 430px, max(300px, calc(100svh - 320px)));
+                max-height: calc(100svh - 24px);
+                padding: 10px 12px 12px;
+            }
+            .header {
+                min-height: 68px;
+                margin-bottom: 10px;
+            }
+            .logo-img {
+                max-height: 72px;
+            }
+            .level-text {
+                margin-bottom: 10px;
+                font-size: 22px;
+            }
+            .board-container {
+                margin-bottom: 10px;
+            }
+            .tray {
+                height: 96px;
+                margin-bottom: 10px;
+            }
+            .bottom-controls {
+                gap: 8px;
+                padding-bottom: 4px;
+            }
+            .btn {
+                padding: 8px 0;
+                font-size: 13px;
+                gap: 4px;
+            }
+            .btn-icon {
+                width: 20px;
+                height: 20px;
             }
         }
 
@@ -521,7 +564,7 @@
             }
             .bottom-controls {
                 gap: 8px;
-                padding-bottom: 5px;
+                padding-bottom: 15px;
             }
             .btn {
                 padding: 8px 0;
@@ -531,7 +574,13 @@
 
         /* ===== RESPONSIVE: Very short screens — всё в видимой области ===== */
         @media (max-height: 620px) {
+            body {
+                height: 100svh;
+            }
             .game-container {
+                width: min(100%, calc(100svh - 110px));
+                max-width: 380px;
+                max-height: 100svh;
                 padding: 5px 10px;
             }
             .header {
@@ -560,23 +609,24 @@
                 height: 14px;
             }
             .tray {
-                height: 72px;
-                margin-bottom: 5px;
+                height: 64px;
+                margin-bottom: 4px;
             }
             .board-container {
-                margin-bottom: 5px;
+                margin-bottom: 4px;
             }
             .bottom-controls {
                 gap: 6px;
+                padding-bottom: 2px;
             }
             .btn {
-                padding: 6px 0;
-                font-size: 12px;
+                padding: 5px 0;
+                font-size: 11px;
                 gap: 3px;
             }
             .btn-icon {
-                width: 20px;
-                height: 20px;
+                width: 18px;
+                height: 18px;
             }
         }
 
@@ -644,13 +694,95 @@
     </div>
 </div>
 
-<audio id="sound-pick" src="pick.mp3" preload="auto"></audio>
-<audio id="sound-click" src="click.mp3" preload="auto"></audio>
-<audio id="sound-pop" src="pop1.mp3" preload="auto"></audio>
-<audio id="sound-line" src="line.mp3" preload="auto"></audio>
-<audio id="sound-hard-pop" src="hard_pop.mp3" preload="auto"></audio>
-
 <script>
+    // --- AUDIO MANAGER (Web Audio API) ---
+    class AudioManager {
+        constructor() {
+            this.audioContext = null;
+            this.buffers = {};
+            this.isInitialized = false;
+            this.soundConfigs = {
+                'pick': { file: 'pick.mp3', volume: 0.4 },
+                'click': { file: 'click.mp3', volume: 0.3 },
+                'pop': { file: 'pop1.mp3', volume: 0.5 },
+                'line': { file: 'line.mp3', volume: 0.6 },
+                'hardPop': { file: 'hard_pop.mp3', volume: 0.7 }
+            };
+        }
+
+        async init() {
+            if (this.isInitialized) return;
+            
+            try {
+                // Создаем AudioContext при первом взаимодействии пользователя
+                if (!this.audioContext) {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Загружаем все звуки параллельно
+                const loadPromises = Object.entries(this.soundConfigs).map(([key, config]) => {
+                    return this.loadSound(key, config.file);
+                });
+
+                await Promise.all(loadPromises);
+                this.isInitialized = true;
+            } catch (e) {
+                console.warn('Audio initialization failed:', e);
+            }
+        }
+
+        async loadSound(name, fileName) {
+            try {
+                const response = await fetch(fileName);
+                const arrayBuffer = await response.arrayBuffer();
+                this.buffers[name] = await this.audioContext.decodeAudioData(arrayBuffer);
+            } catch (e) {
+                console.warn(`Failed to load sound ${name}:`, e);
+            }
+        }
+
+        play(soundName) {
+            // Если еще не инициализировано - запускаем инициализацию
+            if (!this.isInitialized) {
+                this.init().catch(() => {});
+                return; // Пропускаем первый звук, остальные сработают
+            }
+
+            if (!this.buffers[soundName]) return;
+
+            try {
+                // Возобновляем контекст если нужно (на iOS это иногда требуется)
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+
+                const buffer = this.buffers[soundName];
+                const config = this.soundConfigs[soundName];
+                const source = this.audioContext.createBufferSource();
+                const gainNode = this.audioContext.createGain();
+
+                source.buffer = buffer;
+                gainNode.gain.value = config.volume;
+
+                source.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                source.start(0);
+            } catch (e) {
+                console.warn(`Failed to play sound ${soundName}:`, e);
+            }
+        }
+    }
+
+    const audioManager = new AudioManager();
+
+    // Инициализируем аудио при первом взаимодействии пользователя с сайтом
+    // Это гарантирует, что звуки начнут загружаться рано и будут готовы
+    const initAudioEarly = () => {
+        audioManager.init();
+    };
+    document.addEventListener('click', initAudioEarly, { once: true });
+    document.addEventListener('touchstart', initAudioEarly, { once: true });
+
     // --- НАСТРОЙКИ И ДАННЫЕ ---
     const BOARD_SIZE = 8;
     const BEST_SCORE_KEY = 'block-chpok-best-score';
@@ -718,18 +850,9 @@
     const gameOverScoreEl = document.getElementById('game-over-score');
     const gameOverBestEl = document.getElementById('game-over-best');
     const undoBtn = document.getElementById('undo-btn');
-    const soundPick = document.getElementById('sound-pick');
-    const soundClick = document.getElementById('sound-click');
-    const soundPop = document.getElementById('sound-pop');
-    const soundLine = document.getElementById('sound-line');
-    const soundHardPop = document.getElementById('sound-hard-pop');
 
-    function playSound(sound) {
-        if (!sound) return;
-        const newAudio = sound.cloneNode();
-        newAudio.play().catch(e => console.log('Autoplay blocked or audio error'));
-        // Самоочистка после завершения
-        newAudio.onended = () => newAudio.remove();
+    function playSound(soundName) {
+        audioManager.play(soundName);
     }
 
     // Переменные для перетаскивания
@@ -911,7 +1034,6 @@
                 <filter id="filter0_f_${id}" x="8" y="8" width="52" height="52" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
                     <feFlood flood-opacity="0" result="BackgroundImageFix"/>
                     <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                    <feGaussianBlur stdDeviation="0.5" result="effect1_foregroundBlur_${id}"/>
                 </filter>
                 
                 <!-- Градиент с резким переходом -->
@@ -1061,7 +1183,7 @@
                         renderTray(); // Обновляем лоток, чтобы показать фигуру
                         
                         // Звук появления блока
-                        playSound(soundClick);
+                        playSound('click');
                         
                         const slot = traySlots[i];
                         if (slot) {
@@ -1152,8 +1274,11 @@
     function startDrag(e, index) {
         if (!trayPieces[index] || isDragging || isAnimating) return;
 
+        // Инициализируем аудио при первом взаимодействии пользователя
+        audioManager.init();
+
         // Воспроизводим звук клика/поднятия
-        playSound(soundPick);
+        playSound('pick');
         
         e.preventDefault();
         isDragging = true;
@@ -1287,7 +1412,7 @@
 
             if (isThreeByThreeSquare(piece)) {
                 triggerCameraShake();
-                playSound(soundHardPop);
+                playSound('hardPop');
             }
             
             // Получаем координаты центра каждого блока фигуры на доске для эффекта приземления
@@ -1312,7 +1437,7 @@
             fillTray();
         } else {
             // Звук при возврате в слот
-            playSound(soundClick);
+            playSound('click');
             if (traySlots[savedDragPieceIndex].firstElementChild) {
                 traySlots[savedDragPieceIndex].firstElementChild.style.opacity = '1';
             }
@@ -1354,7 +1479,7 @@
         }
         
         // Звук установки
-        playSound(soundPop);
+        playSound('pop');
 
         // Очки начисляются в checkLines после учета сброшенных линий
         return blocksPlaced;
@@ -1440,7 +1565,7 @@
                 const currentLine = linesToClear[i];
                 
                 // Звук сброса линии
-                playSound(soundLine);
+                playSound('line');
 
                 // Анимация текста Комбо (только от 2-х линий)
                 if (totalLines >= 2) {

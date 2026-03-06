@@ -437,7 +437,7 @@
         /* Всплывающие очки */
         .score-popup {
             position: absolute;
-            font-size: 24px;
+            font-size: 36px;
             font-weight: 900;
             color: #fff;
             text-shadow: 0 0 10px rgba(0,0,0,0.5);
@@ -1633,7 +1633,7 @@
                 score += extraPoints;
                 updateScore();
 
-                // Хвалебная надпись и всплывающие очки в месте установки блока
+                // Хвалебная надпись и всплывающие очки ТОЛЬКО при комбо
                 if (lastPlacementCoords) {
                     const centerR = lastPlacementCoords.r;
                     const centerC = lastPlacementCoords.c;
@@ -1644,8 +1644,9 @@
                         const praise = praiseLines[Math.min(totalLines - 1, praiseLines.length - 1)];
                         createPraisePopup(rect.left + rect.width / 2, rect.top + rect.height / 2 - rect.height, praise);
                         
-                        if (extraPoints > 0) {
-                            createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${extraPoints}`);
+                        // Показываем очки только если это комбо (несколько линий)
+                        if (totalLines > 1 && extraPoints > 0) {
+                            createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2 + rect.height, `+${extraPoints}`);
                         }
                     }
                 }
@@ -1653,62 +1654,79 @@
                 const cellsToClear = new Set();
                 comboDisplay.classList.remove('fade-out');
 
+                // Звук проигрывается один раз за все линии
+                playSound('line');
+
+                // Одновременно помечаем все ячейки из всех линий для удаления
                 for (let i = 0; i < totalLines; i++) {
                     const currentLine = linesToClear[i];
                     
-                    // Звук сброса линии
-                    playSound('line');
-
                     // Анимация текста Комбо (только от 2-х линий)
                     if (totalLines >= 2) {
-                        if (i === 0) {
-                            comboDisplay.textContent = 'Combo';
-                        } else {
-                            comboDisplay.textContent = `Combo x${i + 1}`;
-                        }
+                        comboDisplay.textContent = 'Combo x' + totalLines;
                         comboDisplay.style.animation = 'none';
                         void comboDisplay.offsetWidth; // Триггер рефлоу для перезапуска анимации
                         comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
                     }
 
-                    // Последовательная анимация ячеек в линии
+                    // Помечаем все ячейки из текущей линии
                     for (let j = 0; j < currentLine.length; j++) {
-                        const coord = currentLine[j];
-                        if (!cellsToClear.has(coord)) {
-                            cellsToClear.add(coord);
-                            const [r, c] = coord.split(',').map(Number);
-                            const cell = document.getElementById(`cell-${r}-${c}`);
-                            const colorStr = board[r][c];
-                            
-                            // Создаем частицы
-                            const rect = cell.getBoundingClientRect();
-                            createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr, 14);
-
-                            const svgCont = cell.querySelector('.block-svg-container');
-                            if (svgCont) {
-                                svgCont.classList.add('clearing');
-                            }
-                        }
-                        // Небольшая задержка между ячейками для эффекта схлопывания
-                        await new Promise(resolve => setTimeout(resolve, 30));
+                        cellsToClear.add(currentLine[j]);
                     }
-
-                    // Пауза перед следующей линией (цепная реакция)
-                    await new Promise(resolve => setTimeout(resolve, 300));
                 }
 
-                // Ждем окончания анимации последней линии перед удалением
+                // Одновременно применяем анимацию ко всем ячейкам и создаем частицы
+                const coordsArray = Array.from(cellsToClear).map(coord => {
+                    const [r, c] = coord.split(',').map(Number);
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    if (cell) {
+                        const colorStr = board[r][c];
+                        const rect = cell.getBoundingClientRect();
+                        createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr, 14);
+                        
+                        const svgCont = cell.querySelector('.block-svg-container');
+                        if (svgCont) {
+                            svgCont.classList.add('clearing');
+                        }
+                    }
+                    return { coord, r, c };
+                });
+
+                // Сортируем ячейки по расстоянию от точки установки блока
+                if (lastPlacementCoords) {
+                    coordsArray.sort((a, b) => {
+                        const distA = Math.abs(a.r - lastPlacementCoords.r) + Math.abs(a.c - lastPlacementCoords.c);
+                        const distB = Math.abs(b.r - lastPlacementCoords.r) + Math.abs(b.c - lastPlacementCoords.c);
+                        return distA - distB;
+                    });
+                }
+
+                // Анимация текста Комбо закончится к этому времени
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                // Теперь удаляем блоки по очереди, начиная с ближайшего
+                for (const item of coordsArray) {
+                    const [r, c] = item.coord.split(',').map(Number);
+                    board[r][c] = null;
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    if (cell) {
+                        const svgCont = cell.querySelector('.block-svg-container');
+                        if (svgCont) {
+                            svgCont.style.opacity = '0';
+                        }
+                    }
+                    // Небольшая задержка между удалением ячеек
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                }
+
+                // Ждем окончания анимации
                 await new Promise(resolve => setTimeout(resolve, 150));
 
                 // Прячем текст комбо
                 comboDisplay.style.animation = 'none';
                 comboDisplay.classList.add('fade-out');
 
-                // Очищаем массив логически и рендерим
-                cellsToClear.forEach(coord => {
-                    const [r, c] = coord.split(',').map(Number);
-                    board[r][c] = null;
-                });
+                // Перерисовываем доску
                 renderBoard();
             } finally {
                 isAnimating = false; // ГАРАНТИРОВАННО разблокируем игру даже при ошибке

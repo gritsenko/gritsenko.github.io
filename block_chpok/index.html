@@ -472,6 +472,114 @@
             100% { transform: translate(-50%, -250%) scale(1); opacity: 0; rotate: 0deg; }
         }
 
+        /* ===== RESPONSIVE: Narrow / phone screens ===== */
+        @media (max-width: 430px) {
+            body {
+                background-image: none; /* убираем градиент и фото-фон */
+            }
+            .game-container {
+                border-radius: 0;
+                box-shadow: none;
+                max-height: 100svh; /* dynamic viewport height (notch-safe) */
+            }
+        }
+
+        /* ===== RESPONSIVE: Short screens — компактный хедер со счётом ===== */
+        @media (max-height: 750px) {
+            .game-container {
+                padding: 8px 12px;
+            }
+            .header {
+                min-height: 55px;
+                margin-bottom: 8px;
+            }
+            /* Прячем логотип */
+            .title-container {
+                display: none;
+            }
+            /* Текущий счёт перекрывает область логотипа */
+            .level-text {
+                position: absolute;
+                top: 8px;
+                left: 0;
+                right: 0;
+                height: 55px;
+                margin: 0;
+                font-size: 26px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                pointer-events: none;
+                z-index: 1;
+            }
+            .board-container {
+                margin-bottom: 10px;
+            }
+            .tray {
+                height: 100px;
+                margin-bottom: 10px;
+            }
+            .bottom-controls {
+                gap: 8px;
+                padding-bottom: 5px;
+            }
+            .btn {
+                padding: 8px 0;
+                font-size: 13px;
+            }
+        }
+
+        /* ===== RESPONSIVE: Very short screens — всё в видимой области ===== */
+        @media (max-height: 620px) {
+            .game-container {
+                padding: 5px 10px;
+            }
+            .header {
+                min-height: 44px;
+                margin-bottom: 5px;
+            }
+            .level-text {
+                top: 5px;
+                height: 44px;
+                font-size: 20px;
+            }
+            .settings-btn {
+                width: 38px;
+                height: 38px;
+            }
+            .stats-box {
+                padding: 5px 8px;
+                gap: 3px;
+            }
+            .stat-row {
+                font-size: 12px;
+                gap: 5px;
+            }
+            .stat-icon {
+                width: 14px;
+                height: 14px;
+            }
+            .tray {
+                height: 72px;
+                margin-bottom: 5px;
+            }
+            .board-container {
+                margin-bottom: 5px;
+            }
+            .bottom-controls {
+                gap: 6px;
+            }
+            .btn {
+                padding: 6px 0;
+                font-size: 12px;
+                gap: 3px;
+            }
+            .btn-icon {
+                width: 20px;
+                height: 20px;
+            }
+        }
+
     </style>
 </head>
 <body>

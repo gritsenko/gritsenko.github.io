@@ -398,7 +398,7 @@
         
         .restart-btn {
             flex: none; /* Убираем растягивание от базового класса .btn */
-            padding: 15px 40px;
+            padding: 20px 70px;
             font-size: 20px;
             border-radius: 30px;
             height: auto;
@@ -572,6 +572,84 @@
             }
         }
 
+        /* ===== SPLASH SCREEN ===== */
+        .splash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #2a2e54e4 0%, #1a1e3fde 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            gap: 40px;
+            font-family: 'Nunito', sans-serif;
+        }
+
+        .splash-overlay.hidden {
+            display: none;
+        }
+
+        .splash-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+            text-align: center;
+        }
+
+        .splash-logo {
+            max-width: 200px;
+            width: 80%;
+            height: auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+        }
+
+        .splash-title {
+            font-size: 48px;
+            font-weight: 900;
+            color: #fff;
+            margin: 0;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: -1px;
+        }
+
+        .splash-version {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            margin: 0;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .splash-play-btn {
+            background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-family: 'Nunito', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .splash-play-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .splash-play-btn:hover {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        }
+
         /* ===== RESPONSIVE: Very short screens — всё в видимой области ===== */
         @media (max-height: 620px) {
             body {
@@ -633,6 +711,17 @@
     </style>
 </head>
 <body>
+
+<div class="splash-overlay" id="splash-overlay">
+    <div class="splash-content">
+        <img src="logo.png" alt="Block Chpok" class="splash-logo">
+        <div>
+            <!-- <h1 class="splash-title">Block Chpok</h1> -->
+            <p class="splash-version">v0.51</p>
+        </div>
+        <button class="splash-play-btn" id="splash-play-btn">Играть</button>
+    </div>
+</div>
 
 <div class="game-container">
     <div class="header">
@@ -774,14 +863,6 @@
     }
 
     const audioManager = new AudioManager();
-
-    // Инициализируем аудио при первом взаимодействии пользователя с сайтом
-    // Это гарантирует, что звуки начнут загружаться рано и будут готовы
-    const initAudioEarly = () => {
-        audioManager.init();
-    };
-    document.addEventListener('click', initAudioEarly, { once: true });
-    document.addEventListener('touchstart', initAudioEarly, { once: true });
 
     // --- НАСТРОЙКИ И ДАННЫЕ ---
     const BOARD_SIZE = 8;
@@ -1222,8 +1303,7 @@
             const piece = forceEmpty ? null : trayPieces[i];
             
             slot.innerHTML = '';
-            slot.onmousedown = null;
-            slot.ontouchstart = null;
+            slot.onpointerdown = null;
             
             if (piece) {
                 const rows = piece.matrix.length;
@@ -1268,8 +1348,7 @@
                 slot.appendChild(shapeEl);
                 
                 // Добавляем обработчики событий
-                slot.onmousedown = (e) => startDrag(e, i);
-                slot.ontouchstart = (e) => startDrag(e, i);
+                slot.onpointerdown = (e) => startDrag(e, i);
             }
         }
 
@@ -1279,9 +1358,6 @@
     // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ ---
     function startDrag(e, index) {
         if (!trayPieces[index] || isDragging || isAnimating) return;
-
-        // Инициализируем аудио при первом взаимодействии пользователя
-        audioManager.init();
 
         // Воспроизводим звук клика/поднятия
         playSound('pick');
@@ -1321,18 +1397,14 @@
 
         moveDrag(clientX, clientY);
 
-        document.addEventListener('mousemove', onDragMove);
-        document.addEventListener('touchmove', onDragMove, {passive: false});
-        document.addEventListener('mouseup', endDrag);
-        document.addEventListener('touchend', endDrag);
+        document.addEventListener('pointermove', onDragMove, {passive: false});
+        document.addEventListener('pointerup', endDrag);
     }
 
     function onDragMove(e) {
         if (!isDragging) return;
         e.preventDefault(); // Предотвращаем скролл
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        moveDrag(clientX, clientY);
+        moveDrag(e.clientX, e.clientY);
         updatePreview();
     }
 
@@ -1386,10 +1458,8 @@
     async function endDrag(e) {
         if (!isDragging) return;
         
-        document.removeEventListener('mousemove', onDragMove);
-        document.removeEventListener('touchmove', onDragMove);
-        document.removeEventListener('mouseup', endDrag);
-        document.removeEventListener('touchend', endDrag);
+        document.removeEventListener('pointermove', onDragMove);
+        document.removeEventListener('pointerup', endDrag);
         
         const coords = getBoardCoordinates();
         const piece = trayPieces[dragPieceIndex];
@@ -1554,6 +1624,31 @@
                 // СРАЗУ рендерим доску, чтобы новые блоки (которые могли создать линию) стали видимы
                 renderBoard();
 
+                // Очки за линии
+                const linePoints = totalLines * 100;
+                const comboBonus = totalLines > 1 ? (totalLines - 1) * 50 : 0;
+                const extraPoints = linePoints + comboBonus;
+                
+                score += extraPoints;
+                updateScore();
+
+                // Хвалебная надпись и всплывающие очки в месте установки блока
+                if (lastPlacementCoords) {
+                    const centerR = lastPlacementCoords.r;
+                    const centerC = lastPlacementCoords.c;
+                    const cell = document.getElementById(`cell-${centerR}-${centerC}`);
+                    if (cell) {
+                        const rect = cell.getBoundingClientRect();
+                        const praiseLines = ['Good!', 'Great!', 'Super!', 'Excellent!', 'Amazing!', 'Incredible!', 'Unbelievable!', 'Godlike!'];
+                        const praise = praiseLines[Math.min(totalLines - 1, praiseLines.length - 1)];
+                        createPraisePopup(rect.left + rect.width / 2, rect.top + rect.height / 2 - rect.height, praise);
+                        
+                        if (extraPoints > 0) {
+                            createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${extraPoints}`);
+                        }
+                    }
+                }
+
                 const cellsToClear = new Set();
                 comboDisplay.classList.remove('fade-out');
 
@@ -1608,46 +1703,12 @@
                 comboDisplay.style.animation = 'none';
                 comboDisplay.classList.add('fade-out');
 
-                // Очки за линии
-                const linePoints = totalLines * 100;
-                const comboBonus = totalLines > 1 ? (totalLines - 1) * 50 : 0;
-                const extraPoints = linePoints + comboBonus;
-                
-                score += extraPoints;
-                updateScore();
-                
-                // Дополнительные всплывающие очки за линии в той же точке
-                if (lastPlacementCoords && extraPoints > 0) {
-                    const centerR = lastPlacementCoords.r;
-                    const centerC = lastPlacementCoords.c;
-                    const cell = document.getElementById(`cell-${centerR}-${centerC}`);
-                    if (cell) {
-                        const rect = cell.getBoundingClientRect();
-                        setTimeout(() => {
-                            createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${extraPoints}`);
-                        }, 400); // Небольшая задержка чтобы не сливалось с первыми очками
-                    }
-                }
-
                 // Очищаем массив логически и рендерим
                 cellsToClear.forEach(coord => {
                     const [r, c] = coord.split(',').map(Number);
                     board[r][c] = null;
                 });
                 renderBoard();
-
-                // Хвалебная надпись (после удаления всех линий)
-                if (lastPlacementCoords && totalLines >= 1) {
-                    const centerR = lastPlacementCoords.r;
-                    const centerC = lastPlacementCoords.c;
-                    const cell = document.getElementById(`cell-${centerR}-${centerC}`);
-                    if (cell) {
-                        const rect = cell.getBoundingClientRect();
-                        const praiseLines = ['Good!', 'Great!', 'Super!', 'Excellent!', 'Amazing!', 'Incredible!', 'Unbelievable!', 'Godlike!'];
-                        const praise = praiseLines[Math.min(totalLines - 1, praiseLines.length - 1)];
-                        createPraisePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, praise);
-                    }
-                }
             } finally {
                 isAnimating = false; // ГАРАНТИРОВАННО разблокируем игру даже при ошибке
             }
@@ -1799,10 +1860,24 @@
     // Запуск игры
     loadBestScore();
     undoBtn.addEventListener('click', undoLastMove);
-    window.onload = initGame;
+
+    // Обработчик для splash screen
+    const splashPlayBtn = document.getElementById('splash-play-btn');
+    const splashOverlay = document.getElementById('splash-overlay');
+
+    function startGame() {
+        // Скрываем splash screen
+        splashOverlay.classList.add('hidden');
+        // Инициализируем звук
+        audioManager.init();
+        // Начинаем игру
+        initGame();
+    }
+
+    splashPlayBtn.addEventListener('click', startGame);
 
     // Предотвращаем скролл при касании лотка (глобально для ios)
-    document.addEventListener('touchmove', function(e) {
+    document.addEventListener('pointermove', function(e) {
         if(isDragging) e.preventDefault();
     }, { passive: false });
 

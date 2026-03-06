@@ -1120,8 +1120,14 @@
                 const currentColor = cell.dataset.color || null;
                 const targetColor = board[r][c];
 
-                // Если цвет фишки в ячейке поменялся (появилась новая или удалилась старая)
-                if (currentColor !== targetColor) {
+                // SELF-HEALING: Проверяем синхронизацию между логическим состоянием и DOM
+                const hasChild = cell.children.length > 0;
+                const shouldHaveChild = targetColor !== null;
+                const logicalStateMatch = (currentColor === targetColor);
+                const domStateMatch = (hasChild === shouldHaveChild);
+
+                // Если логическое или физическое состояние не совпадает, принудительно перерисовываем
+                if (!logicalStateMatch || !domStateMatch) {
                     cell.innerHTML = ''; // Очищаем старое содержимое
                     
                     if (targetColor) {
@@ -1430,6 +1436,7 @@
                 }
             }
 
+            // Безопасно очищаем слот - удаляем HTML если фигура размещена
             traySlots[savedDragPieceIndex].innerHTML = '';
             
             await checkLines(blocksPlaced); // Ждем завершения всех анимаций взрывов
@@ -1438,12 +1445,13 @@
         } else {
             // Звук при возврате в слот
             playSound('click');
+            // Восстанавливаем видимость фигуры при отмене размещения
             if (traySlots[savedDragPieceIndex].firstElementChild) {
                 traySlots[savedDragPieceIndex].firstElementChild.style.opacity = '1';
             }
+            // Гарантируем, что слот полностью восстановлен в его нормальное состояние
+            traySlots[savedDragPieceIndex].style.opacity = '1';
         }
-        
-        traySlots[savedDragPieceIndex].style.opacity = '1';
     }
 
     // --- ЛОГИКА ИГРЫ ---
@@ -1542,105 +1550,107 @@
         if (totalLines > 0) {
             isAnimating = true; // Блокируем взаимодействие с новыми фигурами
             
-            // СРАЗУ рендерим доску, чтобы новые блоки (которые могли создать линию) стали видимы
-            renderBoard();
+            try {
+                // СРАЗУ рендерим доску, чтобы новые блоки (которые могли создать линию) стали видимы
+                renderBoard();
 
-            const cellsToClear = new Set();
-            comboDisplay.classList.remove('fade-out');
+                const cellsToClear = new Set();
+                comboDisplay.classList.remove('fade-out');
 
-            // Хвалебная надпись
-            if (lastPlacementCoords && totalLines >= 1) {
-                const centerR = lastPlacementCoords.r;
-                const centerC = lastPlacementCoords.c;
-                const cell = document.getElementById(`cell-${centerR}-${centerC}`);
-                if (cell) {
-                    const rect = cell.getBoundingClientRect();
-                    const praiseLines = ['Good!', 'Great!', 'Super!', 'Excellent!', 'Amazing!', 'Incredible!', 'Unbelievable!', 'Godlike!'];
-                    const praise = praiseLines[Math.min(totalLines - 1, praiseLines.length - 1)];
-                    createPraisePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, praise);
-                }
-            }
+                for (let i = 0; i < totalLines; i++) {
+                    const currentLine = linesToClear[i];
+                    
+                    // Звук сброса линии
+                    playSound('line');
 
-            for (let i = 0; i < totalLines; i++) {
-                const currentLine = linesToClear[i];
-                
-                // Звук сброса линии
-                playSound('line');
-
-                // Анимация текста Комбо (только от 2-х линий)
-                if (totalLines >= 2) {
-                    if (i === 0) {
-                        comboDisplay.textContent = 'Combo';
-                    } else {
-                        comboDisplay.textContent = `Combo x${i + 1}`;
-                    }
-                    comboDisplay.style.animation = 'none';
-                    void comboDisplay.offsetWidth; // Триггер рефлоу для перезапуска анимации
-                    comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
-                }
-
-                // Последовательная анимация ячеек в линии
-                for (let j = 0; j < currentLine.length; j++) {
-                    const coord = currentLine[j];
-                    if (!cellsToClear.has(coord)) {
-                        cellsToClear.add(coord);
-                        const [r, c] = coord.split(',').map(Number);
-                        const cell = document.getElementById(`cell-${r}-${c}`);
-                        const colorStr = board[r][c];
-                        
-                        // Создаем частицы
-                        const rect = cell.getBoundingClientRect();
-                        createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr, 14);
-
-                        const svgCont = cell.querySelector('.block-svg-container');
-                        if (svgCont) {
-                            svgCont.classList.add('clearing');
+                    // Анимация текста Комбо (только от 2-х линий)
+                    if (totalLines >= 2) {
+                        if (i === 0) {
+                            comboDisplay.textContent = 'Combo';
+                        } else {
+                            comboDisplay.textContent = `Combo x${i + 1}`;
                         }
+                        comboDisplay.style.animation = 'none';
+                        void comboDisplay.offsetWidth; // Триггер рефлоу для перезапуска анимации
+                        comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
                     }
-                    // Небольшая задержка между ячейками для эффекта схлопывания
-                    await new Promise(resolve => setTimeout(resolve, 30));
+
+                    // Последовательная анимация ячеек в линии
+                    for (let j = 0; j < currentLine.length; j++) {
+                        const coord = currentLine[j];
+                        if (!cellsToClear.has(coord)) {
+                            cellsToClear.add(coord);
+                            const [r, c] = coord.split(',').map(Number);
+                            const cell = document.getElementById(`cell-${r}-${c}`);
+                            const colorStr = board[r][c];
+                            
+                            // Создаем частицы
+                            const rect = cell.getBoundingClientRect();
+                            createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr, 14);
+
+                            const svgCont = cell.querySelector('.block-svg-container');
+                            if (svgCont) {
+                                svgCont.classList.add('clearing');
+                            }
+                        }
+                        // Небольшая задержка между ячейками для эффекта схлопывания
+                        await new Promise(resolve => setTimeout(resolve, 30));
+                    }
+
+                    // Пауза перед следующей линией (цепная реакция)
+                    await new Promise(resolve => setTimeout(resolve, 300));
                 }
 
-                // Пауза перед следующей линией (цепная реакция)
-                await new Promise(resolve => setTimeout(resolve, 300));
-            }
+                // Ждем окончания анимации последней линии перед удалением
+                await new Promise(resolve => setTimeout(resolve, 150));
 
-            // Ждем окончания анимации последней линии перед удалением
-            await new Promise(resolve => setTimeout(resolve, 150));
+                // Прячем текст комбо
+                comboDisplay.style.animation = 'none';
+                comboDisplay.classList.add('fade-out');
 
-            // Прячем текст комбо
-            comboDisplay.style.animation = 'none';
-            comboDisplay.classList.add('fade-out');
-
-            // Очки за линии
-            const linePoints = totalLines * 100;
-            const comboBonus = totalLines > 1 ? (totalLines - 1) * 50 : 0;
-            const extraPoints = linePoints + comboBonus;
-            
-            score += extraPoints;
-            updateScore();
-            
-            // Дополнительные всплывающие очки за линии в той же точке
-            if (lastPlacementCoords && extraPoints > 0) {
-                const centerR = lastPlacementCoords.r;
-                const centerC = lastPlacementCoords.c;
-                const cell = document.getElementById(`cell-${centerR}-${centerC}`);
-                if (cell) {
-                    const rect = cell.getBoundingClientRect();
-                    setTimeout(() => {
-                        createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${extraPoints}`);
-                    }, 400); // Небольшая задержка чтобы не сливалось с первыми очками
+                // Очки за линии
+                const linePoints = totalLines * 100;
+                const comboBonus = totalLines > 1 ? (totalLines - 1) * 50 : 0;
+                const extraPoints = linePoints + comboBonus;
+                
+                score += extraPoints;
+                updateScore();
+                
+                // Дополнительные всплывающие очки за линии в той же точке
+                if (lastPlacementCoords && extraPoints > 0) {
+                    const centerR = lastPlacementCoords.r;
+                    const centerC = lastPlacementCoords.c;
+                    const cell = document.getElementById(`cell-${centerR}-${centerC}`);
+                    if (cell) {
+                        const rect = cell.getBoundingClientRect();
+                        setTimeout(() => {
+                            createScorePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${extraPoints}`);
+                        }, 400); // Небольшая задержка чтобы не сливалось с первыми очками
+                    }
                 }
+
+                // Очищаем массив логически и рендерим
+                cellsToClear.forEach(coord => {
+                    const [r, c] = coord.split(',').map(Number);
+                    board[r][c] = null;
+                });
+                renderBoard();
+
+                // Хвалебная надпись (после удаления всех линий)
+                if (lastPlacementCoords && totalLines >= 1) {
+                    const centerR = lastPlacementCoords.r;
+                    const centerC = lastPlacementCoords.c;
+                    const cell = document.getElementById(`cell-${centerR}-${centerC}`);
+                    if (cell) {
+                        const rect = cell.getBoundingClientRect();
+                        const praiseLines = ['Good!', 'Great!', 'Super!', 'Excellent!', 'Amazing!', 'Incredible!', 'Unbelievable!', 'Godlike!'];
+                        const praise = praiseLines[Math.min(totalLines - 1, praiseLines.length - 1)];
+                        createPraisePopup(rect.left + rect.width / 2, rect.top + rect.height / 2, praise);
+                    }
+                }
+            } finally {
+                isAnimating = false; // ГАРАНТИРОВАННО разблокируем игру даже при ошибке
             }
-
-            // Очищаем массив логически и рендерим
-            cellsToClear.forEach(coord => {
-                const [r, c] = coord.split(',').map(Number);
-                board[r][c] = null;
-            });
-            renderBoard();
-
-            isAnimating = false; // Разблокируем игру
         }
 
         lastPlacementCoords = null; // Сбрасываем после обработки

@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Block Chpok</title>
+    <!-- OpenGraph Tags -->
+    <meta property="og:title" content="Block Chpok">
+    <meta property="og:description" content="Увлекательная головоломка с блоками">
+    <meta property="og:image" content="og.jpg">
+    <meta property="og:type" content="website">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap');
 
@@ -34,7 +39,9 @@
             margin: 0;
             padding: 0;
             font-family: 'Nunito', sans-serif;
-            background: var(--bg-gradient);
+            /* Затемняем основной фон всего окна */
+            background: linear-gradient(rgba(10, 15, 30, 0.8), rgba(10, 15, 30, 0.8)), url('block_chpok/background.jpg') center/cover no-repeat fixed;
+            background-color: var(--bg-color);
             height: 100vh;
             display: flex;
             justify-content: center;
@@ -52,6 +59,30 @@
             flex-direction: column;
             padding: 20px 15px;
             position: relative;
+            z-index: 1;
+            overflow: hidden; /* Обрезаем края псевдоэлемента с размытием */
+            background: transparent;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.6); /* Отделяем контейнер от темного фона */
+            border-radius: 35px; /* Скругляем углы контейнера */
+        }
+
+        /* Независимый яркий и размытый фон внутри контейнера */
+        .game-container::before {
+            content: '';
+            position: absolute;
+            top: -40px; left: -40px; right: -40px; bottom: -40px; /* Растягиваем, чтобы скрыть артефакты размытия */
+            background: url('block_chpok/background.jpg') center/cover no-repeat fixed;
+            filter: blur(25px);
+            z-index: -2;
+        }
+
+        /* Легкое осветление контейнера для лучшей контрастности текста и игрового поля */
+        .game-container::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.35);
+            z-index: -1;
         }
 
         /* Шапка */
@@ -59,7 +90,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            position: relative;
+            min-height: 100px;
         }
 
         .settings-btn {
@@ -72,6 +105,7 @@
             align-items: center;
             box-shadow: 0 4px 0 #3b82f6, inset 0 2px 4px rgba(255,255,255,0.4);
             cursor: pointer;
+            z-index: 2;
         }
 
         .settings-btn svg {
@@ -81,40 +115,33 @@
         }
 
         .title-container {
-            text-align: center;
-            flex-grow: 1;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            z-index: 1;
         }
 
-        .title {
-            font-size: 32px;
-            font-weight: 900;
-            line-height: 1;
-            background: linear-gradient(to bottom, #ff7a9e, #ff4d79);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            -webkit-text-stroke: 1px white;
-            filter: drop-shadow(0px 3px 0px #b13565);
-            margin: 0;
-            position: relative;
-        }
-
-        .title span {
-            display: block;
-            color: #38bdf8;
-            background: linear-gradient(to bottom, #7dd3fc, #0284c7);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0px 3px 0px #0369a1);
+        .logo-img {
+            max-height: 100px;
+            width: auto;
+            filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));
         }
 
         .stats-box {
-            background: rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.5); /* Светлая плашка под статистику */
             padding: 8px 12px;
             border-radius: 15px;
             display: flex;
             flex-direction: column;
             gap: 5px;
             min-width: 90px;
+            z-index: 2;
         }
 
         .stat-row {
@@ -123,7 +150,7 @@
             gap: 8px;
             font-size: 14px;
             font-weight: 700;
-            color: #555;
+            color: #333; /* Темный текст для читаемости на светлом фоне */
         }
 
         .stat-icon {
@@ -134,9 +161,10 @@
         .level-text {
             text-align: center;
             font-size: 20px;
-            color: #444;
+            color: #222; /* Темный текст */
             margin: 10px 0 15px 0;
-            font-weight: 700;
+            font-weight: 800;
+            text-shadow: 0 2px 5px rgba(255,255,255,0.7); /* Белое свечение для контраста */
         }
 
         /* Игровое поле */
@@ -196,12 +224,13 @@
 
         .tray-slot {
             flex: 1;
-            background: rgba(160, 150, 180, 0.25);
+            background: rgba(30, 35, 60, 0.35); /* Прозрачность уменьшена почти в 2 раза */
             border-radius: 15px;
             display: flex;
             justify-content: center;
             align-items: center;
             position: relative;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.5); /* Глубокая тень внутри слота */
         }
 
         /* Формы фигур */
@@ -290,22 +319,26 @@
             top: 40%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 900;
             color: #fbbf24;
             -webkit-text-stroke: 1px #fff;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
             z-index: 100;
             pointer-events: none;
-            animation: floatUp 1.5s ease-out forwards;
             opacity: 0;
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out;
         }
 
-        @keyframes floatUp {
-            0% { transform: translate(-50%, -10px) scale(0.5); opacity: 0; }
-            20% { transform: translate(-50%, -30px) scale(1.2); opacity: 1; }
-            80% { transform: translate(-50%, -50px) scale(1); opacity: 1; }
-            100% { transform: translate(-50%, -60px) scale(1); opacity: 0; }
+        .combo-text.fade-out {
+            opacity: 0 !important;
+            transform: translate(-50%, -80%) scale(0.8) !important;
+        }
+
+        @keyframes popCombo {
+            0% { transform: translate(-50%, -30%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
         }
 
         /* Экран Game Over */
@@ -368,7 +401,7 @@
             <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
         </div>
         <div class="title-container">
-            <h1 class="title">BLOCK <span>CHPOK</span></h1>
+            <img src="logo.png" alt="Block Chpok Logo" class="logo-img">
         </div>
         <div class="stats-box">
             <div class="stat-row">
@@ -417,6 +450,11 @@
         <button class="btn btn-yellow restart-btn" onclick="initGame()">Начать заново</button>
     </div>
 </div>
+
+<audio id="sound-pick" src="pick.mp3" preload="auto"></audio>
+<audio id="sound-click" src="click.mp3" preload="auto"></audio>
+<audio id="sound-pop" src="pop1.mp3" preload="auto"></audio>
+<audio id="sound-line" src="line.mp3" preload="auto"></audio>
 
 <script>
     // --- НАСТРОЙКИ И ДАННЫЕ ---
@@ -472,6 +510,18 @@
     const scoreEl = document.getElementById('score');
     const comboDisplay = document.getElementById('combo-display');
     const gameOverScreen = document.getElementById('game-over');
+    const soundPick = document.getElementById('sound-pick');
+    const soundClick = document.getElementById('sound-click');
+    const soundPop = document.getElementById('sound-pop');
+    const soundLine = document.getElementById('sound-line');
+
+    function playSound(sound) {
+        if (!sound) return;
+        const newAudio = sound.cloneNode();
+        newAudio.play().catch(e => console.log('Autoplay blocked or audio error'));
+        // Самоочистка после завершения
+        newAudio.onended = () => newAudio.remove();
+    }
 
     // Переменные для перетаскивания
     let dragElement = null;
@@ -481,6 +531,7 @@
     let cellSize = 0;
     let gapSize = 3;
     let isDragging = false;
+    let isAnimating = false; // Блокировка интерфейса во время цепной анимации
 
     // Палитры для каждого цвета блока (светлый/темный/центр/обводки), основанные на вашем фиолетовом референсе
     const BLOCK_PALETTES = {
@@ -567,6 +618,7 @@
     // --- ИНИЦИАЛИЗАЦИЯ ---
     function initGame() {
         board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null));
+        trayPieces = [null, null, null];
         score = 0;
         updateScore();
         gameOverScreen.classList.remove('show');
@@ -659,18 +711,44 @@
             const piece = trayPieces[i];
             
             if (piece) {
-                // Масштабируем фигуру в лотке, чтобы она помещалась
-                const maxDim = Math.max(piece.matrix.length, piece.matrix[0].length);
-                const scale = maxDim > 3 ? 0.6 : 0.8; 
+                const rows = piece.matrix.length;
+                const cols = piece.matrix[0].length;
+                const gap = 3;
+                
+                // Получаем реальные размеры слота. Fallback 100x140 на случай если DOM еще не отрендерился
+                const slotW = slot.clientWidth || 100;
+                const slotH = slot.clientHeight || 140;
+                
+                // Внутренние отступы слота, чтобы фигура не касалась краев (заполнение не на 100%)
+                const paddingW = 24; // по 12px отступа слева и справа
+                const paddingH = 24; // по 12px отступа сверху и снизу
+                
+                // Вычисляем максимально доступную область внутри слота
+                const maxW = slotW - paddingW;
+                const maxH = slotH - paddingH;
+                
+                // Рассчитываем максимально возможный размер ячейки как по ширине, так и по высоте
+                // Учитываем формулу: Cell * Count + Gap * (Count - 1) <= MaxSize
+                const maxCellW = (maxW - gap * (cols - 1)) / cols;
+                const maxCellH = (maxH - gap * (rows - 1)) / rows;
+                
+                // Берем минимальное значение, чтобы фигура точно влезла в слот целиком без искажений
+                let trayCellSize = Math.min(maxCellW, maxCellH);
+                
+                // Ограничиваем максимальный размер ячейки, чтобы 1x1 или 2x2 не были абсурдно гигантскими
+                trayCellSize = Math.min(trayCellSize, 42);
                 
                 const container = document.createElement('div');
                 container.innerHTML = createShapeHTML(piece);
                 const shapeEl = container.firstElementChild;
                 
-                // Фиксированные размеры клеток в лотке
-                shapeEl.style.width = `${piece.matrix[0].length * 20}px`;
-                shapeEl.style.height = `${piece.matrix.length * 20}px`;
-                shapeEl.style.transform = `scale(${scale})`;
+                // Применяем вычисленные точные размеры к самой сетке фигуры
+                const w = cols * trayCellSize + (cols - 1) * gap;
+                const h = rows * trayCellSize + (rows - 1) * gap;
+                
+                shapeEl.style.width = `${w}px`;
+                shapeEl.style.height = `${h}px`;
+                shapeEl.style.transform = `none`; // scale больше не нужен
                 
                 slot.appendChild(shapeEl);
                 
@@ -683,7 +761,10 @@
 
     // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ ---
     function startDrag(e, index) {
-        if (!trayPieces[index] || isDragging) return;
+        if (!trayPieces[index] || isDragging || isAnimating) return;
+
+        // Воспроизводим звук клика/поднятия
+        playSound(soundPick);
         
         e.preventDefault();
         isDragging = true;
@@ -699,14 +780,16 @@
         dragElement.innerHTML = createShapeHTML(piece);
         
         const shapeEl = dragElement.firstElementChild;
-        // Задаем реальный размер блоков как на доске
+        // Задаем реальный размер блоков как на доске (фигура сразу приобретает масштаб игрового поля)
         shapeEl.style.width = `${piece.matrix[0].length * cellSize + (piece.matrix[0].length - 1) * gapSize}px`;
         shapeEl.style.height = `${piece.matrix.length * cellSize + (piece.matrix.length - 1) * gapSize}px`;
         
         document.body.appendChild(dragElement);
         
-        // Прячем оригинал в лотке
-        traySlots[index].style.opacity = '0';
+        // Прячем только саму фигуру, оставляя темную подложку слота видимой
+        if (traySlots[index].firstElementChild) {
+            traySlots[index].firstElementChild.style.opacity = '0';
+        }
 
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -779,7 +862,7 @@
         }
     }
 
-    function endDrag(e) {
+    async function endDrag(e) {
         if (!isDragging) return;
         
         document.removeEventListener('mousemove', onDragMove);
@@ -797,12 +880,25 @@
             placed = true;
         }
         
-        // Возвращаем видимость лотка и удаляем клон
-        traySlots[dragPieceIndex].style.opacity = '1';
+        // Удаляем клон
         if (dragElement) {
             dragElement.remove();
             dragElement = null;
         }
+        
+        // Возвращаем видимость фигуры или очищаем слот
+        if (placed) {
+            traySlots[dragPieceIndex].innerHTML = '';
+        } else {
+            // Звук при возврате в слот
+            playSound(soundClick);
+            if (traySlots[dragPieceIndex].firstElementChild) {
+                traySlots[dragPieceIndex].firstElementChild.style.opacity = '1';
+            }
+        }
+        
+        // На всякий случай сбрасываем прозрачность самого слота
+        traySlots[dragPieceIndex].style.opacity = '1';
         
         clearPreview();
         isDragging = false;
@@ -810,11 +906,9 @@
 
         if (placed) {
             renderBoard();
-            const linesCleared = checkLines();
-            if (linesCleared === 0) {
-                renderTray();
-                fillTray();
-            }
+            await checkLines(); // Ждем завершения всех анимаций взрывов
+            renderTray();
+            fillTray();
         }
     }
 
@@ -849,11 +943,15 @@
                 }
             }
         }
+        
+        // Звук установки
+        playSound(soundPop);
+
         score += blocksPlaced; // Базовые очки за выставление
         updateScore();
     }
 
-    function checkLines() {
+    async function checkLines() {
         const rowsToClear = [];
         const colsToClear = [];
 
@@ -876,58 +974,88 @@
             if (colFull) colsToClear.push(c);
         }
 
-        const totalLines = rowsToClear.length + colsToClear.length;
+        // Собираем все линии в массив для последовательной анимации
+        const linesToClear = [];
+        rowsToClear.forEach(r => {
+            const line = [];
+            for(let c=0; c<BOARD_SIZE; c++) line.push(`${r},${c}`);
+            linesToClear.push(line);
+        });
+        colsToClear.forEach(c => {
+            const line = [];
+            for(let r=0; r<BOARD_SIZE; r++) line.push(`${r},${c}`);
+            linesToClear.push(line);
+        });
+
+        const totalLines = linesToClear.length;
 
         if (totalLines > 0) {
-            // Анимация и удаление
+            isAnimating = true; // Блокируем взаимодействие с новыми фигурами
             const cellsToClear = new Set();
-            
-            rowsToClear.forEach(r => {
-                for(let c=0; c<BOARD_SIZE; c++) cellsToClear.add(`${r},${c}`);
-            });
-            colsToClear.forEach(c => {
-                for(let r=0; r<BOARD_SIZE; r++) cellsToClear.add(`${r},${c}`);
-            });
+            comboDisplay.classList.remove('fade-out');
 
-            // Воспроизводим анимацию
-            cellsToClear.forEach(coord => {
-                const [r, c] = coord.split(',');
-                const cell = document.getElementById(`cell-${r}-${c}`);
-                const colorStr = board[r][c];
+            for (let i = 0; i < totalLines; i++) {
+                const currentLine = linesToClear[i];
                 
-                // Создаем частицы от центра удаляемого блока
-                const rect = cell.getBoundingClientRect();
-                createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr);
+                // Звук сброса линии
+                playSound(soundLine);
 
-                const svgCont = cell.querySelector('.block-svg-container');
-                if (svgCont) {
-                    svgCont.classList.add('clearing');
+                // Анимация текста Комбо
+                if (i === 0) {
+                    comboDisplay.textContent = 'Combo';
+                } else {
+                    comboDisplay.textContent = `Combo x${i + 1}`;
                 }
-            });
-
-            // Показываем комбо-текст
-            if (totalLines > 1) {
-                comboDisplay.textContent = `Комбо x${totalLines} !`;
                 comboDisplay.style.animation = 'none';
                 void comboDisplay.offsetWidth; // Триггер рефлоу для перезапуска анимации
-                comboDisplay.style.animation = 'floatUp 1.5s ease-out forwards';
+                comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+
+                // Последовательная анимация ячеек в линии
+                for (let j = 0; j < currentLine.length; j++) {
+                    const coord = currentLine[j];
+                    if (!cellsToClear.has(coord)) {
+                        cellsToClear.add(coord);
+                        const [r, c] = coord.split(',').map(Number);
+                        const cell = document.getElementById(`cell-${r}-${c}`);
+                        const colorStr = board[r][c];
+                        
+                        // Создаем частицы
+                        const rect = cell.getBoundingClientRect();
+                        createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, colorStr);
+
+                        const svgCont = cell.querySelector('.block-svg-container');
+                        if (svgCont) {
+                            svgCont.classList.add('clearing');
+                        }
+                    }
+                    // Небольшая задержка между ячейками для эффекта схлопывания
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                }
+
+                // Пауза перед следующей линией (цепная реакция)
+                await new Promise(resolve => setTimeout(resolve, 300));
             }
+
+            // Ждем окончания анимации последней линии перед удалением
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            // Прячем текст комбо
+            comboDisplay.style.animation = 'none';
+            comboDisplay.classList.add('fade-out');
 
             // Очки за линии
             score += totalLines * 100;
             if (totalLines > 1) score += (totalLines - 1) * 50; // Бонус за комбо
             updateScore();
 
-            // Ждем окончания анимации, затем очищаем массив и рендерим
-            setTimeout(() => {
-                cellsToClear.forEach(coord => {
-                    const [r, c] = coord.split(',');
-                    board[r][c] = null;
-                });
-                renderBoard();
-                renderTray();
-                fillTray();
-            }, 300); // 300ms = время анимации
+            // Очищаем массив логически и рендерим
+            cellsToClear.forEach(coord => {
+                const [r, c] = coord.split(',').map(Number);
+                board[r][c] = null;
+            });
+            renderBoard();
+
+            isAnimating = false; // Разблокируем игру
         }
 
         return totalLines;

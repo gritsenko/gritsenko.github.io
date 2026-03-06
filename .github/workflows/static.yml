@@ -37,8 +37,8 @@ jobs:
           node-version: '18'
       - name: Install dependencies
         run: npm install
-      - name: Generate index.html from itch.io data
-        run: node publish.js ${{ secrets.ITCH_IO_API_KEY }}
+      # - name: Generate index.html from itch.io data
+      #   run: node publish.js ${{ secrets.ITCH_IO_API_KEY }}
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

@@ -1086,8 +1086,9 @@
     // --- ГЕНЕРАЦИЯ SVG БЛОКА ---
     // Создаем максимально реалистичный 3D блок на основе вашего SVG
     function getBlockSVG(colorStr) {
-        // Уникальный ID для градиентов (чтобы разные цвета не смешивались в DOM)
-        const id = colorStr.replace(/[^a-zA-Z0-9]/g, '');
+        // Генерируем уникальный ID для каждого блока, чтобы избежать проблемы с кэшированием градиентов в WebKit
+        const uid = Math.random().toString(36).substring(2, 9);
+        const id = colorStr.replace(/[^a-zA-Z0-9]/g, '') + '_' + uid;
         const pal = BLOCK_PALETTES[colorStr] || BLOCK_PALETTES['var(--color-purple)']; // фоллбэк на фиолетовый
 
         return `

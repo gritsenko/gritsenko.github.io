@@ -795,8 +795,8 @@ body {
         padding-bottom: 2px;
     }
     .btn {
-        padding: 5px 0;
-        font-size: 11px;
+        padding: 16px 13px;
+        font-size: 18px;
         gap: 3px;
     }
     .btn-icon {

@@ -76,9 +76,8 @@ class AudioManager {
 const audioManager = new AudioManager();
 
 // --- HAPTIC FEEDBACK SYSTEM ---
-const supportsHaptics = typeof window === 'undefined'
-    ? false
-    : window.matchMedia('(pointer: coarse)').matches;
+const supportsHaptics = typeof window !== 'undefined'
+    && (window.matchMedia('(pointer: coarse)').matches || /iPhone|iPad|iPod/.test(navigator.userAgent));
 
 function _haptic() {
     try {
@@ -98,9 +97,9 @@ function _haptic() {
         inputEl.setAttribute('switch', '');
         labelEl.appendChild(inputEl);
 
-        document.head.appendChild(labelEl);
+        document.body.appendChild(labelEl);
         labelEl.click();
-        document.head.removeChild(labelEl);
+        document.body.removeChild(labelEl);
     } catch {
         // do nothing
     }

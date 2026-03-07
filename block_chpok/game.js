@@ -197,6 +197,7 @@ let refillTimeoutIds = [];
 let gameOverTimeoutId = null;
 let isRefillingTray = false;
 let lastPlacementCoords = null;
+let comboStreak = 0;
 
 const gameContainer = document.querySelector('.game-container');
 const boardEl = document.getElementById('board');
@@ -220,10 +221,19 @@ let dragElement = null;
 let dragPieceIndex = -1;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
+let dragStartPointerX = 0;
+let dragStartPointerY = 0;
+let dragAnchorX = 0;
+let dragAnchorY = 0;
 let cellSize = 0;
+let lastKnownCellSize = 0;
 let gapSize = 3;
 let isDragging = false;
 let isAnimating = false;
+
+const DRAG_GAIN_X = 1.35;
+const DRAG_GAIN_Y = 1.55;
+const DRAG_POPUP_LIFT_Y = 58;
 
 // ОПТИМИЗАЦИЯ: переиспользуем объект координат и уменьшаем давление на GC
 const currentCoords = { r: -1, c: -1 };
@@ -314,6 +324,23 @@ function createBlockElement(colorStr) {
     return block;
 }
 
+function getCurrentCellSize() {
+    const boardRect = boardEl.getBoundingClientRect();
+    const boardStyles = window.getComputedStyle(boardEl);
+    const parsedGap = parseFloat(boardStyles.columnGap || boardStyles.gap || '3');
+    gapSize = Number.isFinite(parsedGap) ? parsedGap : 3;
+
+    const firstCell = document.querySelector('.cell');
+    const directCellSize = firstCell ? firstCell.getBoundingClientRect().width : 0;
+    const fallbackCellSize = (boardRect.width - gapSize * (BOARD_SIZE - 1)) / BOARD_SIZE;
+
+    const nextCellSize = [directCellSize, fallbackCellSize, lastKnownCellSize, cellSize, 32]
+        .find(size => Number.isFinite(size) && size > 0);
+
+    lastKnownCellSize = nextCellSize;
+    return nextCellSize;
+}
+
 function initGame() {
     clearPendingRefill();
     clearPendingGameOver();
@@ -329,6 +356,7 @@ function initGame() {
     isAnimating = false;
     isDragging = false;
     dragPieceIndex = -1;
+    comboStreak = 0;
     updateScore();
     gameOverScreen.classList.remove('show');
     comboDisplay.style.animation = 'none';
@@ -481,16 +509,16 @@ function renderTray(forceEmpty = false, popIndexes = null) {
 function startDrag(e, index) {
     if (!trayPieces[index] || isDragging || isAnimating) return;
 
+    e.preventDefault();
+
+    const piece = trayPieces[index];
+    cellSize = getCurrentCellSize();
+
     playSound('pick');
     haptic();
 
-    e.preventDefault();
     isDragging = true;
     dragPieceIndex = index;
-
-    const piece = trayPieces[index];
-    const cellRect = document.querySelector('.cell').getBoundingClientRect();
-    cellSize = cellRect.width;
 
     dragElement = document.createElement('div');
     dragElement.className = 'drag-clone';
@@ -510,22 +538,43 @@ function startDrag(e, index) {
         traySlots[index].firstElementChild.style.opacity = '0';
     }
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const clientX = e.clientX;
+    const clientY = e.clientY;
 
     dragOffsetX = shapeEl.offsetWidth / 2;
-    dragOffsetY = shapeEl.offsetHeight + 40;
+    dragOffsetY = shapeEl.offsetHeight / 2 + DRAG_POPUP_LIFT_Y;
 
-    moveDrag(clientX, clientY);
+    const slotRect = traySlots[index].getBoundingClientRect();
+    dragAnchorX = slotRect.left + slotRect.width / 2;
+    dragAnchorY = slotRect.top + slotRect.height / 2;
+    dragStartPointerX = clientX;
+    dragStartPointerY = clientY;
 
+    // Фигура появляется над центром слота, а не под точкой касания
+    moveDrag(dragAnchorX, dragAnchorY);
+
+    addDragListeners();
+}
+
+function addDragListeners() {
     document.addEventListener('pointermove', onDragMove, { passive: false });
     document.addEventListener('pointerup', endDrag);
+    document.addEventListener('pointercancel', cancelDrag);
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', cancelDrag);
+    window.addEventListener('blur', cancelDrag);
 }
 
 function onDragMove(e) {
     if (!isDragging) return;
     e.preventDefault();
-    moveDrag(e.clientX, e.clientY);
+
+    const dx = (e.clientX - dragStartPointerX) * DRAG_GAIN_X;
+    const dy = (e.clientY - dragStartPointerY) * DRAG_GAIN_Y;
+    const virtualX = dragAnchorX + dx;
+    const virtualY = dragAnchorY + dy;
+
+    moveDrag(virtualX, virtualY);
     updatePreview();
 }
 
@@ -545,6 +594,10 @@ function updatePreview() {
 
 function getBoardCoordinates() {
     if (!dragElement) return null;
+
+    if (!Number.isFinite(cellSize) || cellSize <= 0) {
+        cellSize = getCurrentCellSize();
+    }
 
     const rect = dragElement.getBoundingClientRect();
     const boardRect = boardEl.getBoundingClientRect();
@@ -578,8 +631,7 @@ function drawPreview(shape, startR, startC) {
 async function endDrag() {
     if (!isDragging) return;
 
-    document.removeEventListener('pointermove', onDragMove);
-    document.removeEventListener('pointerup', endDrag);
+    removeDragListeners();
 
     const coords = getBoardCoordinates();
     const piece = trayPieces[dragPieceIndex];
@@ -631,6 +683,40 @@ async function endDrag() {
         }
         traySlots[savedDragPieceIndex].style.opacity = '1';
     }
+}
+
+function removeDragListeners() {
+    document.removeEventListener('pointermove', onDragMove);
+    document.removeEventListener('pointerup', endDrag);
+    document.removeEventListener('pointercancel', cancelDrag);
+    window.removeEventListener('pointerup', endDrag);
+    window.removeEventListener('pointercancel', cancelDrag);
+    window.removeEventListener('blur', cancelDrag);
+}
+
+function cancelDrag() {
+    if (!isDragging) return;
+
+    const savedDragPieceIndex = dragPieceIndex;
+
+    removeDragListeners();
+
+    if (dragElement) {
+        dragElement.remove();
+        dragElement = null;
+    }
+
+    clearPreview();
+    isDragging = false;
+    dragPieceIndex = -1;
+
+    if (savedDragPieceIndex >= 0 && traySlots[savedDragPieceIndex]?.firstElementChild) {
+        traySlots[savedDragPieceIndex].firstElementChild.style.opacity = '1';
+    }
+}
+
+function refreshLayoutMetrics() {
+    cellSize = getCurrentCellSize();
 }
 
 function canPlace(shape, startR, startC) {
@@ -701,6 +787,12 @@ async function checkLines(blocksPlaced) {
     });
 
     const totalLines = linesToClear.length;
+    if (totalLines > 0) {
+        comboStreak += 1;
+    } else {
+        comboStreak = 0;
+    }
+
     const initialPoints = 10 * blocksPlaced * (totalLines + 1);
     score += initialPoints;
     updateScore();
@@ -722,7 +814,7 @@ async function checkLines(blocksPlaced) {
             renderBoard();
 
             const linePoints = totalLines * 100;
-            const comboBonus = totalLines > 1 ? (totalLines - 1) * 50 : 0;
+            const comboBonus = comboStreak > 1 ? (comboStreak - 1) * 50 : 0;
             const extraPoints = linePoints + comboBonus;
 
             score += extraPoints;
@@ -745,19 +837,21 @@ async function checkLines(blocksPlaced) {
             }
 
             const cellsToClear = new Set();
-            comboDisplay.classList.remove('fade-out');
+            if (comboStreak >= 2) {
+                comboDisplay.textContent = `Combo x${comboStreak}`;
+                comboDisplay.classList.remove('fade-out');
+                comboDisplay.style.animation = 'none';
+                void comboDisplay.offsetWidth;
+                comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+            } else {
+                comboDisplay.style.animation = 'none';
+                comboDisplay.classList.add('fade-out');
+            }
 
             playSound('line');
 
             for (let i = 0; i < totalLines; i++) {
                 const currentLine = linesToClear[i];
-
-                if (totalLines >= 2) {
-                    comboDisplay.textContent = 'Combo x' + totalLines;
-                    comboDisplay.style.animation = 'none';
-                    void comboDisplay.offsetWidth;
-                    comboDisplay.style.animation = 'popCombo 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
-                }
 
                 for (let j = 0; j < currentLine.length; j++) {
                     cellsToClear.add(currentLine[j]);
@@ -969,5 +1063,8 @@ splashPlayBtn.addEventListener('click', startGame);
 document.addEventListener('pointermove', function (e) {
     if (isDragging) e.preventDefault();
 }, { passive: false });
+
+window.addEventListener('resize', refreshLayoutMetrics);
+window.addEventListener('orientationchange', refreshLayoutMetrics);
 
 window.initGame = initGame;

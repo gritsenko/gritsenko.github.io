@@ -90,7 +90,7 @@ function _haptic() {
 
         const labelEl = document.createElement('label');
         labelEl.ariaHidden = 'true';
-        labelEl.style.display = 'none';
+        labelEl.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1;';
 
         const inputEl = document.createElement('input');
         inputEl.type = 'checkbox';
@@ -99,7 +99,13 @@ function _haptic() {
 
         document.body.appendChild(labelEl);
         labelEl.click();
-        document.body.removeChild(labelEl);
+        
+        // Маленькая задержка перед удалением, чтобы браузер успел обработать клик
+        setTimeout(() => {
+            if (labelEl.parentNode) {
+                document.body.removeChild(labelEl);
+            }
+        }, 100);
     } catch {
         // do nothing
     }
@@ -649,7 +655,8 @@ async function endDrag() {
         const blocksPlaced = placeShape(piece, coords.r, coords.c);
         trayPieces[savedDragPieceIndex] = null;
 
-        haptic();
+        // Используем haptic.confirm для более четкой отдачи при установке
+        haptic.confirm();
         renderBoard();
 
         if (isThreeByThreeSquare(piece)) {

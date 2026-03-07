@@ -79,7 +79,57 @@ const audioManager = new AudioManager();
 const supportsHaptics = typeof window !== 'undefined'
     && (window.matchMedia('(pointer: coarse)').matches || /iPhone|iPad|iPod/.test(navigator.userAgent));
 
-function _haptic() {
+const hapticFallbackState = {
+    labelEl: null,
+    inputEl: null,
+    lastX: 0,
+    lastY: 0,
+    hideTimeoutId: null
+};
+
+function ensureHapticFallbackElement() {
+    if (!supportsHaptics || typeof document === 'undefined') return null;
+    if (hapticFallbackState.labelEl && hapticFallbackState.inputEl) {
+        return hapticFallbackState;
+    }
+
+    const labelEl = document.createElement('label');
+    labelEl.ariaHidden = 'true';
+    labelEl.style.cssText = 'position:fixed;top:0;left:0;width:22px;height:22px;opacity:0.015;pointer-events:auto;z-index:2147483647;transform:translate3d(-100px,-100px,0);margin:0;padding:0;border:0;background:transparent;overflow:hidden;touch-action:none;';
+
+    const inputEl = document.createElement('input');
+    inputEl.type = 'checkbox';
+    inputEl.setAttribute('switch', '');
+    inputEl.tabIndex = -1;
+    inputEl.style.cssText = 'width:100%;height:100%;margin:0;opacity:0.01;pointer-events:none;';
+
+    labelEl.appendChild(inputEl);
+    document.body.appendChild(labelEl);
+
+    hapticFallbackState.labelEl = labelEl;
+    hapticFallbackState.inputEl = inputEl;
+    return hapticFallbackState;
+}
+
+function moveHapticFallback(x, y) {
+    const state = ensureHapticFallbackElement();
+    if (!state || !Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    state.lastX = x;
+    state.lastY = y;
+
+    const left = Math.round(x - 11);
+    const top = Math.round(y - 11);
+    state.labelEl.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+}
+
+function hideHapticFallback() {
+    const state = ensureHapticFallbackElement();
+    if (!state) return;
+    state.labelEl.style.transform = 'translate3d(-100px,-100px,0)';
+}
+
+function _haptic(options = null) {
     try {
         if (navigator.vibrate) {
             navigator.vibrate(50);
@@ -88,37 +138,29 @@ function _haptic() {
 
         if (!supportsHaptics) return;
 
-        const labelEl = document.createElement('label');
-        labelEl.ariaHidden = 'true';
-        labelEl.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1;';
+        const state = ensureHapticFallbackElement();
+        if (!state) return;
 
-        const inputEl = document.createElement('input');
-        inputEl.type = 'checkbox';
-        inputEl.setAttribute('switch', '');
-        labelEl.appendChild(inputEl);
+        if (options && Number.isFinite(options.x) && Number.isFinite(options.y)) {
+            moveHapticFallback(options.x, options.y);
+        } else if (Number.isFinite(state.lastX) && Number.isFinite(state.lastY)) {
+            moveHapticFallback(state.lastX, state.lastY);
+        }
 
-        document.body.appendChild(labelEl);
-        labelEl.click();
-        
-        // Маленькая задержка перед удалением, чтобы браузер успел обработать клик
-        setTimeout(() => {
-            if (labelEl.parentNode) {
-                document.body.removeChild(labelEl);
-            }
-        }, 100);
+        state.labelEl.click();
     } catch {
         // do nothing
     }
 }
 
-_haptic.confirm = () => {
+_haptic.confirm = (options = null) => {
     if (navigator.vibrate) {
         navigator.vibrate([50, 70, 50]);
         return;
     }
 
-    _haptic();
-    setTimeout(() => _haptic(), 120);
+    _haptic(options);
+    setTimeout(() => _haptic(options), 120);
 };
 
 _haptic.error = () => {
@@ -130,6 +172,30 @@ _haptic.error = () => {
     _haptic();
     setTimeout(() => _haptic(), 120);
     setTimeout(() => _haptic(), 240);
+};
+
+_haptic.track = (x, y) => {
+    if (navigator.vibrate || !supportsHaptics) return;
+
+    if (hapticFallbackState.hideTimeoutId !== null) {
+        clearTimeout(hapticFallbackState.hideTimeoutId);
+        hapticFallbackState.hideTimeoutId = null;
+    }
+
+    moveHapticFallback(x, y);
+};
+
+_haptic.release = () => {
+    if (navigator.vibrate || !supportsHaptics) return;
+
+    if (hapticFallbackState.hideTimeoutId !== null) {
+        clearTimeout(hapticFallbackState.hideTimeoutId);
+    }
+
+    hapticFallbackState.hideTimeoutId = setTimeout(() => {
+        hideHapticFallback();
+        hapticFallbackState.hideTimeoutId = null;
+    }, 220);
 };
 
 const haptic = _haptic;
@@ -519,8 +585,9 @@ function startDrag(e, index) {
     const piece = trayPieces[index];
     cellSize = getCurrentCellSize();
 
+    haptic.track(e.clientX, e.clientY);
     playSound('pick');
-    haptic();
+    haptic({ x: e.clientX, y: e.clientY });
 
     isDragging = true;
     dragPieceIndex = index;
@@ -573,6 +640,8 @@ function addDragListeners() {
 function onDragMove(e) {
     if (!isDragging) return;
     e.preventDefault();
+
+    haptic.track(e.clientX, e.clientY);
 
     const dx = (e.clientX - dragStartPointerX) * DRAG_GAIN_X;
     const dy = (e.clientY - dragStartPointerY) * DRAG_GAIN_Y;
@@ -633,8 +702,12 @@ function drawPreview(shape, startR, startC) {
     }
 }
 
-async function endDrag() {
+async function endDrag(e) {
     if (!isDragging) return;
+
+    if (e && Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
+        haptic.track(e.clientX, e.clientY);
+    }
 
     removeDragListeners();
 
@@ -655,8 +728,7 @@ async function endDrag() {
         const blocksPlaced = placeShape(piece, coords.r, coords.c);
         trayPieces[savedDragPieceIndex] = null;
 
-        // Используем haptic.confirm для более четкой отдачи при установке
-        haptic.confirm();
+        haptic.confirm(e ? { x: e.clientX, y: e.clientY } : null);
         renderBoard();
 
         if (isThreeByThreeSquare(piece)) {
@@ -689,6 +761,8 @@ async function endDrag() {
         }
         traySlots[savedDragPieceIndex].style.opacity = '1';
     }
+
+    haptic.release();
 }
 
 function removeDragListeners() {
@@ -719,6 +793,8 @@ function cancelDrag() {
     if (savedDragPieceIndex >= 0 && traySlots[savedDragPieceIndex]?.firstElementChild) {
         traySlots[savedDragPieceIndex].firstElementChild.style.opacity = '1';
     }
+
+    haptic.release();
 }
 
 function refreshLayoutMetrics() {

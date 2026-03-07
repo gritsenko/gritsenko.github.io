@@ -969,6 +969,7 @@
     let refillTimeoutIds = [];
     let gameOverTimeoutId = null;
     let isRefillingTray = false;
+    let lastPlacementCoords = null;
 
     // Элементы DOM
     const gameContainer = document.querySelector('.game-container');
@@ -1248,46 +1249,36 @@
     }
 
     function fillTray() {
-        let emptyCount = 0;
-        for (let i = 0; i < 3; i++) {
-            if (!trayPieces[i]) {
-                emptyCount++;
-            }
-        }
+        const emptyCount = trayPieces.filter(p => !p).length;
         
-        // Заполняем только если все 3 пустые
+        // Only refill when all 3 slots are empty
         if (emptyCount === 3) {
             clearPendingRefill();
             isRefillingTray = true;
-            renderTray(true); // Рендерим пустые слоты
+            renderTray(true); // Render empty slots
             
-            // Задержка перед началом появления новой партии блоков
             const refillStartTimeoutId = setTimeout(() => {
                 for (let i = 0; i < 3; i++) {
                     const randomShape = SHAPES_DATA[Math.floor(Math.random() * SHAPES_DATA.length)];
                     
-                    // Задержка появления и фигур, и частиц
                     const slotFillTimeoutId = setTimeout(() => {
                         trayPieces[i] = randomShape;
-                        renderTray(); // Обновляем лоток, чтобы показать фигуру
+                        renderTray();
                         
-                        // Звук появления блока
                         playSound('click');
                         
                         const slot = traySlots[i];
                         if (slot) {
                             const rect = slot.getBoundingClientRect();
-                            // Частицы в 3 раза больше (14 * 3 = 42)
                             createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, randomShape.color, 42);
                         }
                         
-                        // После заполнения последнего слота проверяем возможность хода
                         if (i === 2) {
                             isRefillingTray = false;
                             refillTimeoutIds = [];
                             checkGameOver();
                         }
-                    }, i * 150); 
+                    }, i * 150);
                     refillTimeoutIds.push(slotFillTimeoutId);
                 }
             }, 300);
@@ -1331,8 +1322,8 @@
                 // Берем минимальное значение, чтобы фигура точно влезла в слот целиком без искажений
                 let trayCellSize = Math.min(maxCellW, maxCellH);
                 
-                // Ограничиваем максимальный размер ячейки, чтобы 1x1 или 2x2 не были абсурдно гигантскими
-                trayCellSize = Math.min(trayCellSize, 42);
+                // Clamp: min 20px so tall shapes aren't tiny; max 38px so small shapes aren't huge
+                trayCellSize = Math.min(Math.max(trayCellSize, 20), 38);
                 
                 const container = document.createElement('div');
                 container.innerHTML = createShapeHTML(piece);
@@ -1360,6 +1351,8 @@
 
         // Воспроизводим звук клика/поднятия
         playSound('pick');
+        // Haptic feedback on block pick
+        haptic();
         
         e.preventDefault();
         isDragging = true;
@@ -1553,6 +1546,9 @@
                 }
             }
         }
+        
+        // Store placement coordinates for score popups and sorting
+        lastPlacementCoords = { r: startR, c: startC };
         
         // Звук установки
         playSound('pop');

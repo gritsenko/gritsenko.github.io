@@ -246,12 +246,12 @@
             justify-content: space-between;
             gap: 10px;
             margin-bottom: 20px;
-            height: 140px; /* Фиксируем высоту вместо растягивания */
             flex-shrink: 0;
         }
 
         .tray-slot {
             flex: 1;
+            aspect-ratio: 1 / 1;
             background: rgba(30, 35, 60, 0.35); /* Прозрачность уменьшена почти в 2 раза */
             border-radius: 15px;
             display: flex;
@@ -529,7 +529,6 @@
                 margin-bottom: 10px;
             }
             .tray {
-                height: 96px;
                 margin-bottom: 10px;
             }
             .bottom-controls {
@@ -579,7 +578,6 @@
                 margin-bottom: 10px;
             }
             .tray {
-                height: 100px;
                 margin-bottom: 10px;
             }
             .bottom-controls {
@@ -707,7 +705,6 @@
                 height: 14px;
             }
             .tray {
-                height: 64px;
                 margin-bottom: 4px;
             }
             .board-container {
@@ -737,7 +734,7 @@
         <img src="logo.png" alt="Block Chpok" class="splash-logo">
         <div>
             <!-- <h1 class="splash-title">Block Chpok</h1> -->
-            <p class="splash-version">v0.51</p>
+            <p class="splash-version">v0.53</p>
         </div>
         <button class="splash-play-btn" id="splash-play-btn">Играть</button>
     </div>
@@ -776,21 +773,6 @@
         <div class="tray-slot" id="slot-0"></div>
         <div class="tray-slot" id="slot-1"></div>
         <div class="tray-slot" id="slot-2"></div>
-    </div>
-
-    <div class="bottom-controls">
-        <button class="btn btn-blue" id="undo-btn" type="button">
-            <svg class="btn-icon" viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
-            Отмена
-        </button>
-        <button class="btn btn-blue" type="button">
-            <svg class="btn-icon" viewBox="0 0 24 24"><path d="M16 11V3H8v6H2v12h20V11h-6zm-6-6h4v14h-4V5zm-6 6h4v8H4v-8zm16 8h-4v-6h4v6z"/></svg>
-            Рейтинг
-        </button>
-        <button class="btn btn-yellow" type="button">
-            <svg class="btn-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-            Подсказка
-        </button>
     </div>
     
     <div id="game-over">
@@ -884,6 +866,60 @@
 
     const audioManager = new AudioManager();
 
+    // --- HAPTIC FEEDBACK SYSTEM ---
+    const supportsHaptics = typeof window === "undefined"
+        ? false
+        : window.matchMedia("(pointer: coarse)").matches;
+
+    function _haptic() {
+        try {
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+                return;
+            }
+
+            if (!supportsHaptics) return;
+
+            const labelEl = document.createElement("label");
+            labelEl.ariaHidden = "true";
+            labelEl.style.display = "none";
+
+            const inputEl = document.createElement("input");
+            inputEl.type = "checkbox";
+            inputEl.setAttribute("switch", "");
+            labelEl.appendChild(inputEl);
+
+            document.head.appendChild(labelEl);
+            labelEl.click();
+            document.head.removeChild(labelEl);
+        } catch {
+            // do nothing
+        }
+    }
+
+    _haptic.confirm = () => {
+        if (navigator.vibrate) {
+            navigator.vibrate([50, 70, 50]);
+            return;
+        }
+
+        _haptic();
+        setTimeout(() => _haptic(), 120);
+    };
+
+    _haptic.error = () => {
+        if (navigator.vibrate) {
+            navigator.vibrate([50, 70, 50, 70, 50]);
+            return;
+        }
+
+        _haptic();
+        setTimeout(() => _haptic(), 120);
+        setTimeout(() => _haptic(), 240);
+    };
+
+    const haptic = _haptic;
+
     // --- НАСТРОЙКИ И ДАННЫЕ ---
     const BOARD_SIZE = 8;
     const BEST_SCORE_KEY = 'block-chpok-best-score';
@@ -930,11 +966,9 @@
     let bestScore = 0;
     let displayedScore = 0;
     let scoreAnimationToken = 0;
-    let undoHistory = [];
     let refillTimeoutIds = [];
     let gameOverTimeoutId = null;
     let isRefillingTray = false;
-    let lastPlacementCoords = null; // Последняя точка установки фишки
 
     // Элементы DOM
     const gameContainer = document.querySelector('.game-container');
@@ -950,7 +984,6 @@
     const gameOverScreen = document.getElementById('game-over');
     const gameOverScoreEl = document.getElementById('game-over-score');
     const gameOverBestEl = document.getElementById('game-over-best');
-    const undoBtn = document.getElementById('undo-btn');
 
     function playSound(soundName) {
         audioManager.play(soundName);
@@ -968,12 +1001,12 @@
 
     // Палитры для каждого цвета блока (светлый/темный/центр/обводки), основанные на вашем фиолетовом референсе
     const BLOCK_PALETTES = {
-        'var(--color-orange)': { light: '#FFD5A3', dark: '#C24D00', centerL: '#FA8F28', centerD: '#A13C00', strokeL: '#FFDFB5', strokeD: '#E36500', outline: '#4A1D00' },
-        'var(--color-blue)': { light: '#9EE0FF', dark: '#1056BA', centerL: '#47A8F7', centerD: '#0B4291', strokeL: '#B5EAFF', strokeD: '#1E75E0', outline: '#072454' },
-        'var(--color-green)': { light: '#C3F79C', dark: '#2F850B', centerL: '#77D938', centerD: '#216107', strokeL: '#D1FAAF', strokeD: '#43AB14', outline: '#113303' },
-        'var(--color-purple)': { light: '#F2A8F7', dark: '#7228A5', centerL: '#D175E2', centerD: '#561385', strokeL: '#F8A9FA', strokeD: '#B854E5', outline: '#301B54' },
-        'var(--color-yellow)': { light: '#FFF29C', dark: '#D19200', centerL: '#FFCC14', centerD: '#A87200', strokeL: '#FFF5B0', strokeD: '#EBB000', outline: '#593A00' },
-        'var(--color-red)': { light: '#FFA8A8', dark: '#A80C0C', centerL: '#F04141', centerD: '#7D0707', strokeL: '#FFBCBC', strokeD: '#CC1414', outline: '#420303' }
+        'var(--color-orange)': { light: '#FFD5A3', dark: '#E36500', centerL: '#FFB347', centerD: '#F58220', strokeL: '#FFDFB5', strokeD: '#FFB347', outline: '#4A1D00' },
+        'var(--color-blue)': { light: '#9EE0FF', dark: '#1E75E0', centerL: '#60BFFF', centerD: '#35A0F0', strokeL: '#B5EAFF', strokeD: '#60BFFF', outline: '#072454' },
+        'var(--color-green)': { light: '#C3F79C', dark: '#43AB14', centerL: '#82E0AA', centerD: '#66CC33', strokeL: '#D1FAAF', strokeD: '#82E0AA', outline: '#113303' },
+        'var(--color-purple)': { light: '#F2A8F7', dark: '#7228A5', centerL: '#D175E2', centerD: '#A251DC', strokeL: '#F8A9FA', strokeD: '#D579E8', outline: '#301B54' },
+        'var(--color-yellow)': { light: '#FFF29C', dark: '#EBB000', centerL: '#F7DC6F', centerD: '#FFCC00', strokeL: '#FFF5B0', strokeD: '#F7DC6F', outline: '#593A00' },
+        'var(--color-red)': { light: '#FFA8A8', dark: '#CC1414', centerL: '#F1948A', centerD: '#F03030', strokeL: '#FFBCBC', strokeD: '#F1948A', outline: '#420303' }
     };
 
     function cloneBoardState(sourceBoard) {
@@ -1032,25 +1065,6 @@
         gameOverBestEl.textContent = formattedBestScore;
     }
 
-    function updateUndoButtonState() {
-        undoBtn.disabled = undoHistory.length === 0 || isAnimating || isDragging || isRefillingTray;
-    }
-
-    function resetUndoHistory() {
-        undoHistory = [];
-        updateUndoButtonState();
-    }
-
-    function pushUndoState() {
-        undoHistory.push({
-            board: cloneBoardState(board),
-            trayPieces: cloneTrayState(trayPieces),
-            score,
-            displayedScore
-        });
-        updateUndoButtonState();
-    }
-
     function isThreeByThreeSquare(shape) {
         return Boolean(shape)
             && shape.matrix.length === 3
@@ -1075,32 +1089,9 @@
     function showGameOver() {
         finalizeBestScore();
         gameOverScoreEl.textContent = score.toLocaleString('en-US');
+        // Haptic feedback on game over
+        haptic.error();
         gameOverScreen.classList.add('show');
-    }
-
-    function undoLastMove() {
-        if (undoHistory.length === 0 || isAnimating || isDragging || isRefillingTray) {
-            return;
-        }
-
-        clearPendingRefill();
-        clearPendingGameOver();
-
-        const previousState = undoHistory.pop();
-        board = cloneBoardState(previousState.board);
-        trayPieces = cloneTrayState(previousState.trayPieces);
-        score = previousState.score;
-        displayedScore = previousState.displayedScore;
-
-        comboDisplay.style.animation = 'none';
-        comboDisplay.classList.add('fade-out');
-        gameOverScreen.classList.remove('show');
-
-        updateScore();
-        renderBoard();
-        renderTray();
-        updateUndoButtonState();
-        checkGameOver();
     }
 
     // --- ГЕНЕРАЦИЯ SVG БЛОКА ---
@@ -1112,33 +1103,28 @@
         const pal = BLOCK_PALETTES[colorStr] || BLOCK_PALETTES['var(--color-purple)']; // фоллбэк на фиолетовый
 
         return `
-        <svg viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%; display:block; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.3));">
+        <svg viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
             <!-- 1. Базовый фон с резким диагональным градиентом -->
             <rect width="68" height="68" rx="12" fill="url(#paint0_linear_${id})"/>
             
             <!-- 2. Отзеркаленный слой с прозрачностью для создания 4 граней -->
             <rect opacity="0.5" width="68" height="68" rx="12" transform="matrix(-1 0 0 1 68 0)" fill="url(#paint1_linear_${id})"/>
             
-            <!-- 3. Центральная часть с мягким краем (фильтр размытия) -->
-            <g filter="url(#filter0_f_${id})">
+            <!-- 3. Центральная часть (фильтр убран для повышения производительности) -->
+            <g>
                 <rect x="10" y="10" width="48" height="48" rx="7" fill="url(#paint2_linear_${id})"/>
                 <rect x="10" y="10" width="48" height="48" rx="7" stroke="url(#paint_inner_stroke_${id})" stroke-width="1.5"/>
             </g>
             
             <!-- 4. Темная обводка по контуру -->
-            <rect x="1" y="1" width="66" height="66" rx="11" stroke="${pal.outline}" stroke-width="2" stroke-opacity="0.8"/>
+            <rect x="1" y="1" width="66" height="66" rx="11" stroke="${pal.outline}" stroke-width="2"/>
             
             <!-- 5. Сложный кастомный блик в левом верхнем углу -->
             <path d="M16.8276 9.12817C17.5747 10.3664 16.1728 12.5815 13.6963 14.0757C11.2198 15.5699 8.60661 15.7774 7.8595 14.5392C10 10.5 6.52353 9.99422 9 8.5C11.4765 7.00578 16.0805 7.88993 16.8276 9.12817Z" fill="url(#paint3_radial_${id})"/>
             <path d="M16.8276 9.12817C17.5747 10.3664 16.1728 12.5815 13.6963 14.0757C11.2198 15.5699 8.60661 15.7774 7.8595 14.5392C10 10.5 6.52353 9.99422 9 8.5C11.4765 7.00578 16.0805 7.88993 16.8276 9.12817Z" fill="url(#paint4_radial_${id})"/>
             
             <defs>
-                <filter id="filter0_f_${id}" x="8" y="8" width="52" height="52" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-                    <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                </filter>
-                
-                <!-- Градиент с резким переходом -->
+                <!-- Градиент с резким переходом от 0.49 до 0.53 -->
                 <linearGradient id="paint0_linear_${id}" x1="0" y1="0" x2="68" y2="68" gradientUnits="userSpaceOnUse">
                     <stop offset="0.490951" stop-color="${pal.light}"/>
                     <stop offset="0.5315" stop-color="${pal.dark}"/>
@@ -1147,18 +1133,16 @@
                     <stop offset="0.490951" stop-color="${pal.light}"/>
                     <stop offset="0.5315" stop-color="${pal.dark}"/>
                 </linearGradient>
-                
-                <!-- Заливка центральной части: уходит в тень снизу -->
                 <linearGradient id="paint2_linear_${id}" x1="34" y1="10" x2="34" y2="58" gradientUnits="userSpaceOnUse">
                     <stop stop-color="${pal.centerL}"/>
                     <stop offset="1" stop-color="${pal.centerD}"/>
                 </linearGradient>
                 
-                <!-- Градиент для внутренней рамки: яркий блик сверху -->
+                <!-- Градиент для внутренней рамки: светлый блик сверху, прозрачная середина, легкий рефлекс снизу -->
                 <linearGradient id="paint_inner_stroke_${id}" x1="34" y1="10" x2="34" y2="58" gradientUnits="userSpaceOnUse">
                     <stop stop-color="${pal.strokeL}"/>
-                    <stop offset="0.4" stop-color="${pal.strokeD}" stop-opacity="0"/>
-                    <stop offset="1" stop-color="${pal.strokeD}" stop-opacity="0.9"/>
+                    <stop offset="0.5" stop-color="${pal.centerD}" stop-opacity="0"/>
+                    <stop offset="1" stop-color="${pal.strokeD}" stop-opacity="0.8"/>
                 </linearGradient>
                 
                 <!-- Радиальные градиенты для блика -->
@@ -1191,7 +1175,6 @@
         isAnimating = false;
         isDragging = false;
         dragPieceIndex = -1;
-        resetUndoHistory();
         updateScore();
         gameOverScreen.classList.remove('show');
         comboDisplay.style.animation = 'none';
@@ -1250,13 +1233,13 @@
         const rows = shape.matrix.length;
         const cols = shape.matrix[0].length;
         
-        let html = `<div class="shape" style="grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${rows}, 1fr);">`;
+        let html = `<div class="shape" style="grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${rows}, 1fr); width: 100%; height: 100%;">`;
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 if (shape.matrix[r][c]) {
-                    html += `<div class="block">${getBlockSVG(shape.color)}</div>`;
+                    html += `<div class="block" style="aspect-ratio: 1/1;">${getBlockSVG(shape.color)}</div>`;
                 } else {
-                    html += `<div class="block empty"></div>`;
+                    html += `<div class="block empty" style="aspect-ratio: 1/1;"></div>`;
                 }
             }
         }
@@ -1275,9 +1258,7 @@
         // Заполняем только если все 3 пустые
         if (emptyCount === 3) {
             clearPendingRefill();
-            resetUndoHistory();
             isRefillingTray = true;
-            updateUndoButtonState();
             renderTray(true); // Рендерим пустые слоты
             
             // Задержка перед началом появления новой партии блоков
@@ -1304,7 +1285,6 @@
                         if (i === 2) {
                             isRefillingTray = false;
                             refillTimeoutIds = [];
-                            updateUndoButtonState();
                             checkGameOver();
                         }
                     }, i * 150); 
@@ -1372,8 +1352,6 @@
                 slot.onpointerdown = (e) => startDrag(e, i);
             }
         }
-
-        updateUndoButtonState();
     }
 
     // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ ---
@@ -1386,7 +1364,6 @@
         e.preventDefault();
         isDragging = true;
         dragPieceIndex = index;
-        updateUndoButtonState();
         
         const piece = trayPieces[index];
         const cellRect = document.querySelector('.cell').getBoundingClientRect();
@@ -1496,13 +1473,13 @@
         clearPreview();
         isDragging = false;
         dragPieceIndex = -1;
-        updateUndoButtonState();
         
         if (coords && canPlace(piece, coords.r, coords.c)) {
-            pushUndoState();
-            lastPlacementCoords = { r: coords.r, c: coords.c };
             const blocksPlaced = placeShape(piece, coords.r, coords.c);
             trayPieces[savedDragPieceIndex] = null;
+
+            // Haptic feedback on block drop
+            haptic();
 
             // Рендерим доску СРАЗУ, чтобы новые блоки появились
             renderBoard();
@@ -1898,8 +1875,7 @@
 
     // Запуск игры
     loadBestScore();
-    undoBtn.addEventListener('click', undoLastMove);
-
+    
     // Обработчик для splash screen
     const splashPlayBtn = document.getElementById('splash-play-btn');
     const splashOverlay = document.getElementById('splash-overlay');
@@ -1909,6 +1885,8 @@
         splashOverlay.classList.add('hidden');
         // Инициализируем звук
         audioManager.init();
+        // Haptic feedback on game start
+        haptic.confirm();
         // Начинаем игру
         initGame();
     }

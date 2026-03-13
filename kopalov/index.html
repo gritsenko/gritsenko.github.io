@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nikolay Kopalov</title>
+
+    <!-- Open Graph / Facebook / Telegram -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://gritsenko.biz/kopalov">
+    <meta property="og:title" content="Nikolay Kopalov">
+    <meta property="og:description" content="Помоги Николаю добыть 1000 золота! Веселая мини-игра про копание блоков и сбор бонусов.">
+    <meta property="og:image" content="https://gritsenko.biz/kopalov/og.jpg">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://gritsenko.biz/kopalov">
+    <meta property="twitter:title" content="Nikolay Kopalov">
+    <meta property="twitter:description" content="Помоги Николаю добыть 1000 золота! Веселая мини-игра про копание блоков и сбор бонусов.">
+    <meta property="twitter:image" content="https://gritsenko.biz/kopalov/og.jpg">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #87CEEB; /* Небо */
+            font-family: 'Press Start 2P', cursive;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #FFD700;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 4px solid #555;
+            z-index: 10;
+            font-size: 16px;
+            box-shadow: 0 4px 0 #222;
+            transition: transform 0.1s;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .score-pop {
+            transform: translateX(-50%) scale(1.2) !important;
+        }
+
+        /* Экран победы */
+        #winScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            color: white;
+            text-align: center;
+        }
+
+        #winScreen.active {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        #winScreen h1 {
+            color: #FFD700;
+            text-shadow: 3px 3px 0 #b8860b;
+            margin-bottom: 20px;
+            font-size: 32px;
+            line-height: 1.5;
+            padding: 0 20px;
+        }
+
+        #winScreen p {
+            font-size: 14px;
+            color: #ccc;
+            margin-bottom: 30px;
+        }
+
+        .cake-container {
+            font-size: 120px;
+            animation: bounce 2s infinite ease-in-out;
+            margin-bottom: 30px;
+            filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.5));
+        }
+
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-family: inherit;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #2E7D32;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #2E7D32;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            text-align: center;
+            pointer-events: none;
+            text-shadow: 2px 2px 0 #000;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">Золото: <span id="scoreVal">0</span> / 1000</div>
+    <div id="controls-hint">Жми и держи, чтобы лететь и копать!</div>
+    
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="winScreen">
+        <div class="cake-container">🎂</div>
+        <h1>С Днем Рождения,<br>Николай Копалов!</h1>
+        <p>Ты собрал все золото и прошел игру!</p>
+        <button class="btn" onclick="location.reload()">Играть снова</button>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const uiScore = document.getElementById('scoreVal');
+    const uiContainer = document.getElementById('ui');
+    const winScreen = document.getElementById('winScreen');
+
+    let width, height;
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Настройки игры (Удвоенный масштаб)
+    const BLOCK_SIZE = 100; // Было 50
+    const WORLD_W = 60; // ширина мира в блоках
+    const WORLD_H = 150; // глубина мира
+    const GOAL_SCORE = 1000;
+    
+    let score = 0;
+    let camera = { x: 0, y: 0 };
+    let isPointerDown = false;
+    let pointerPos = { x: 0, y: 0 };
+    let gameState = 'playing';
+
+    // Ввод
+    function handlePointerDown(e) {
+        if(gameState !== 'playing') return;
+        isPointerDown = true;
+        updatePointerPos(e);
+    }
+    function handlePointerUp(e) {
+        isPointerDown = false;
+    }
+    function handlePointerMove(e) {
+        if(isPointerDown) updatePointerPos(e);
+    }
+    function updatePointerPos(e) {
+        let clientX = e.clientX;
+        let clientY = e.clientY;
+        if(e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        }
+        pointerPos.x = clientX;
+        pointerPos.y = clientY;
+    }
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('touchstart', handlePointerDown, {passive: false});
+    window.addEventListener('touchend', handlePointerUp, {passive: false});
+    window.addEventListener('touchmove', handlePointerMove, {passive: false});
+
+    // Типы блоков
+    const BLOCK_TYPES = {
+        AIR: 0,
+        GRASS: 1,
+        DIRT: 2,
+        STONE: 3,
+        COAL: 4,
+        GOLD: 5,
+        DIAMOND: 6,
+        BEDROCK: 7
+    };
+
+    const BLOCK_DEF = {
+        [BLOCK_TYPES.GRASS]: { color: '#4CAF50', hp: 1, value: 0 },
+        [BLOCK_TYPES.DIRT]: { color: '#795548', hp: 2, value: 1, emojis: ['🪱', '🌱'] },
+        [BLOCK_TYPES.STONE]: { color: '#9E9E9E', hp: 4, value: 2, emojis: ['🪨'] },
+        [BLOCK_TYPES.COAL]: { color: '#212121', hp: 5, value: 10, emojis: ['🔥', '⬛'] },
+        [BLOCK_TYPES.GOLD]: { color: '#FFD700', hp: 8, value: 50, emojis: ['💰', '🪙', '🏆'] },
+        [BLOCK_TYPES.DIAMOND]: { color: '#00FFFF', hp: 12, value: 150, emojis: ['💎', '👑'] },
+        [BLOCK_TYPES.BEDROCK]: { color: '#111111', hp: 9999, value: 0 }
+    };
+
+    let world = [];
+
+    function generateWorld() {
+        for (let y = 0; y < WORLD_H; y++) {
+            world[y] = [];
+            for (let x = 0; x < WORLD_W; x++) {
+                if (x === 0 || x === WORLD_W - 1 || y === WORLD_H - 1) {
+                    world[y][x] = { type: BLOCK_TYPES.BEDROCK, hp: BLOCK_DEF[BLOCK_TYPES.BEDROCK].hp };
+                    continue;
+                }
+
+                if (y < 5) {
+                    world[y][x] = { type: BLOCK_TYPES.AIR, hp: 0 };
+                } else if (y === 5) {
+                    world[y][x] = { type: BLOCK_TYPES.GRASS, hp: BLOCK_DEF[BLOCK_TYPES.GRASS].hp };
+                } else {
+                    let type = BLOCK_TYPES.DIRT;
+                    let rand = Math.random();
+                    let depthFactor = y / WORLD_H;
+                    
+                    if (y > 10) {
+                        if (rand < 0.02 + depthFactor * 0.05) type = BLOCK_TYPES.DIAMOND;
+                        else if (rand < 0.07 + depthFactor * 0.1) type = BLOCK_TYPES.GOLD;
+                        else if (rand < 0.15 + depthFactor * 0.15) type = BLOCK_TYPES.COAL;
+                        else if (rand < 0.3 + depthFactor * 0.5) type = BLOCK_TYPES.STONE;
+                    }
+
+                    world[y][x] = { 
+                        type: type, 
+                        hp: BLOCK_DEF[type].hp,
+                        maxHp: BLOCK_DEF[type].hp
+                    };
+                }
+            }
+        }
+    }
+
+    // Игрок Николай Копалов (Удвоенный размер)
+    const player = {
+        x: (WORLD_W / 2) * BLOCK_SIZE,
+        y: 2 * BLOCK_SIZE,
+        w: 60, // Было 30
+        h: 80, // Было 40
+        vx: 0,
+        vy: 0,
+        speed: 1.6, // Ускорено в 2 раза
+        friction: 0.85,
+        gravity: 0.8, // Ускорено в 2 раза
+        miningTarget: null,
+        mineTimer: 0,
+        mineInterval: 15,
+        pickaxeAngle: 0,
+        facingRight: true
+    };
+
+    let particles = [];
+    let lootParticles = [];
+    let smokeParticles = [];
+
+    function addSparks(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 20,
+                vy: (Math.random() - 0.5) * 20 - 4,
+                size: Math.random() * 8 + 4,
+                color: color,
+                life: 1,
+                decay: Math.random() * 0.03 + 0.02
+            });
+        }
+    }
+
+    function addBlockDebris(cx, cy, color) {
+        for (let i = 0; i < 8; i++) {
+            particles.push({
+                x: cx + (Math.random() - 0.5) * BLOCK_SIZE,
+                y: cy + (Math.random() - 0.5) * BLOCK_SIZE,
+                vx: (Math.random() - 0.5) * 12,
+                vy: (Math.random() - 0.5) * 12 - 6,
+                size: Math.random() * 20 + 10,
+                color: color,
+                life: 1,
+                decay: 0.02,
+                isDebris: true
+            });
+        }
+    }
+
+    function spawnLoot(x, y, typeInfo) {
+        let emojis = typeInfo.emojis || ['✨'];
+        let emoji = emojis[Math.floor(Math.random() * emojis.length)];
+        let amount = typeInfo.value;
+
+        if (amount <= 0) return;
+
+        lootParticles.push({
+            x: x, y: y,
+            worldX: x, worldY: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: -10 - Math.random() * 5,
+            emoji: emoji,
+            amount: amount,
+            life: 0 
+        });
+    }
+
+    function getBlock(bx, by) {
+        if (bx < 0 || bx >= WORLD_W || by < 0 || by >= WORLD_H) return null;
+        return world[by][bx];
+    }
+
+    function updatePhysics() {
+        if(gameState !== 'playing') return;
+
+        // Генерация дыма из трубы домика
+        if (Math.random() < 0.2) {
+            let houseX = (WORLD_W / 2 - 4) * BLOCK_SIZE;
+            let houseY = 5 * BLOCK_SIZE;
+            smokeParticles.push({
+                x: houseX + 220 + (Math.random() * 10 - 5),
+                y: houseY - 300,
+                vx: Math.random() * 2 + 1, // Ветер вправо
+                vy: -(Math.random() * 2 + 2),
+                life: 1,
+                size: Math.random() * 15 + 10
+            });
+        }
+
+        // Обновление дыма
+        for (let i = smokeParticles.length - 1; i >= 0; i--) {
+            let p = smokeParticles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.size += 0.5;
+            p.life -= 0.005;
+            if (p.life <= 0) smokeParticles.splice(i, 1);
+        }
+
+        let targetWorldX = pointerPos.x + camera.x;
+        let targetWorldY = pointerPos.y + camera.y;
+
+        player.miningTarget = null;
+        let movingToCursor = false;
+
+        if (isPointerDown) {
+            let dx = targetWorldX - (player.x + player.w / 2);
+            let dy = targetWorldY - (player.y + player.h / 2);
+            let dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dx > 0) player.facingRight = true;
+            if (dx < 0) player.facingRight = false;
+
+            if (dist > 10) {
+                player.vx += (dx / dist) * player.speed;
+                player.vy += (dy / dist) * player.speed;
+                movingToCursor = true;
+            }
+            
+            let tBx = Math.floor(targetWorldX / BLOCK_SIZE);
+            let tBy = Math.floor(targetWorldY / BLOCK_SIZE);
+            let b = getBlock(tBx, tBy);
+            
+            if (b && b.type !== BLOCK_TYPES.AIR && b.type !== BLOCK_TYPES.BEDROCK) {
+                let bcx = tBx * BLOCK_SIZE + BLOCK_SIZE/2;
+                let bcy = tBy * BLOCK_SIZE + BLOCK_SIZE/2;
+                let bdist = Math.sqrt(Math.pow(bcx - (player.x+player.w/2), 2) + Math.pow(bcy - (player.y+player.h/2), 2));
+                
+                if (bdist < BLOCK_SIZE * 1.8) {
+                    player.miningTarget = { x: tBx, y: tBy, block: b };
+                    player.vx *= 0.5; 
+                    player.vy *= 0.5;
+                }
+            }
+        }
+
+        if (!movingToCursor) {
+            player.vy += player.gravity;
+        }
+
+        player.vx *= player.friction;
+        player.vy *= player.friction;
+
+        player.x += player.vx;
+        checkCollision('x');
+        player.y += player.vy;
+        checkCollision('y');
+
+        if (player.miningTarget && isPointerDown) {
+            player.mineTimer++;
+            player.pickaxeAngle = Math.sin(player.mineTimer * 0.5) * 1.5;
+
+            if (player.mineTimer >= player.mineInterval) {
+                player.mineTimer = 0;
+                let t = player.miningTarget;
+                
+                if (t.block.hp > 0) {
+                    t.block.hp--;
+                    
+                    let bcx = t.x * BLOCK_SIZE + BLOCK_SIZE/2;
+                    let bcy = t.y * BLOCK_SIZE + BLOCK_SIZE/2;
+                    addSparks(bcx, bcy, '#FFF', 5);
+
+                    camera.x += (Math.random() - 0.5) * 8;
+                    camera.y += (Math.random() - 0.5) * 8;
+
+                    if (t.block.hp <= 0) {
+                        let bDef = BLOCK_DEF[t.block.type];
+                        addBlockDebris(bcx, bcy, bDef.color);
+                        spawnLoot(bcx, bcy, bDef);
+                        t.block.type = BLOCK_TYPES.AIR;
+                        player.miningTarget = null;
+                    }
+                }
+            }
+        } else {
+            player.mineTimer = 0;
+            player.pickaxeAngle += (0 - player.pickaxeAngle) * 0.2;
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            if (p.isDebris) p.vy += 0.6; 
+            p.life -= p.decay;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // Центр UI счетчика
+        let targetUIX = camera.x + width / 2;
+        let targetUIY = camera.y + 30;
+        
+        for (let i = lootParticles.length - 1; i >= 0; i--) {
+            let lp = lootParticles[i];
+            
+            if(lp.life < 60) {
+                lp.worldX += lp.vx;
+                lp.worldY += lp.vy;
+                lp.vy += 0.5; // Гравитация лута
+                lp.life++;
+            } else {
+                let ldx = targetUIX - lp.worldX;
+                let ldy = targetUIY - lp.worldY;
+                let dist = Math.sqrt(ldx*ldx + ldy*ldy);
+                
+                lp.worldX += (ldx / dist) * 15;
+                lp.worldY += (ldy / dist) * 15;
+
+                if (dist < 40) {
+                    addScore(lp.amount);
+                    lootParticles.splice(i, 1);
+                }
+            }
+        }
+
+        let targetCamX = player.x + player.w/2 - width/2;
+        let targetCamY = player.y + player.h/2 - height/2;
+        
+        targetCamX = Math.max(0, Math.min(targetCamX, WORLD_W * BLOCK_SIZE - width));
+        targetCamY = Math.max(0, Math.min(targetCamY, WORLD_H * BLOCK_SIZE - height));
+
+        camera.x += (targetCamX - camera.x) * 0.1;
+        camera.y += (targetCamY - camera.y) * 0.1;
+    }
+
+    function checkCollision(axis) {
+        let bx1 = Math.floor(player.x / BLOCK_SIZE);
+        let bx2 = Math.floor((player.x + player.w) / BLOCK_SIZE);
+        let by1 = Math.floor(player.y / BLOCK_SIZE);
+        let by2 = Math.floor((player.y + player.h) / BLOCK_SIZE);
+
+        for (let y = by1; y <= by2; y++) {
+            for (let x = bx1; x <= bx2; x++) {
+                let b = getBlock(x, y);
+                if (b && b.type !== BLOCK_TYPES.AIR) {
+                    if (axis === 'x') {
+                        if (player.vx > 0) player.x = x * BLOCK_SIZE - player.w - 0.1;
+                        else if (player.vx < 0) player.x = (x + 1) * BLOCK_SIZE + 0.1;
+                        player.vx = 0;
+                        
+                        if(isPointerDown && !player.miningTarget) {
+                            player.miningTarget = {x: x, y: y, block: b};
+                        }
+                    } else {
+                        if (player.vy > 0) player.y = y * BLOCK_SIZE - player.h - 0.1;
+                        else if (player.vy < 0) player.y = (y + 1) * BLOCK_SIZE + 0.1;
+                        player.vy = 0;
+                        
+                        if(isPointerDown && !player.miningTarget && player.vy < 0) {
+                            player.miningTarget = {x: x, y: y, block: b};
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function addScore(amount) {
+        score += amount;
+        uiScore.innerText = score;
+        
+        uiContainer.classList.remove('score-pop');
+        void uiContainer.offsetWidth; 
+        uiContainer.classList.add('score-pop');
+
+        if (score >= GOAL_SCORE && gameState !== 'win') {
+            gameState = 'win';
+            setTimeout(() => {
+                winScreen.classList.add('active');
+            }, 500);
+        }
+    }
+
+    function drawSurfaceDecorations() {
+        let houseX = (WORLD_W / 2 - 4) * BLOCK_SIZE;
+        let houseY = 5 * BLOCK_SIZE; // Уровень земли (низ домика)
+        
+        // Тело дома
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(houseX, houseY - 200, 260, 200);
+        
+        // Крыша
+        ctx.fillStyle = '#A52A2A';
+        ctx.beginPath();
+        ctx.moveTo(houseX - 30, houseY - 200);
+        ctx.lineTo(houseX + 130, houseY - 320);
+        ctx.lineTo(houseX + 290, houseY - 200);
+        ctx.fill();
+        
+        // Дверь
+        ctx.fillStyle = '#5C4033';
+        ctx.fillRect(houseX + 40, houseY - 120, 60, 120);
+        
+        // Окно
+        ctx.fillStyle = '#87CEFA';
+        ctx.fillRect(houseX + 150, houseY - 140, 70, 70);
+        ctx.strokeStyle = '#5C4033';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(houseX + 150, houseY - 140, 70, 70);
+        ctx.beginPath();
+        ctx.moveTo(houseX + 185, houseY - 140);
+        ctx.lineTo(houseX + 185, houseY - 70);
+        ctx.moveTo(houseX + 150, houseY - 105);
+        ctx.lineTo(houseX + 220, houseY - 105);
+        ctx.stroke();
+
+        // Труба
+        ctx.fillStyle = '#696969';
+        ctx.fillRect(houseX + 200, houseY - 300, 40, 80);
+
+        // Табличка "Хата Копалова"
+        let signX = houseX + 340;
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(signX, houseY - 80, 12, 80); // Столбик
+        ctx.fillStyle = '#DEB887';
+        ctx.fillRect(signX - 70, houseY - 150, 220, 70); // Доска
+        ctx.strokeStyle = '#5C4033';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(signX - 70, houseY - 150, 220, 70);
+        
+        ctx.fillStyle = '#3E2723';
+        ctx.font = '14px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText("Хата", signX + 40, houseY - 125);
+        ctx.fillText("Копалова", signX + 40, houseY - 100);
+    }
+
+    function draw() {
+        // Рисуем Небо
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+
+        // Темный фон земли (за пределами неба)
+        let horizonY = 5 * BLOCK_SIZE;
+        ctx.fillStyle = '#3e2723'; 
+        ctx.fillRect(0, horizonY, WORLD_W * BLOCK_SIZE, WORLD_H * BLOCK_SIZE - horizonY);
+
+        // Рисуем домик и табличку на поверхности
+        drawSurfaceDecorations();
+
+        // Рисуем дым от домика
+        for (let p of smokeParticles) {
+            ctx.fillStyle = `rgba(180, 180, 180, ${p.life * 0.4})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Рисуем блоки
+        let startCol = Math.floor(camera.x / BLOCK_SIZE);
+        let endCol = startCol + Math.floor(width / BLOCK_SIZE) + 2;
+        let startRow = Math.floor(camera.y / BLOCK_SIZE);
+        let endRow = startRow + Math.floor(height / BLOCK_SIZE) + 2;
+
+        startCol = Math.max(0, startCol);
+        endCol = Math.min(WORLD_W, endCol);
+        startRow = Math.max(0, startRow);
+        endRow = Math.min(WORLD_H, endRow);
+
+        for (let y = startRow; y < endRow; y++) {
+            for (let x = startCol; x < endCol; x++) {
+                let b = world[y][x];
+                if (b.type !== BLOCK_TYPES.AIR) {
+                    let bDef = BLOCK_DEF[b.type];
+                    let px = x * BLOCK_SIZE;
+                    let py = y * BLOCK_SIZE;
+
+                    ctx.fillStyle = bDef.color;
+                    ctx.fillRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+                    
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(px, py, BLOCK_SIZE, BLOCK_SIZE);
+
+                    if(b.hp < b.maxHp) {
+                        ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+                        ctx.beginPath();
+                        ctx.moveTo(px + 20, py + 20);
+                        ctx.lineTo(px + BLOCK_SIZE/2, py + BLOCK_SIZE/2);
+                        ctx.lineTo(px + BLOCK_SIZE - 20, py + BLOCK_SIZE/2 + 20);
+                        ctx.stroke();
+
+                        // HP бар блока
+                        let hpPercent = Math.max(0, b.hp / b.maxHp);
+                        let barW = BLOCK_SIZE * 0.6;
+                        let barH = 8;
+                        let barX = px + (BLOCK_SIZE - barW) / 2;
+                        let barY = py - 15;
+                        
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(barX, barY, barW, barH);
+                        
+                        ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : (hpPercent > 0.25 ? '#f1c40f' : '#e74c3c');
+                        ctx.fillRect(barX, barY, barW * hpPercent, barH);
+                        
+                        ctx.strokeStyle = '#000';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(barX, barY, barW, barH);
+                    }
+                }
+            }
+        }
+
+        if (player.miningTarget) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(player.miningTarget.x * BLOCK_SIZE, player.miningTarget.y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        }
+
+        drawPlayer();
+
+        for (let p of particles) {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        }
+        ctx.globalAlpha = 1;
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let lp of lootParticles) {
+            ctx.font = '48px Arial'; // Крупные эмоджи
+            ctx.fillText(lp.emoji, lp.worldX, lp.worldY);
+            ctx.fillStyle = '#FFD700';
+            ctx.font = '16px "Press Start 2P"';
+            ctx.fillText('+' + lp.amount, lp.worldX, lp.worldY - 30);
+        }
+
+        ctx.restore();
+    }
+
+    function drawPlayer() {
+        let cx = player.x + player.w / 2;
+        let cy = player.y + player.h / 2;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        
+        // Имя Kopalov над героем (до масштабирования, чтобы текст оставался четким и не зеркалился)
+        ctx.fillStyle = 'white';
+        ctx.font = '14px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 4;
+        ctx.fillText("KOPALOV", 0, -110);
+        ctx.shadowBlur = 0; // сброс тени
+
+        if (!player.facingRight) ctx.scale(-1, 1);
+        
+        // Внутренний масштаб в 2 раза
+        ctx.scale(2, 2); 
+        ctx.translate(-15, -20); // Центрирование относительно w=30, h=40
+
+        // Тело (комбинезон)
+        ctx.fillStyle = '#2980b9'; 
+        ctx.fillRect(5, 20, 20, 20);
+
+        // Увеличенная Голова
+        ctx.fillStyle = '#f1c40f'; // Кожа
+        ctx.fillRect(-2, -10, 34, 30); // Сделал голову шире и выше
+
+        // Борода (Темная как на фото)
+        ctx.fillStyle = '#1c1e21';
+        ctx.beginPath();
+        ctx.moveTo(-4, 8);
+        ctx.lineTo(34, 8);
+        ctx.lineTo(25, 25);
+        ctx.lineTo(5, 25);
+        ctx.fill();
+
+        // Радостная улыбка при копании
+        if (player.miningTarget) {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(15, 12, 6, 0, Math.PI);
+            ctx.fill();
+        }
+
+        // Очки (Синяя оправа как на фото)
+        ctx.fillStyle = '#1A365D'; 
+        ctx.fillRect(2, -2, 10, 6); // Левая оправа
+        ctx.fillRect(18, -2, 10, 6); // Правая оправа
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; // Стекла
+        ctx.fillRect(3, -1, 8, 4);
+        ctx.fillRect(19, -1, 8, 4);
+        // Перемычка
+        ctx.fillStyle = '#1A365D';
+        ctx.fillRect(12, 0, 6, 2);
+        
+        // Зрачки
+        ctx.fillStyle = 'black';
+        ctx.fillRect(6, 0, 2, 2);
+        ctx.fillRect(22, 0, 2, 2);
+
+        // Каска
+        ctx.fillStyle = '#e67e22'; 
+        ctx.beginPath();
+        ctx.arc(15, -10, 16, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = '#f1c40f'; // Фонарик
+        ctx.fillRect(26, -18, 6, 6);
+
+        // Рука с киркой
+        ctx.save();
+        ctx.translate(15, 22); // Плечо
+        
+        let pAngle = player.pickaxeAngle;
+        if (player.miningTarget) {
+             let tx = player.miningTarget.x * BLOCK_SIZE + BLOCK_SIZE/2;
+             let ty = player.miningTarget.y * BLOCK_SIZE + BLOCK_SIZE/2;
+             
+             let relX = tx - cx;
+             let relY = ty - cy;
+             if (!player.facingRight) relX = -relX;
+
+             let baseAngle = Math.atan2(relY, relX);
+             ctx.rotate(baseAngle + pAngle - Math.PI/4); 
+        } else {
+             ctx.rotate(Math.PI/4 + (Math.sin(Date.now()/200)*0.1)); 
+        }
+
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(-4, -4, 25, 8); // Рука
+
+        ctx.fillStyle = '#7f8c8d';
+        ctx.fillRect(15, -20, 6, 40); // Рукоятка
+        
+        ctx.fillStyle = '#bdc3c7';
+        ctx.beginPath(); // Лезвие
+        ctx.moveTo(18, -25);
+        ctx.quadraticCurveTo(35, -20, 40, -5);
+        ctx.quadraticCurveTo(18, -15, -4, -5);
+        ctx.quadraticCurveTo(1, -20, 18, -25);
+        ctx.fill();
+
+        ctx.restore(); // Конец руки
+
+        // Джетпак огонек 
+        if (isPointerDown && player.vy < 0) {
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(10, 45, Math.random()*5 + 3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(10, 45, Math.random()*3 + 1, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.restore(); // Конец игрока
+    }
+
+    function loop() {
+        updatePhysics();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    generateWorld();
+    loop();
+
+</script>
+</body>
+</html>

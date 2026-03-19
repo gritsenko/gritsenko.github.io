@@ -14,8 +14,9 @@
     "generate-enhanced": "node generate-enhanced.js",
     "batch-generate": "node batch-generate.js",
     "generate-og": "node og-integration.js generate-og",
-  "build-og-cache": "node og-integration.js bulk-og 1 50",
-  "build-quote-pages": "node statham/scripts/build-quote-pages.js"
+    "build-og-cache": "node og-integration.js bulk-og 1 50",
+    "build-quote-pages": "node statham/scripts/build-quote-pages.js",
+    "inject-metrika": "node inject-metrika.js"
   },
   "keywords": [],
   "author": "",

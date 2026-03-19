@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Idea Generator - Абсурдные Стартапы</title>
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://startup-gen.example.com/">
+    <meta property="og:title" content="AI Idea Generator - Абсурдные Стартапы">
+    <meta property="og:description" content="Генерируйте безумные идеи для ИИ-сервисов в один клик. Идеально для фальшивых питчей и поиска вдохновения в абсурде.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=1200&h=630">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://startup-gen.example.com/">
+    <meta property="twitter:title" content="AI Idea Generator - Абсурдные Стартапы">
+    <meta property="twitter:description" content="Генерируйте безумные идеи для ИИ-сервисов в один клик. Идеально для фальшивых питчей и поиска вдохновения в абсурде.">
+    <meta property="twitter:image" content="https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=1200&h=630">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #1e1b4b, #000);
+            min-height: 100vh;
+            color: white;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px rgba(255, 255, 255, 0.1) solid;
+        }
+        .generate-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .generate-btn:active {
+            transform: scale(0.95);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="max-w-2xl w-full space-y-8 text-center">
+        <!-- Header -->
+        <header class="space-y-2">
+            <h1 class="text-5xl md:text-6xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                STARTUP <span class="text-white">GEN</span>
+            </h1>
+            <p class="text-gray-400 text-lg">Генератор невероятно «полезных» сервисов на базе ИИ</p>
+        </header>
+
+        <!-- Result Card -->
+        <div id="result-container" class="glass rounded-3xl p-8 md:p-12 min-h-[300px] flex flex-col justify-center items-center relative overflow-hidden">
+            <div id="empty-state" class="space-y-4">
+                <div class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <p class="text-gray-500 italic text-sm">Нажмите кнопку, чтобы получить инвестиции в размере 0$</p>
+            </div>
+
+            <div id="idea-display" class="hidden space-y-6 fade-in">
+                <div class="inline-block px-4 py-1 rounded-full bg-purple-500/20 text-purple-300 text-sm font-semibold tracking-wide uppercase">
+                    Идея на миллион
+                </div>
+                <h2 id="startup-name" class="text-4xl md:text-5xl font-bold text-white leading-tight"></h2>
+                <p id="startup-desc" class="text-xl text-gray-300 leading-relaxed"></p>
+                
+                <div class="pt-6 flex justify-center gap-4">
+                    <button onclick="copyToClipboard()" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        Копировать питч
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col items-center gap-4">
+            <button id="generate-btn" class="generate-btn w-full md:w-auto px-12 py-5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-2xl font-bold text-xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-3">
+                <span>СГЕНЕРИРОВАТЬ ЕЩЕ</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
+            <p class="text-xs text-gray-600 uppercase tracking-widest">Powered by Synthetic Absurdity</p>
+        </div>
+    </div>
+
+    <!-- Notification toast -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full font-bold shadow-2xl opacity-0 transition-opacity pointer-events-none">
+        Питч готов к отправке инвесторам!
+    </div>
+
+    <script>
+        const nouns = [
+            "Табурет", "Вареник", "Шлагбаум", "Крыжовник", "Бутерброд", "Пылесос", "Кирпич", "Подстаканник",
+            "Одуванчик", "Чебурек", "Ламинат", "Борщ", "Кипятильник", "Носок", "Степлер", "Дуршлаг",
+            "Шифоньер", "Кактус", "Батон", "Вентилятор", "Миксер", "Сапог", "Гвоздь", "Творог",
+            "Веник", "Пельмень", "Баклажан", "Кабачок", "Утюг", "Хомяк", "Шнурок", "Огурец",
+            "Ершик", "Лапоть", "Самовар", "Плинтус", "Бигуди", "Дырокол", "Фумигатор", "Подштанник",
+            "Кисель", "Форточка", "Блин", "Штопор", "Лопух", "Валенок", "Кефир", "Овощевоз",
+            "Кирзач", "Корыто", "Шпингалет", "Ухват", "Кочерга", "Авоська", "Балалайка", "Пряник",
+            "Кукиш", "Тазик", "Фуфайка", "Ватник", "Килограмм", "Гречка", "Макарошка", "Свекла",
+            "Укроп", "Селедка", "Редиска", "Капуста", "Шланг", "Ведро", "Грабли", "Лопата",
+            "Молоток", "Топор", "Отвертка", "Дрель", "Сверло", "Гаечный ключ", "Болт", "Гайка",
+            "Шайба", "Заклепка", "Скрепка", "Ластик", "Циркуль", "Линейка", "Пенал", "Ранец",
+            "Портфель", "Саквояж", "Чемодан", "Рюкзак", "Баул", "Котомка", "Сундук", "Шкатулка",
+            "Ступа", "Метла", "Веник", "Совок", "Ветошь", "Тряпка", "Мочалка", "Мыло",
+            "Шампунь", "Гребень", "Расческа", "Зеркальце", "Пудреница", "Помада", "Тушь", "Лак",
+            "Пинцет", "Ножницы", "Иголка", "Нитка", "Пуговица", "Молния", "Кнопка", "Шпилька",
+            "Заколка", "Ободок", "Браслет", "Кулон", "Перстень", "Серьга", "Брошь", "Запонка"
+        ];
+
+        const descriptions = [
+            "Первая в мире нейросеть, которая предсказывает депрессию у комнатных растений и заказывает им психолога.",
+            "Система анализирует тембр вашего храпа и автоматически переводит его в биткоины на благотворительность.",
+            "Революционный алгоритм, который подбирает идеальный цвет носков под текущий курс акций Газпрома.",
+            "Облачный сервис для общения с бывшими вещами. Узнайте, почему ваш старый свитер вас бросил.",
+            "ИИ-ассистент, который спорит с вашей бабушкой в WhatsApp, чтобы у вас было свободное время.",
+            "Децентрализованная платформа для обмена неиспользованными минутами тишины в библиотеке.",
+            "Умная система распознавания лиц для голубей. Кормите только тех, кто ведет себя прилично.",
+            "Генеративный интеллект, превращающий ваши ошибки в жизни в красивые NFT-картины в стиле кубизма.",
+            "Нейронный фильтр для реальности, который заменяет всех неприятных людей на видео со шпицами.",
+            "Блокчейн-стартап, позволяющий арендовать чужую совесть на выходные за небольшую плату.",
+            "Сервис, который автоматически пишет оправдания вашему начальнику, используя цитаты из Пауло Коэльо.",
+            "ИИ, который по форме ваших утренних мюслей определяет, в какой город вам стоит переехать.",
+            "Инновационная платформа для тиндеринга среди домашних пылесосов. Найдите пару своему роботу.",
+            "Алгоритм, вычисляющий вероятность того, что вы забыли выключить утюг, на основе ваших лайков в соцсетях.",
+            "Метавселенная для домашних тараканов, где они могут строить карьеру и не мешать вам жить.",
+            "ИИ-сомелье для водопроводной воды: определяет год урожая труб и послевкусие ржавчины.",
+            "Платформа для токенизации ваших несбывшихся мечтаний. Продайте свой потенциал инвесторам из Кремниевой долины.",
+            "Сервис предиктивной аналитики для поиска второго носка. Экономит до 40 лет жизни среднего пользователя.",
+            "Нейросеть, которая переводит лай собак на латынь для более пафосных прогулок.",
+            "Квантовый алгоритм для выбора самой быстрой очереди в супермаркете. Работает с погрешностью в 150%.",
+            "Приложение, которое накладывает фильтр успешного успеха на ваши счета за ЖКХ.",
+            "ИИ-тренер по осознанному лежанию на диване. Отслеживает качество прокрастинации в реальном времени.",
+            "Система распознавания «не тех» людей на вечеринках. Автоматически включает режим «я занят телефоном».",
+            "Умный ошейник для котов, который транслирует их презрение к вам прямо в Twitter (X).",
+            "Платформа для коллективных медитаций на растущий курс доллара через Zoom.",
+            "ИИ-инструмент для автоматического превращения ваших рабочих писем в пассивно-агрессивные шедевры.",
+            "Генератор случайных оправданий для пропуска спортзала на основе фаз Луны и настроения Сатурна.",
+            "Бот, который заменяет вас на скучных созвонах с помощью Deepfake и случайных фраз «Да, это имеет смысл».",
+            "Нейросеть, предсказывающая, когда закончится туалетная бумага, и заказывающая дрон-доставку.",
+            "Сервис для аренды виртуальных друзей, которые будут лайкать ваши старые несмешные шутки.",
+            "ИИ-фильтр для еды, который делает любую кашу похожей на блюдо из ресторана Michelin в дополненной реальности.",
+            "Платформа для обмена негативной энергией на скидочные купоны в магазины электроники.",
+            "Блокчейн-реестр для записи всех случаев, когда вы были правы в споре с женой/мужем.",
+            "Алгоритм, подбирающий музыку для ваших походов к холодильнику в три часа ночи.",
+            "ИИ-ассистент для поиска глубокого смысла в песнях современной поп-музыки.",
+            "Система дополненной реальности, которая рисует нимб над вашей головой, когда вы делаете что-то хорошее.",
+            "Бот, который генерирует комплименты вашему коту, чтобы тот перестал на вас смотреть как на раба.",
+            "Нейросеть для подбора идеальной формы облаков под ваше текущее настроение.",
+            "Сервис для превращения звуков города в успокаивающий шум прибоя и пение эльфов.",
+            "ИИ-аналитик, который объясняет, почему ваша жизнь идет не по плану, используя графики и диаграммы.",
+            "Умная кормушка для птиц, которая требует от них подписки на ваш канал за каждое зернышко.",
+            "Платформа для продажи ваших снов в качестве сценариев для малобюджетных хорроров.",
+            "ИИ-система для автоматического удаления из вашей ленты всех постов о продуктивности.",
+            "Алгоритм, выбирающий за вас, какой сериал посмотреть, основываясь на уровне вашей усталости.",
+            "Сервис для создания виртуальных алиби на случай, если вы просто не хотите никуда идти.",
+            "ИИ-переводчик с «женского» на «мужской» и обратно с точностью до 0.01%.",
+            "Нейронный стимулятор для поиска смысла жизни в пробках на МКАДе.",
+            "Приложение, которое считает, сколько раз вы вздохнули за день, и выдает медаль «Герой труда».",
+            "ИИ-помощник для выбора самого красивого фильтра для фото вашего завтрака.",
+            "Бот, который пишет стихи в стиле Маяковского про ваши проблемы с интернетом.",
+            "Система оценки качества вашего юмора по шкале от «батя» до «стендап-комик».",
+            "ИИ для генерации бесконечных оправданий, почему вы до сих пор не выучили английский.",
+            "Сервис для поиска собутыльников среди нейросетей. Поговорят о чем угодно и не осудят.",
+            "Алгоритм, предсказывающий идеальный момент для того, чтобы уволиться и уехать на Бали.",
+            "ИИ-фильтр, который делает ваш голос более уверенным во время просьбы о повышении зарплаты.",
+            "Система автоматического заказа пиццы, когда уровень стресса превышает критическую отметку.",
+            "Блокчейн для регистрации обещаний, которые вы дали себе 1 января.",
+            "ИИ-гадание на кофейной гуще, оцифрованное и переведенное в формат смарт-контрактов."
+        ];
+
+        const generateBtn = document.getElementById('generate-btn');
+        const emptyState = document.getElementById('empty-state');
+        const ideaDisplay = document.getElementById('idea-display');
+        const startupName = document.getElementById('startup-name');
+        const startupDesc = document.getElementById('startup-desc');
+        const toast = document.getElementById('toast');
+
+        function generate() {
+            generateBtn.disabled = true;
+            generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+            const randomDesc = descriptions[Math.floor(Math.random() * descriptions.length)];
+            const name = `${randomNoun} ИИ`;
+
+            emptyState.classList.add('hidden');
+            ideaDisplay.classList.remove('hidden');
+            
+            ideaDisplay.classList.remove('fade-in');
+            void ideaDisplay.offsetWidth; 
+            ideaDisplay.classList.add('fade-in');
+
+            startupName.innerText = name;
+            startupDesc.innerText = randomDesc;
+
+            setTimeout(() => {
+                generateBtn.disabled = false;
+                generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }, 500);
+        }
+
+        function copyToClipboard() {
+            const text = `🚀 Идея стартапа: ${startupName.innerText}\n📝 Описание: ${startupDesc.innerText}\n\nСгенерировано в Startup Gen`;
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 2500);
+        }
+
+        generateBtn.addEventListener('click', generate);
+    </script>
+</body>
+</html>

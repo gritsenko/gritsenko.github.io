@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пилим Трём: Чайный Крафт</title>
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://gritsenko.biz/tests/pilimtrem/">
+    <meta property="og:title" content="Пилим Трём: Чайный Крафт">
+    <meta property="og:description" content="Симулятор заваривания идеального чая для подкаста.">
+    <meta property="og:image" content="https://gritsenko.biz/tests/pilimtrem/coverOg.jpg">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://gritsenko.biz/tests/pilimtrem/">
+    <meta property="twitter:title" content="Пилим Трём: Чайный Крафт">
+    <meta property="twitter:description" content="Симулятор заваривания идеального чая для подкаста.">
+    <meta property="twitter:image" content="https://gritsenko.biz/tests/pilimtrem/coverOg.jpg">
+    
+    <!-- Подключаем Tailwind CSS для стилей -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Карта импортов: объясняет браузеру, откуда скачивать библиотеки, когда game.js просит 'react' или 'lucide-react' -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.263.1"
+        }
+    }
+    </script>
+    
+    <style>
+        /* Немного базовых стилей для красивой загрузки */
+        body { margin: 0; background-color: #1a0b2e; color: white; }
+        #root { min-height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; color: #8b5cf6;">
+            Завариваем компоненты... (Загрузка)
+        </div>
+    </div>
+
+    <!-- Точка входа: импортируем React и вашу игру, затем рендерим её -->
+    <script type="module">
+        import React from 'react';
+        import { createRoot } from 'react-dom/client';
+        import App from './game.js';
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>

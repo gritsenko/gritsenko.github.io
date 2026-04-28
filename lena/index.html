@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lena vs Claws — Цветочки и Крабы</title>
+    <meta name="description" content="Сможет ли Лена одолеть орду когтей? Аркадная битва — собирай цветочки, отстреливайся от крабов.">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Lena vs Claws">
+    <meta property="og:title" content="Lena vs Claws">
+    <meta property="og:description" content="Сможет ли она одолеть орду когтей? Аркадная битва — собирай цветочки, отстреливайся от крабов.">
+    <meta property="og:url" content="https://gritsenko.biz/lena/">
+    <meta property="og:image" content="https://gritsenko.biz/lena/cover.jpg">
+    <meta property="og:image:width" content="768">
+    <meta property="og:image:height" content="402">
+    <meta property="og:image:alt" content="Lena vs Claws — постер игры">
+    <meta property="og:locale" content="ru_RU">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Lena vs Claws">
+    <meta name="twitter:description" content="Сможет ли она одолеть орду когтей? Аркадная битва — собирай цветочки, отстреливайся от крабов.">
+    <meta name="twitter:image" content="https://gritsenko.biz/lena/cover.jpg">
+
+    <link rel="canonical" href="https://gritsenko.biz/lena/">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background-color: #64805f;
+            cursor: crosshair;
+        }
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            color: #fff;
+            font-size: 22px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+            user-select: none;
+        }
+        .highlight { color: #ffd166; }
+        .danger    { color: #ef476f; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui">
+            🌼 Цветочки: <span id="score" class="highlight">0</span> &nbsp;&nbsp;&nbsp; 🦀 Крабы: <span id="kills" class="danger">0</span>
+        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+
+<script>
+window.onload = function() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const killsEl = document.getElementById('kills');
+
+    const lenaImg = new Image();
+    lenaImg.src = 'Lena.png';
+
+    // Пре-рендер emoji в offscreen-canvas: гарантирует непрозрачность и корректные тени
+    // (fillText на Canvas в Windows наследует fillStyle и globalAlpha, что портит emoji)
+    function makeEmojiSprite(emoji, fontSize) {
+        const padding = 8;
+        const size = fontSize + padding * 2;
+        const off = document.createElement('canvas');
+        off.width = size;
+        off.height = size;
+        const octx = off.getContext('2d');
+        octx.font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Arial`;
+        octx.textAlign = 'center';
+        octx.textBaseline = 'middle';
+        octx.fillStyle = '#000';
+        octx.globalAlpha = 1.0;
+        octx.fillText(emoji, size / 2, size / 2);
+        return off;
+    }
+    const flowerSprite = makeEmojiSprite('🌼', 30);
+    const crabSprite = makeEmojiSprite('🦀', 36);
+
+    // --- АУДИО (8-bit, Web Audio API) ---
+    let _ac = null;
+    function getAC() {
+        if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+        if (_ac.state === 'suspended') _ac.resume();
+        return _ac;
+    }
+
+    function snd_shot() {
+        const a = getAC(), t = a.currentTime;
+        // Шум дробового выстрела
+        const len = Math.ceil(a.sampleRate * 0.2);
+        const buf = a.createBuffer(1, len, a.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.3);
+        const src = a.createBufferSource(); src.buffer = buf;
+        const g = a.createGain(); g.gain.setValueAtTime(0.7, t);
+        src.connect(g); g.connect(a.destination); src.start(t);
+        // Низкочастотный удар
+        const osc = a.createOscillator(); osc.type = 'square';
+        osc.frequency.setValueAtTime(100, t);
+        osc.frequency.exponentialRampToValueAtTime(20, t + 0.2);
+        const og = a.createGain(); og.gain.setValueAtTime(0.45, t);
+        og.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc.connect(og); og.connect(a.destination);
+        osc.start(t); osc.stop(t + 0.2);
+    }
+
+    function snd_reload() {
+        const a = getAC(), t = a.currentTime;
+        // Два щелчка помпы
+        [0, 0.22].forEach((dt, i) => {
+            const osc = a.createOscillator(); osc.type = 'square';
+            osc.frequency.setValueAtTime(i ? 170 : 260, t + dt);
+            osc.frequency.exponentialRampToValueAtTime(i ? 80 : 120, t + dt + 0.07);
+            const g = a.createGain(); g.gain.setValueAtTime(0.28, t + dt);
+            g.gain.exponentialRampToValueAtTime(0.001, t + dt + 0.09);
+            osc.connect(g); g.connect(a.destination);
+            osc.start(t + dt); osc.stop(t + dt + 0.1);
+        });
+    }
+
+    function snd_hit() {
+        const a = getAC(), t = a.currentTime;
+        const osc = a.createOscillator(); osc.type = 'square';
+        osc.frequency.setValueAtTime(380, t);
+        osc.frequency.exponentialRampToValueAtTime(65, t + 0.13);
+        const g = a.createGain(); g.gain.setValueAtTime(0.38, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+        osc.connect(g); g.connect(a.destination);
+        osc.start(t); osc.stop(t + 0.14);
+    }
+
+    function snd_pickup() {
+        const a = getAC(), t = a.currentTime;
+        [523, 659, 784, 1047].forEach((f, i) => {
+            const osc = a.createOscillator(); osc.type = 'square';
+            osc.frequency.setValueAtTime(f, t + i * 0.07);
+            const g = a.createGain(); g.gain.setValueAtTime(0.22, t + i * 0.07);
+            g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.1);
+            osc.connect(g); g.connect(a.destination);
+            osc.start(t + i * 0.07); osc.stop(t + i * 0.07 + 0.12);
+        });
+    }
+
+    function snd_gameover() {
+        const a = getAC(), t = a.currentTime;
+        // Нисходящая 8-битная мелодия "проигрыша": 4 ноты вниз
+        const notes = [392.00, 329.63, 261.63, 196.00]; // G4 E4 C4 G3
+        notes.forEach((f, i) => {
+            const dt = i * 0.16;
+            const osc = a.createOscillator(); osc.type = 'square';
+            osc.frequency.setValueAtTime(f, t + dt);
+            const g = a.createGain();
+            g.gain.setValueAtTime(0.0001, t + dt);
+            g.gain.exponentialRampToValueAtTime(0.32, t + dt + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, t + dt + 0.18);
+            osc.connect(g); g.connect(a.destination);
+            osc.start(t + dt); osc.stop(t + dt + 0.2);
+        });
+        // Низкочастотный "удар" в конце
+        const osc = a.createOscillator(); osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, t + 0.64);
+        osc.frequency.exponentialRampToValueAtTime(30, t + 1.1);
+        const g = a.createGain();
+        g.gain.setValueAtTime(0.45, t + 0.64);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+        osc.connect(g); g.connect(a.destination);
+        osc.start(t + 0.64); osc.stop(t + 1.12);
+    }
+
+    let _stepParity = 0;
+    function snd_step() {
+        const a = getAC(), t = a.currentTime;
+        const freq = _stepParity++ % 2 === 0 ? 115 : 95;
+        const osc = a.createOscillator(); osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, t);
+        osc.frequency.exponentialRampToValueAtTime(48, t + 0.06);
+        const g = a.createGain(); g.gain.setValueAtTime(0.16, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+        osc.connect(g); g.connect(a.destination);
+        osc.start(t); osc.stop(t + 0.08);
+    }
+
+    // Ввод пользователя
+    const keys = {};
+    let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    canvas.addEventListener('mousemove', e => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mousedown', () => {
+        if (gameOver) {
+            restartGame();
+        } else {
+            player.shoot();
+        }
+    });
+
+    function distance(x1, y1, x2, y2) {
+        return Math.hypot(x2 - x1, y2 - y1);
+    }
+
+    // --- ИГРОВЫЕ ОБЪЕКТЫ ---
+
+    class Player {
+        constructor() {
+            this.x = canvas.width / 2;
+            this.y = canvas.height / 2;
+            this.radius = 18;
+            this.speed = 4.5;
+            this.walkTime = 0;
+            this.moving = false;
+            this.lastStepHalf = 0;
+            this.recoil = 0; // 0..1, затухает каждый кадр
+        }
+        update() {
+            this.moving = false;
+            if ((keys['KeyW'] || keys['ArrowUp'])    && this.y > this.radius)                this.y -= this.speed, this.moving = true;
+            if ((keys['KeyS'] || keys['ArrowDown'])  && this.y < canvas.height - this.radius) this.y += this.speed, this.moving = true;
+            if ((keys['KeyA'] || keys['ArrowLeft'])  && this.x > this.radius)                this.x -= this.speed, this.moving = true;
+            if ((keys['KeyD'] || keys['ArrowRight']) && this.x < canvas.width - this.radius) this.x += this.speed, this.moving = true;
+
+            if (this.moving) {
+                this.walkTime += 0.44;
+                const half = Math.floor(this.walkTime / Math.PI);
+                if (half !== this.lastStepHalf) {
+                    this.lastStepHalf = half;
+                    snd_step();
+                }
+            }
+
+            this.recoil *= 0.72; // отдача затухает
+        }
+        draw() {
+            const angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+            const bob = this.moving ? Math.sin(this.walkTime) * 3 : 0;
+
+            // Спрайт — смотрит в сторону курсора
+            // Тень девочки (круг внизу)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(this.x, this.y + 30, 20, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.save();
+            ctx.translate(this.x, this.y + bob);
+            if (mouse.x > this.x) ctx.scale(-1, 1);
+            ctx.drawImage(lenaImg, -24, -33, 48, 66);
+            ctx.restore();
+
+            // Дробовик — орбита с визуальной отдачей
+            const effectiveOrbit = 40 - this.recoil * 12;
+            const gunX = this.x + Math.cos(angle) * effectiveOrbit;
+            const gunY = this.y + Math.sin(angle) * effectiveOrbit;
+
+            ctx.save();
+            ctx.translate(gunX, gunY);
+            ctx.rotate(angle);
+
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, -5, 32, 10);
+            ctx.fillStyle = '#5c4033';
+            ctx.fillRect(-10, -5, 12, 10);
+            ctx.fillStyle = '#888';
+            ctx.fillRect(8, 1, 12, 6);
+
+            ctx.restore();
+        }
+        shoot() {
+            const angle = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+            const orbitRadius = 40;
+            const gunTipX = this.x + Math.cos(angle) * (orbitRadius + 32);
+            const gunTipY = this.y + Math.sin(angle) * (orbitRadius + 32);
+
+            for (let i = -2.5; i <= 2.5; i++) {
+                projectiles.push(new Projectile(gunTipX, gunTipY, angle + i * 0.12));
+            }
+
+            this.recoil = 1.0;
+            snd_shot();
+            //setTimeout(snd_reload, 280);
+        }
+    }
+
+    class Flower {
+        constructor() {
+            this.radius = 15;
+            this.spawn();
+        }
+        spawn() {
+            // Учитываем половину размера пре-рендеренного спрайта + запас на тень
+            const margin = 32;
+            // UI-оверлей со счётом перекрывает левый верхний угол — туда не спавним
+            const uiW = 420, uiH = 60;
+            for (let i = 0; i < 30; i++) {
+                this.x = Math.random() * (canvas.width - margin * 2) + margin;
+                this.y = Math.random() * (canvas.height - margin * 2) + margin;
+                if (!(this.x < uiW && this.y < uiH)) return;
+            }
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 3;
+            const w = flowerSprite.width;
+            const h = flowerSprite.height;
+            ctx.drawImage(flowerSprite, this.x - w / 2, this.y - h / 2);
+            ctx.restore();
+        }
+    }
+
+    class Crab {
+        constructor() {
+            this.radius = 16;
+            this.speed = Math.random() * 1.5 + 1.2;
+            this.wobbleOffset = Math.random() * Math.PI * 2;
+
+            if (Math.random() < 0.5) {
+                this.x = Math.random() < 0.5 ? -30 : canvas.width + 30;
+                this.y = Math.random() * canvas.height;
+            } else {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() < 0.5 ? -30 : canvas.height + 30;
+            }
+        }
+        update() {
+            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(angle) * this.speed;
+            this.y += Math.sin(angle) * this.speed;
+        }
+        draw() {
+            const time = performance.now();
+            const wobbleAngle = Math.sin(time * 0.008 + this.wobbleOffset) * 0.35;
+
+            ctx.save();
+            ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 3;
+            ctx.translate(this.x, this.y);
+            ctx.rotate(wobbleAngle);
+            const w = crabSprite.width;
+            const h = crabSprite.height;
+            ctx.drawImage(crabSprite, -w / 2, -h / 2);
+            ctx.restore();
+        }
+    }
+
+    class Projectile {
+        constructor(x, y, angle) {
+            this.x = x;
+            this.y = y;
+            this.vx = Math.cos(angle) * 12;
+            this.vy = Math.sin(angle) * 12;
+            this.radius = 3;
+            this.life = 35;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life--;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = 'orange';
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.vx = (Math.random() - 0.5) * 6;
+            this.vy = (Math.random() - 0.5) * 6;
+            this.life = 20 + Math.random() * 20;
+            this.color = color;
+            this.radius = Math.random() * 3 + 1;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life--;
+        }
+        draw() {
+            ctx.globalAlpha = Math.max(0, this.life / 40);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    // Фразы героини при удачном попадании (шанс 0.3)
+    const KILL_PHRASES = [
+        // Jira и бэклог
+        'Перевожу тебя в статус "Done"!',
+        'Этот таск закрывается только с дробовика!',
+        'Отправляю тебя в бэклог... посмертно.',
+        'Опять приполз без эстимейта?!',
+        'Блокер успешно устранён!',
+        'Сторипоинты списаны, отдыхай.',
+        'Это не баг, это фича! А ты — труп.',
+        // PM и Agile
+        'Где твой апдейт для дейлика, членистоногое?!',
+        'Это тебе за созвон в пятницу вечером!',
+        'Scope creep? Не в мою смену!',
+        'Давай запаркуем этот вопрос... навсегда.',
+        'Твой KPI сегодня отрицательный!',
+        'Аут-оф-скоуп, приятель. Прощай!',
+        'А вот и ретроспектива подъехала!',
+        'Спринт закрыт, всем спасибо!',
+        // ИИ и нейросети
+        'Мой контекст ограничен, а патроны — нет!',
+        'Иди галлюцинируй в другом месте!',
+        'Сгенерируй-ка себе пощаду, кусок кода!',
+        'Я тебе не ChatGPT, два раза повторять не буду!',
+        'ИИ может написать код, но баги отстреливаю Я!'
+    ];
+
+    class FloatingText {
+        constructor(x, y, text) {
+            this.x = x;
+            this.y = y;
+            this.text = text;
+            this.vy = -0.7;
+            this.life = 110;
+            this.maxLife = 110;
+        }
+        update() {
+            this.y += this.vy;
+            this.vy *= 0.985;
+            this.life--;
+        }
+        draw() {
+            // Плавное появление и затухание
+            const fadeIn = Math.min(1, (this.maxLife - this.life) / 6);
+            const fadeOut = Math.min(1, this.life / 25);
+            const alpha = Math.max(0, Math.min(fadeIn, fadeOut));
+
+            ctx.save();
+            ctx.font = 'bold 16px "Segoe UI", Tahoma, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Удерживаем текст в кадре по горизонтали
+            const halfW = ctx.measureText(this.text).width / 2 + 10;
+            const drawX = Math.max(halfW, Math.min(canvas.width - halfW, this.x));
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 4;
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.strokeText(this.text, drawX, this.y);
+            ctx.fillStyle = '#ffd166';
+            ctx.fillText(this.text, drawX, this.y);
+            ctx.restore();
+        }
+    }
+
+    // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ИГРЫ ---
+    let player, flower;
+    let crabs = [], projectiles = [], particles = [], floatingTexts = [];
+    let spawnRate = 2000, lastSpawnTime = 0;
+    let score = 0, kills = 0, gameOver = false, animationId;
+
+    function initGame() {
+        player = new Player();
+        flower = new Flower();
+        crabs = []; projectiles = []; particles = []; floatingTexts = [];
+        score = 0; kills = 0;
+        spawnRate = 1800; gameOver = false;
+        scoreEl.innerText = 0; killsEl.innerText = 0;
+        lastSpawnTime = performance.now();
+    }
+
+    function restartGame() {
+        cancelAnimationFrame(animationId);
+        initGame();
+        animate(performance.now());
+    }
+
+    function createExplosion(x, y, color) {
+        for (let i = 0; i < 15; i++) particles.push(new Particle(x, y, color));
+    }
+
+    function animate(currentTime) {
+        if (gameOver) return;
+        animationId = requestAnimationFrame(animate);
+
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (currentTime - lastSpawnTime > spawnRate) {
+            crabs.push(new Crab());
+            lastSpawnTime = currentTime;
+            if (spawnRate > 500) spawnRate -= 40;
+        }
+
+        flower.draw();
+        player.update();
+        player.draw();
+
+        // Сбор цветка
+        if (distance(player.x, player.y, flower.x, flower.y) < player.radius + flower.radius) {
+            score++;
+            scoreEl.innerText = score;
+            flower.spawn();
+            createExplosion(flower.x, flower.y, '#ffd166');
+            snd_pickup();
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.update(); p.draw();
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            let p = projectiles[i];
+            p.update(); p.draw();
+            if (p.life <= 0 || p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height)
+                projectiles.splice(i, 1);
+        }
+
+        ctx.shadowBlur = 0;
+
+        for (let i = crabs.length - 1; i >= 0; i--) {
+            let crab = crabs[i];
+            crab.update(); crab.draw();
+
+            if (distance(player.x, player.y, crab.x, crab.y) < player.radius + crab.radius) {
+                gameOver = true;
+                snd_gameover();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ef476f';
+                ctx.font = 'bold 48px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('ИГРА ОКОНЧЕНА!', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillStyle = '#fff';
+                ctx.font = '24px sans-serif';
+                ctx.fillText('Кликните мышкой, чтобы начать заново.', canvas.width / 2, canvas.height / 2 + 30);
+                return;
+            }
+
+            for (let j = projectiles.length - 1; j >= 0; j--) {
+                let p = projectiles[j];
+                if (distance(crab.x, crab.y, p.x, p.y) < crab.radius + p.radius) {
+                    createExplosion(crab.x, crab.y, '#ef476f');
+                    crabs.splice(i, 1);
+                    projectiles.splice(j, 1);
+                    kills++;
+                    killsEl.innerText = kills;
+                    snd_hit();
+                    if (Math.random() < 0.3) {
+                        const phrase = KILL_PHRASES[Math.floor(Math.random() * KILL_PHRASES.length)];
+                        floatingTexts.push(new FloatingText(player.x, player.y - 55, phrase));
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Всплывающие фразы — поверх всего
+        ctx.shadowBlur = 0;
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            const ft = floatingTexts[i];
+            ft.update(); ft.draw();
+            if (ft.life <= 0) floatingTexts.splice(i, 1);
+        }
+    }
+
+    initGame();
+    animate(performance.now());
+};
+</script>
+</body>
+</html>

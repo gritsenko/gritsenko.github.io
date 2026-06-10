@@ -66,6 +66,9 @@
             <a class="nav-link" href="#portfolio">Portfolio</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link" href="#research">Research</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link" href="#contact">Contact</a>
           </li>
         </ul>
@@ -103,6 +106,27 @@
         </div>
       </div>
       {{/each}}
+
+    </div>
+  </section>
+
+  <section id="research" class="container py-5">
+    <h2>Research</h2>
+    <p class="mb-4">Side projects exploring ML infrastructure and tooling</p>
+    <div class="row">
+
+      <div class="col-md-6">
+        <div class="card mb-4">
+          <a href="https://gritsenko.biz/NeuroReaper/" target="_blank">
+            <img src="/images/neuroreaper.png" class="card-img-top" alt="Neuro Reaper">
+          </a>
+          <div class="card-body">
+            <h5 class="card-title">Neuro Reaper</h5>
+            <p class="card-text">Divergence debugger for on-device ML inference: shows where and how much fp32 and int8 outputs drift apart across backends, node by node in an ONNX graph. Includes a 38-evening training course from paper-math tensors to a released v1.</p>
+            <a href="https://gritsenko.biz/NeuroReaper/" class="btn btn-primary" target="_blank">Explore</a>
+          </div>
+        </div>
+      </div>
 
     </div>
   </section>

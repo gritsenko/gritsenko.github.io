@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Tower Defense - Green Fields Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Metamorphous&family=Inter:wght@400;700&display=swap');
+        
+        body {
+            background-color: #0d0c0c;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .gothic-title {
+            font-family: 'Cinzel', serif;
+            text-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+        }
+
+        /* Симуляция экрана 9:16 с красивой рамкой */
+        .game-viewport {
+            aspect-ratio: 9/16;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.1);
+            background: radial-gradient(circle at center, #141f16 0%, #070a08 100%);
+            border: 4px solid #1e2d24;
+        }
+
+        /* STREAMING_CHUNK: Styling grid cells... */
+        /* Стили ячеек поля */
+        .grid-cell {
+            position: relative;
+            transition: all 0.25s ease;
+        }
+
+        /* Заблокированное зеленое поле (дикая природа) */
+        .cell-locked {
+            background: radial-gradient(circle, #274d30 0%, #132b18 100%);
+            border: 1px solid #1e5c31;
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.3);
+        }
+
+        /* Разблокированная территория базы (каменный двор) */
+        .cell-unlocked {
+            background: radial-gradient(circle, #44403c 0%, #1c1917 100%);
+            border: 1px solid #57534e;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.7);
+        }
+
+        /* Сердце базы */
+        .cell-core {
+            background: radial-gradient(circle, #991b1b 0%, #450a0a 100%);
+            border: 2px solid #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
+            animation: pulse-core 2s infinite alternate;
+        }
+
+        @keyframes pulse-core {
+            0% { transform: scale(1); box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+            100% { transform: scale(1.06); box-shadow: 0 0 18px rgba(239, 68, 68, 0.9); }
+        }
+
+        /* Слот барабаны */
+        .reel-column {
+            position: relative;
+            overflow: hidden;
+            height: 120px; /* 3 ячейки по 40px */
+            background: rgba(10, 18, 12, 0.95);
+            border: 1px solid #1b3a24;
+            border-radius: 6px;
+        }
+
+        .reel-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            transition: top 0.1s ease-out;
+        }
+
+        .slot-item {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            border-bottom: 1px solid rgba(27, 58, 36, 0.3);
+        }
+
+        /* Скрываем скроллбар */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Перетаскивание и мердж юнитов */
+        .drop-valid {
+            outline: 2px solid rgba(34, 197, 94, 0.85) !important;
+            box-shadow: inset 0 0 14px rgba(34, 197, 94, 0.4) !important;
+        }
+        .drop-merge {
+            outline: 2px solid rgba(234, 179, 8, 0.95) !important;
+            animation: merge-glow 0.65s infinite alternate;
+        }
+        @keyframes merge-glow {
+            from { box-shadow: inset 0 0 8px rgba(234,179,8,0.4); }
+            to   { box-shadow: inset 0 0 22px rgba(234,179,8,0.95), 0 0 14px rgba(234,179,8,0.6); }
+        }
+        #drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            font-size: 1.9rem;
+            line-height: 1;
+            opacity: 0.92;
+            transform: translate(-50%, -65%) scale(1.3);
+            filter: drop-shadow(0 0 12px rgba(255,255,200,0.9));
+            text-align: center;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="flex justify-center items-center min-h-screen p-2 text-gray-200">
+
+    <div class="game-viewport flex flex-col justify-between rounded-2xl overflow-hidden relative">
+        
+        <!-- Верхний Хедер состояния -->
+        <div class="px-4 py-3 bg-black/70 border-b border-green-900/30 flex justify-between items-center z-20">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">❤️</span>
+                <span id="hp-text" class="font-bold text-red-500 text-lg tracking-wider gothic-title">15</span>
+            </div>
+            <div class="text-center">
+                <h1 id="game-phase" class="text-xs uppercase tracking-widest text-emerald-400 gothic-title">Подготовка: Спины</h1>
+                <p id="spins-counter" class="text-[10px] text-gray-400">Осталось крутить: 5</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-yellow-500 font-bold text-xs">ВОЛНА: <span id="wave-num" class="text-sm">1</span></span>
+            </div>
+        </div>
+
+        <!-- Центральный игровой экран (Поле боя) -->
+        <div class="flex-1 relative flex flex-col items-center justify-center p-3 overflow-hidden">
+            <!-- STREAMING_CHUNK: Defining playfield container... -->
+            <!-- Контейнер для поля боя, чтобы холст ложился ровно поверх сетки -->
+            <div class="relative w-full aspect-square max-w-[340px] z-10">
+                <!-- Сетка 7х7 -->
+                <div id="battle-grid" class="grid grid-cols-7 grid-rows-7 gap-[2px] w-full h-full">
+                    <!-- Ячейки сгенерируются в JS -->
+                </div>
+                <!-- Холст, точно перекрывающий сетку -->
+                <canvas id="effects-canvas" class="absolute inset-0 pointer-events-none z-30"></canvas>
+            </div>
+        </div>
+
+        <!-- Нижний блок управления -->
+        <div class="bg-black/90 border-t-4 border-green-950 p-4 flex flex-col justify-between min-h-[220px] relative z-20">
+            <!-- Лог действий / Инструкции -->
+            <div class="text-center min-h-[36px] flex items-center justify-center px-2">
+                <p id="action-log" class="text-xs text-amber-400 font-medium leading-tight">Собери оборонную линию на слотах! Крути барабаны!</p>
+            </div>
+
+            <!-- СЛОТ-МАШИНА 5х3 -->
+            <div id="slots-panel" class="relative my-2">
+                <div class="grid grid-cols-5 gap-1 p-1 bg-green-950/20 rounded-lg border border-green-900/40 relative">
+                    <!-- Барабан 1 -->
+                    <div class="reel-column" id="reel-0">
+                        <div class="reel-container" id="reel-container-0"></div>
+                    </div>
+                    <!-- Барабан 2 -->
+                    <div class="reel-column" id="reel-1">
+                        <div class="reel-container" id="reel-container-1"></div>
+                    </div>
+                    <!-- Барабан 3 -->
+                    <div class="reel-column" id="reel-2">
+                        <div class="reel-container" id="reel-container-2"></div>
+                    </div>
+                    <!-- Барабан 4 -->
+                    <div class="reel-column" id="reel-3">
+                        <div class="reel-container" id="reel-container-3"></div>
+                    </div>
+                    <!-- Барабан 5 -->
+                    <div class="reel-column" id="reel-4">
+                        <div class="reel-container" id="reel-container-4"></div>
+                    </div>
+
+                    <!-- SVG Слой для линий выплат из файла image_327ebe.jpg -->
+                    <svg id="payline-svg" class="absolute inset-0 pointer-events-none w-full h-full z-10"></svg>
+                </div>
+
+                <!-- Кнопка Спина -->
+                <button id="spin-btn" class="w-full mt-3 py-3 px-4 rounded-lg font-bold text-white uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-amber-600 hover:from-emerald-500 hover:to-amber-500 active:scale-95 transition-all shadow-lg shadow-green-950/50 border border-amber-500/30">
+                    🎰 Крутить барабаны
+                </button>
+            </div>
+
+            <!-- STREAMING_CHUNK: Defense panel initialization... -->
+            <!-- ИНТЕРФЕЙС ФАЗЫ ЗАЩИТЫ -->
+            <div id="defense-panel" class="hidden flex-1 flex flex-col justify-center items-center gap-3">
+                <div class="text-center">
+                    <p class="text-red-500 font-bold tracking-widest text-sm uppercase">Орда приближается!</p>
+                    <p class="text-[11px] text-gray-400">Враги идут через зеленые поля к вашему ядру.</p>
+                </div>
+                <button id="start-wave-btn" class="w-full py-4 rounded-lg font-bold text-white uppercase tracking-wider bg-gradient-to-r from-red-700 via-red-600 to-red-800 hover:from-red-600 hover:to-red-700 active:scale-95 transition-all border border-red-500/40 shadow-lg shadow-red-950">
+                    ⚔️ Начать битву
+                </button>
+            </div>
+
+            <!-- ЭКРАН РЕСТАРТА -->
+            <div id="restart-panel" class="hidden flex-1 flex flex-col justify-center items-center gap-3">
+                <div class="text-center">
+                    <p id="game-result-title" class="text-2xl font-bold tracking-widest uppercase gothic-title text-red-500">Поражение</p>
+                    <p id="game-result-desc" class="text-xs text-gray-400">Вы продержались до волны 1</p>
+                </div>
+                <button id="restart-btn" class="w-full py-3 rounded-lg font-bold text-white uppercase tracking-wider bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 transition-all">
+                    🔄 Начать заново
+                </button>
+            </div>
+
+            <!-- Подсказка линий -->
+            <div id="info-footer" class="text-[9px] text-gray-500 text-center mt-1">
+                Линии выплат: 3 горизонтали + 2 зигзага. Матч 3+ символов дает награды!
+            </div>
+        </div>
+    </div>
+
+<script>
+    /* STREAMING_CHUNK: Audio Engine Setup... */
+    // --- ЗВУКОВОЙ ДВИЖОК (Web Audio API Synthesizer) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        try {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'spin_tick') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'spin_stop') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(330, audioCtx.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'win') {
+                const now = audioCtx.currentTime;
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(261.6, now);
+                osc.frequency.setValueAtTime(329.6, now + 0.1);
+                osc.frequency.setValueAtTime(392.0, now + 0.2);
+                osc.frequency.setValueAtTime(523.3, now + 0.3);
+                gainNode.gain.setValueAtTime(0.12, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start();
+                osc.stop(now + 0.5);
+            } else if (type === 'shoot_arrow') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'shoot_laser') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'explosion') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.4);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } else if (type === 'core_damage') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(90, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        } catch (e) {
+            console.log("Audio Context issue:", e);
+        }
+    }
+
+    /* STREAMING_CHUNK: Game Configurations... */
+    // --- КОНФИГУРАЦИЯ ИГРЫ ---
+    const SYMBOLS = ['🏰', '🏹', '🛡️', '🔓', '⭐'];
+    const SYMBOL_MAP = {
+        '🏰': { name: 'Башня', type: 'TOWER', color: '#f59e0b' },
+        '🏹': { name: 'Лучник', type: 'ARCHER', color: '#10b981' },
+        '🛡️': { name: 'Защитник', type: 'DEFENDER', color: '#3b82f6' },
+        '🔓': { name: 'Расширение', type: 'EXPAND', color: '#a855f7' },
+        '⭐': { name: 'Улучшение', type: 'UPGRADE', color: '#eab308' }
+    };
+
+    // Линии выплат 5х3 из картинки image_327ebe.jpg
+    const PAYLINES = [
+        { id: 1, name: 'Центральная линия', rows: [1, 1, 1, 1, 1], color: '#ef4444' },
+        { id: 2, name: 'Верхняя линия', rows: [0, 0, 0, 0, 0], color: '#3b82f6' },
+        { id: 3, name: 'Нижняя линия', rows: [2, 2, 2, 2, 2], color: '#22c55e' },
+        { id: 4, name: 'Зигзаг V', rows: [0, 1, 2, 1, 0], color: '#eab308' },
+        { id: 5, name: 'Инвертированный V', rows: [2, 1, 0, 1, 2], color: '#a855f7' }
+    ];
+
+    // Игровое состояние
+    let baseHp = 15;
+    let spinsLeft = 5;
+    let currentWave = 1;
+    let gamePhase = 'SPIN'; // 'SPIN', 'DEFENSE', 'BATTLE_ACTIVE', 'GAMEOVER'
+    let gridData = Array(7).fill(null).map(() => Array(7).fill(null));
+    
+    let enemies = [];
+    let bullets = [];
+    let damageTexts = [];
+    let cellAttackFlashes = [];
+
+    let reelsData = [[], [], [], [], []];
+    let isSpinning = false;
+
+    const canvas = document.getElementById('effects-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Настройка размеров Canvas
+    function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setTimeout(resizeCanvas, 150);
+
+    /* STREAMING_CHUNK: Initializing Grid Structure... */
+    // --- ИНИЦИАЛИЗАЦИЯ ИГРОВОГО ПОЛЯ ---
+    function initGrid() {
+        const gridEl = document.getElementById('battle-grid');
+        gridEl.innerHTML = '';
+        
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                let status = 'locked';
+                let type = 'EMPTY';
+                
+                // Зона 3х3 в центре - изначально открыта
+                if (r >= 2 && r <= 4 && c >= 2 && c <= 4) {
+                    status = 'unlocked';
+                }
+                
+                // Ядро базы в центре [3][3]
+                if (r === 3 && c === 3) {
+                    status = 'unlocked';
+                    type = 'CORE';
+                }
+
+                gridData[r][c] = {
+                    type: type,
+                    status: status,
+                    level: 1,
+                    defenderHp: 0,
+                    maxDefenderHp: 40,
+                    lastAttackTime: 0
+                };
+
+                const cell = document.createElement('div');
+                cell.id = `cell-${r}-${c}`;
+                // Классы генерируются динамически в updateGridUI
+                gridEl.appendChild(cell);
+            }
+        }
+        updateGridUI();
+    }
+
+    /* STREAMING_CHUNK: Updating Grid UI... */
+    // Обновление картинок, стилей и замков на сетке
+    function updateGridUI() {
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                const cellObj = gridData[r][c];
+                const cellEl = document.getElementById(`cell-${r}-${c}`);
+                
+                // Сбрасываем старые классы и применяем нужные стили
+                cellEl.className = `grid-cell rounded flex flex-col justify-center items-center font-bold relative cell-${cellObj.status}`;
+
+                // Курсор grab для перетаскиваемых юнитов
+                if (cellObj.type !== 'EMPTY' && cellObj.type !== 'CORE' &&
+                    cellObj.status === 'unlocked' &&
+                    (gamePhase === 'SPIN' || gamePhase === 'DEFENSE')) {
+                    cellEl.style.cursor = 'grab';
+                } else {
+                    cellEl.style.cursor = '';
+                }
+                
+                if (cellObj.type === 'CORE') {
+                    cellEl.classList.add('cell-core');
+                    cellEl.innerHTML = '<span class="text-xl">💎</span>';
+                } else if (cellObj.type !== 'EMPTY') {
+                    let symb = Object.keys(SYMBOL_MAP).find(k => SYMBOL_MAP[k].type === cellObj.type);
+                    let stars = '★'.repeat(cellObj.level);
+                    let hpBar = '';
+                    
+                    if (cellObj.type === 'DEFENDER') {
+                        let hpPercent = (cellObj.defenderHp / cellObj.maxDefenderHp) * 100;
+                        hpBar = `
+                            <div class="absolute bottom-1 left-1 right-1 h-1 bg-red-950 rounded-full overflow-hidden">
+                                <div class="bg-blue-500 h-full" style="width: ${hpPercent}%"></div>
+                            </div>
+                        `;
+                    }
+
+                    cellEl.innerHTML = `
+                        <span class="text-xl transform -translate-y-1">${symb}</span>
+                        <span class="absolute top-1 right-1 text-[8px] text-yellow-400 font-extrabold tracking-tighter">${stars}</span>
+                        ${hpBar}
+                    `;
+                } else {
+                    // Отрисовка пустоты
+                    if (cellObj.status === 'locked') {
+                        cellEl.innerHTML = '';
+                    } else {
+                        cellEl.innerHTML = '';
+                    }
+                }
+            }
+        }
+    }
+
+    /* STREAMING_CHUNK: Slot Reels Setup... */
+    // --- ИНИЦИАЛИЗАЦИЯ БАРАБАНОВ СЛОТОВ ---
+    function initReels() {
+        for (let i = 0; i < 5; i++) {
+            const container = document.getElementById(`reel-container-${i}`);
+            let html = '';
+            reelsData[i] = [];
+            for (let j = 0; j < 30; j++) {
+                let sym = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+                reelsData[i].push(sym);
+                html += `<div class="slot-item text-green-100">${sym}</div>`;
+            }
+            container.innerHTML = html;
+            container.style.top = '0px';
+        }
+    }
+
+    // Запуск прокрутки
+    function spin() {
+        if (isSpinning || spinsLeft <= 0 || gamePhase !== 'SPIN') return;
+        
+        isSpinning = true;
+        document.getElementById('spin-btn').disabled = true;
+        clearPaylineSVG();
+
+        playSound('spin_tick');
+
+        let itemsCount = 30;
+        let itemHeight = 40;
+
+        for (let i = 0; i < 5; i++) {
+            const container = document.getElementById(`reel-container-${i}`);
+            let finalSymbols = [];
+            for (let j = 0; j < 3; j++) {
+                finalSymbols.push(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
+            }
+
+            for (let j = 0; j < 3; j++) {
+                reelsData[i][j] = finalSymbols[j];
+                container.children[j].innerText = finalSymbols[j];
+            }
+
+            let targetOffset = -((itemsCount - 3) * itemHeight);
+            container.style.transition = 'none';
+            container.style.top = `${targetOffset}px`;
+
+            setTimeout(() => {
+                container.style.transition = `top ${0.5 + i * 0.25}s cubic-bezier(0.25, 1, 0.5, 1)`;
+                container.style.top = '0px';
+                setTimeout(() => playSound('spin_stop'), (0.5 + i * 0.25) * 1000);
+            }, 50);
+        }
+
+        setTimeout(() => {
+            isSpinning = false;
+            spinsLeft--;
+            document.getElementById('spins-counter').innerText = `Осталось крутить: ${spinsLeft}`;
+            checkPaylines(); // кнопка и смена фазы управляются через processWinQueue
+        }, 1800);
+    }
+
+    function clearPaylineSVG() {
+        document.getElementById('payline-svg').innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+            for (let r = 0; r < 3; r++) {
+                const reelCol = document.getElementById(`reel-${i}`);
+                if (reelCol && reelCol.children[0] && reelCol.children[0].children[r]) {
+                    reelCol.children[0].children[r].style.backgroundColor = '';
+                }
+            }
+        }
+    }
+
+    /* STREAMING_CHUNK: Checking Winning Lines... */
+    // Проверка выигрышных комбинаций
+    function checkPaylines() {
+        let winQueue = [];
+        let logParts = [];
+        let hadRealWin = false;
+
+        PAYLINES.forEach(line => {
+            let symsOnLine = [];
+            let srcElements = []; // Все элементы из 5 барабанов
+            for (let col = 0; col < 5; col++) {
+                symsOnLine.push(reelsData[col][line.rows[col]]);
+                srcElements.push(document.getElementById(`reel-container-${col}`).children[line.rows[col]]);
+            }
+
+            let matchCount = 1;
+            let matchSym = symsOnLine[0];
+            for (let i = 1; i < 5; i++) {
+                if (symsOnLine[i] === matchSym) {
+                    matchCount++;
+                } else {
+                    if (matchCount >= 3) break;
+                    matchSym = symsOnLine[i];
+                    matchCount = 1;
+                }
+            }
+
+            if (matchCount >= 3) {
+                hadRealWin = true;
+                drawPayline(line);
+                // Передаём ВСЕ элементы из линии для анимации слияния
+                winQueue.push({ symbol: matchSym, count: matchCount, srcElements, isWin: true });
+
+                let sInfo = SYMBOL_MAP[matchSym];
+                if (sInfo.type === 'EXPAND') logParts.push(`Линия ${line.id}: Расширение!`);
+                else if (sInfo.type === 'UPGRADE') logParts.push(`Линия ${line.id}: Улучшение!`);
+                else logParts.push(`Линия ${line.id}: ${sInfo.name} ур.${Math.max(1, matchCount - 2)}!`);
+            }
+        });
+
+        if (!hadRealWin) {
+            let randomSym = SYMBOLS[Math.floor(Math.random() * 3)];
+            const srcEl = document.getElementById('reel-container-2').children[1];
+            winQueue.push({ symbol: randomSym, count: 3, srcElements: [srcEl], isWin: false });
+            logParts.push(`Нет линий. Бонус: ${SYMBOL_MAP[randomSym].name}!`);
+        }
+
+        document.getElementById('action-log').innerHTML =
+            `<span class="text-green-400 font-bold">${logParts.join(' ')}</span>`;
+
+        processWinQueue(winQueue);
+    }
+
+    function drawPayline(line) {
+        const svg = document.getElementById('payline-svg');
+        const svgRect = svg.getBoundingClientRect();
+        
+        let points = [];
+        for (let col = 0; col < 5; col++) {
+            const reelCol = document.getElementById(`reel-${col}`);
+            const cell = reelCol.children[0].children[line.rows[col]];
+            
+            cell.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+
+            const cellRect = cell.getBoundingClientRect();
+            let x = cellRect.left - svgRect.left + cellRect.width / 2;
+            let y = cellRect.top - svgRect.top + cellRect.height / 2;
+            points.push(`${x},${y}`);
+        }
+
+        const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        polyline.setAttribute("points", points.join(" "));
+        polyline.setAttribute("stroke", line.color);
+        polyline.setAttribute("stroke-width", "4");
+        polyline.setAttribute("fill", "none");
+        polyline.setAttribute("stroke-linecap", "round");
+        polyline.setAttribute("stroke-linejoin", "round");
+        polyline.setAttribute("opacity", "0.95");
+        
+        polyline.style.filter = `drop-shadow(0px 0px 4px ${line.color})`;
+        svg.appendChild(polyline);
+    }
+
+    /* STREAMING_CHUNK: Applying Rewards... */
+    // Выбирает цель и сразу применяет изменение к gridData (без UI-обновления)
+    // Возвращает { r, c, color } или null
+    function pickAndApplyReward(symbol, count) {
+        let info = SYMBOL_MAP[symbol];
+        let level = Math.max(1, count - 2);
+
+        if (info.type === 'EXPAND') {
+            let candidates = [];
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (gridData[r][c].status === 'locked') {
+                        if ((r > 0 && gridData[r-1][c].status === 'unlocked') ||
+                            (r < 6 && gridData[r+1][c].status === 'unlocked') ||
+                            (c > 0 && gridData[r][c-1].status === 'unlocked') ||
+                            (c < 6 && gridData[r][c+1].status === 'unlocked')) {
+                            candidates.push({r, c});
+                        }
+                    }
+                }
+            }
+            if (candidates.length > 0) {
+                let t = candidates[Math.floor(Math.random() * candidates.length)];
+                gridData[t.r][t.c].status = 'unlocked';
+                return { r: t.r, c: t.c, color: '#a855f7' };
+            }
+        } else if (info.type === 'UPGRADE') {
+            let units = [];
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (gridData[r][c].status === 'unlocked' &&
+                        ['TOWER', 'ARCHER', 'DEFENDER'].includes(gridData[r][c].type)) {
+                        units.push({r, c});
+                    }
+                }
+            }
+            if (units.length > 0) {
+                let t = units[Math.floor(Math.random() * units.length)];
+                let cell = gridData[t.r][t.c];
+                cell.level++;
+                if (cell.type === 'DEFENDER') {
+                    cell.maxDefenderHp += 20;
+                    cell.defenderHp = cell.maxDefenderHp;
+                }
+                return { r: t.r, c: t.c, color: '#eab308' };
+            }
+        } else {
+            let emptyCells = [];
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (r === 3 && c === 3) continue;
+                    if (gridData[r][c].status === 'unlocked' && gridData[r][c].type === 'EMPTY') {
+                        emptyCells.push({r, c});
+                    }
+                }
+            }
+            if (emptyCells.length > 0) {
+                let t = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                gridData[t.r][t.c].type = info.type;
+                gridData[t.r][t.c].level = level;
+                if (info.type === 'DEFENDER') {
+                    gridData[t.r][t.c].maxDefenderHp = 40 + (level - 1) * 20;
+                    gridData[t.r][t.c].defenderHp = gridData[t.r][t.c].maxDefenderHp;
+                }
+                return { r: t.r, c: t.c, color: info.color };
+            }
+        }
+        return null;
+    }
+
+    // Анимация полёта одной иконки от srcEl к ячейке поля (r, c)
+    function flyIconToCell(symbol, srcEl, targetR, targetC, onLand) {
+        const targetCellEl = document.getElementById(`cell-${targetR}-${targetC}`);
+        if (!targetCellEl || !srcEl) { onLand(); return; }
+
+        const srcRect = srcEl.getBoundingClientRect();
+        const dstRect = targetCellEl.getBoundingClientRect();
+
+        const flyer = document.createElement('div');
+        flyer.style.cssText = `
+            position: fixed;
+            left: ${srcRect.left + srcRect.width / 2}px;
+            top: ${srcRect.top + srcRect.height / 2}px;
+            transform: translate(-50%, -50%) scale(1.6);
+            font-size: 1.7rem;
+            z-index: 10000;
+            pointer-events: none;
+            filter: drop-shadow(0 0 14px rgba(255, 220, 80, 0.95));
+            transition: left 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                        top  0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.48s ease,
+                        opacity  0.48s ease;
+        `;
+        flyer.textContent = symbol;
+        document.body.appendChild(flyer);
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            flyer.style.left      = `${dstRect.left + dstRect.width / 2}px`;
+            flyer.style.top       = `${dstRect.top  + dstRect.height / 2}px`;
+            flyer.style.transform = 'translate(-50%, -50%) scale(0.7)';
+            flyer.style.opacity   = '0.4';
+        }));
+
+        setTimeout(() => { flyer.remove(); onLand(); }, 520);
+    }
+
+    // Анимация слияния: несколько иконок летят в одну точку, затем объединённая летит на поле
+    function mergeAndFlyToCell(symbol, srcElements, mergePointEl, targetR, targetC, onComplete) {
+        const FLY_TO_MERGE = 350; // полёт к точке слияния
+        const FLY_TO_CELL  = 480; // полёт на поле
+
+        const mergeRect = mergePointEl.getBoundingClientRect();
+        const targetCellEl = document.getElementById(`cell-${targetR}-${targetC}`);
+        const targetRect = targetCellEl.getBoundingClientRect();
+
+        // Запускаем полёты всех иконок в точку слияния одновременно
+        srcElements.forEach((srcEl, idx) => {
+            if (!srcEl) return;
+
+            const srcRect = srcEl.getBoundingClientRect();
+            const mergeFlyer = document.createElement('div');
+            mergeFlyer.style.cssText = `
+                position: fixed;
+                left: ${srcRect.left + srcRect.width / 2}px;
+                top: ${srcRect.top + srcRect.height / 2}px;
+                transform: translate(-50%, -50%) scale(1.4);
+                font-size: 1.5rem;
+                z-index: 9999;
+                pointer-events: none;
+                opacity: 1;
+                transition: left ${FLY_TO_MERGE}ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                            top ${FLY_TO_MERGE}ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                            transform ${FLY_TO_MERGE}ms ease-in,
+                            opacity ${FLY_TO_MERGE}ms ease-out;
+            `;
+            mergeFlyer.textContent = symbol;
+            document.body.appendChild(mergeFlyer);
+
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                mergeFlyer.style.left = `${mergeRect.left + mergeRect.width / 2}px`;
+                mergeFlyer.style.top  = `${mergeRect.top + mergeRect.height / 2}px`;
+                mergeFlyer.style.transform = 'translate(-50%, -50%) scale(0.5)';
+                mergeFlyer.style.opacity = '0.1';
+            }));
+
+            setTimeout(() => { mergeFlyer.remove(); }, FLY_TO_MERGE + 20);
+        });
+
+        // Через 50ms после завершения слияния, запускаем полёт объединённого элемента
+        setTimeout(() => {
+            const merged = document.createElement('div');
+            merged.style.cssText = `
+                position: fixed;
+                left: ${mergeRect.left + mergeRect.width / 2}px;
+                top: ${mergeRect.top + mergeRect.height / 2}px;
+                transform: translate(-50%, -50%) scale(1.8);
+                font-size: 1.9rem;
+                z-index: 10000;
+                pointer-events: none;
+                filter: drop-shadow(0 0 16px rgba(251, 191, 36, 1));
+                transition: left ${FLY_TO_CELL}ms cubic-bezier(0.22, 1, 0.36, 1),
+                            top ${FLY_TO_CELL}ms cubic-bezier(0.22, 1, 0.36, 1),
+                            transform ${FLY_TO_CELL}ms ease,
+                            opacity ${FLY_TO_CELL}ms ease;
+            `;
+            merged.textContent = symbol;
+            document.body.appendChild(merged);
+
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                merged.style.left      = `${targetRect.left + targetRect.width / 2}px`;
+                merged.style.top       = `${targetRect.top  + targetRect.height / 2}px`;
+                merged.style.transform = 'translate(-50%, -50%) scale(0.8)';
+                merged.style.opacity   = '0.5';
+            }));
+
+            setTimeout(() => { merged.remove(); onComplete(); }, FLY_TO_CELL + 20);
+        }, FLY_TO_MERGE + 50);
+    }
+
+    // Запускает анимации наград друг за другом с задержкой STAGGER мс
+    function processWinQueue(queue) {
+        const STAGGER = 900; // длиннее из-за 2-этапной анимации для линий
+        const SIMPLE_FLY_MS = 520;
+        const MERGE_FLY_MS  = 350 + 480 + 50; // слияние + полёт
+
+        // Сначала определяем все цели (чтобы они не пересекались)
+        const resolved = queue.map(item => ({
+            ...item,
+            dest: pickAndApplyReward(item.symbol, item.count)
+        }));
+
+        const slotsPanel = document.getElementById('slots-panel');
+        const mergePoint = slotsPanel || document.body; // точка слияния для линий
+
+        let maxDuration = 0;
+
+        resolved.forEach((item, i) => {
+            const delayMs = i * STAGGER;
+            const duration = item.isWin ? MERGE_FLY_MS : SIMPLE_FLY_MS;
+            maxDuration = Math.max(maxDuration, delayMs + duration);
+
+            setTimeout(() => {
+                if (!item.dest) return;
+                if (item.isWin) {
+                    playSound('win');
+                    // Для линии: все элементы летят в точку слияния, потом объединённый на поле
+                    mergeAndFlyToCell(
+                        item.symbol,
+                        item.srcElements,
+                        mergePoint,
+                        item.dest.r,
+                        item.dest.c,
+                        () => {
+                            createFlashEffect(item.dest.r, item.dest.c, item.dest.color);
+                            updateGridUI();
+                        }
+                    );
+                } else {
+                    // Бонус: простой полёт
+                    playSound('spin_stop');
+                    flyIconToCell(item.symbol, item.srcElements[0], item.dest.r, item.dest.c, () => {
+                        createFlashEffect(item.dest.r, item.dest.c, item.dest.color);
+                        updateGridUI();
+                    });
+                }
+            }, delayMs);
+        });
+
+        // После всех анимаций — разблокируем кнопку или переходим к волне
+        setTimeout(() => {
+            if (spinsLeft <= 0) {
+                switchToDefensePhase();
+            } else {
+                document.getElementById('spin-btn').disabled = false;
+            }
+        }, maxDuration + 200);
+    }
+
+    function createFlashEffect(r, c, color) {
+        cellAttackFlashes.push({
+            r: r,
+            c: c,
+            color: color,
+            alpha: 1.0
+        });
+    }
+
+    /* STREAMING_CHUNK: Transitioning to Defense Phase... */
+    // --- ПЕРЕХОД К ФАЗЕ ЗАЩИТЫ БАЗЫ ---
+    function switchToDefensePhase() {
+        gamePhase = 'DEFENSE';
+        document.getElementById('game-phase').innerText = `Фаза защиты!`;
+        document.getElementById('spins-counter').innerText = `Волна ${currentWave} готова к атаке`;
+        document.getElementById('action-log').innerHTML = `<span class="text-red-500 font-extrabold uppercase">Орда начинает марш! Замки скрыты. Защити ядро!</span>`;
+        
+        // Скрываем замки, обновляем отображение сетки
+        updateGridUI();
+
+        document.getElementById('slots-panel').classList.add('hidden');
+        document.getElementById('defense-panel').classList.remove('hidden');
+    }
+
+    // Старт боевой симуляции
+    function startBattle() {
+        if (gamePhase !== 'DEFENSE') return;
+        gamePhase = 'BATTLE_ACTIVE';
+        document.getElementById('start-wave-btn').disabled = true;
+        document.getElementById('action-log').innerText = `Враги наступают через луга!`;
+        
+        // Переинициализируем размеры Canvas на случай изменения макета
+        resizeCanvas();
+
+        spawnWave();
+        
+        // СБРОС ТАЙМЕРА КАДРА (Важное исправление бага!)
+        lastTime = 0; 
+        
+        // Запуск плавного бесконечного цикла отрисовки
+        requestAnimationFrame(gameLoop);
+    }
+
+    /* STREAMING_CHUNK: Spawning Enemies... */
+    function spawnWave() {
+        enemies = [];
+        bullets = [];
+        damageTexts = [];
+        cellAttackFlashes = [];
+        
+        let count = 4 + currentWave * 4;
+        let hpMultiplier = 1 + (currentWave - 1) * 0.45;
+
+        // Определяем координаты появления монстров по краям сетки 7х7
+        let borderCoords = [];
+        for (let i = 0; i < 7; i++) {
+            borderCoords.push({ r: 0, c: i });
+            borderCoords.push({ r: 6, c: i });
+            if (i > 0 && i < 6) {
+                borderCoords.push({ r: i, c: 0 });
+                borderCoords.push({ r: i, c: 6 });
+            }
+        }
+
+        for (let idx = 0; idx < count; idx++) {
+            let start = borderCoords[Math.floor(Math.random() * borderCoords.length)];
+            let enemyType = 'slime';
+            let emoji = '👾';
+            let speed = (0.012 + Math.random() * 0.008) * 0.5; // Reduced speed by half
+            let hp = 15 * hpMultiplier;
+
+            if (Math.random() < 0.35) {
+                enemyType = 'orc';
+                emoji = '👹';
+                hp = 35 * hpMultiplier;
+                speed = 0.008 * 0.5; // Reduced speed by half
+            } else if (Math.random() < 0.2) {
+                enemyType = 'ghost';
+                emoji = '💀';
+                hp = 12 * hpMultiplier;
+                speed = 0.022 * 0.5; // Reduced speed by half
+            }
+
+            enemies.push({
+                x: start.c,
+                y: start.r,
+                r: start.r,
+                c: start.c,
+                emoji: emoji,
+                hp: hp,
+                maxHp: hp,
+                speed: speed,
+                isBlocked: false,
+                attackCooldown: 0
+            });
+        }
+    }
+
+    /* STREAMING_CHUNK: Main Game Loop... */
+    // --- ОСНОВНОЙ КРЯК-ЦИКЛ ИГРЫ (ОТРИСОВКА И ЛОГИКА) ---
+    let lastTime = 0;
+    function gameLoop(timestamp) {
+        if (gamePhase !== 'BATTLE_ACTIVE') return;
+
+        if (!lastTime) lastTime = timestamp;
+        let dt = timestamp - lastTime;
+        lastTime = timestamp;
+
+        // Предотвращаем гигантские скачки времени при сворачивании окна
+        if (dt > 100) dt = 16.66; 
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        updateGameLogic(dt);
+        drawEffects();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    /* STREAMING_CHUNK: Game Logic Updates... */
+    function updateGameLogic(dt) {
+        // Конвертер ячеек сетки в точные экранные координаты Canvas
+        function cellToCanvas(r, c) {
+            let cellSize = canvas.width / 7;
+            return {
+                x: (c + 0.5) * cellSize,
+                y: (r + 0.5) * cellSize
+            };
+        }
+
+        // 1. ПЕРЕМЕЩЕНИЕ И АТАКА МОНСТРОВ
+        enemies.forEach((enemy) => {
+            if (enemy.hp <= 0) return;
+
+            let targetR = 3;
+            let targetC = 3;
+
+            // Расчет текущей плитки под врагом
+            let currentR = Math.round(enemy.y);
+            let currentC = Math.round(enemy.x);
+
+            let onDefenderCell = false;
+            let defCell = null;
+
+            if (currentR >= 0 && currentR < 7 && currentC >= 0 && currentC < 7) {
+                let cell = gridData[currentR][currentC];
+                if (cell.type === 'DEFENDER' && cell.defenderHp > 0) {
+                    onDefenderCell = true;
+                    defCell = cell;
+                    enemy.isBlocked = true;
+                }
+            }
+
+            if (onDefenderCell) {
+                // Враг дерется с защитником
+                enemy.attackCooldown += dt;
+                if (enemy.attackCooldown >= 1100) {
+                    enemy.attackCooldown = 0;
+                    defCell.defenderHp -= 8;
+                    playSound('core_damage');
+                    createFlashEffect(currentR, currentC, '#ef4444');
+                    
+                    let pos = cellToCanvas(currentR, currentC);
+                    damageTexts.push({
+                        x: pos.x + (Math.random() - 0.5) * 15,
+                        y: pos.y - 10,
+                        text: '-8🛡️',
+                        color: '#f87171',
+                        alpha: 1
+                    });
+
+                    if (defCell.defenderHp <= 0) {
+                        defCell.type = 'EMPTY';
+                        enemy.isBlocked = false;
+                        updateGridUI();
+                        document.getElementById('action-log').innerText = `Защитник замка пал!`;
+                    }
+                }
+            } else {
+                enemy.isBlocked = false;
+                // Движение к ядру
+                let dx = targetC - enemy.x;
+                let dy = targetR - enemy.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist > 0.05) {
+                    // Нормализуем по дельте кадра
+                    enemy.x += (dx / dist) * enemy.speed * (dt / 16.66);
+                    enemy.y += (dy / dist) * enemy.speed * (dt / 16.66);
+                } else {
+                    // Проникновение врага в Ядро базы
+                    baseHp--;
+                    playSound('core_damage');
+                    document.getElementById('hp-text').innerText = baseHp;
+                    enemy.hp = 0; 
+                    
+                    createFlashEffect(3, 3, '#ff0000');
+                    let pos = cellToCanvas(3, 3);
+                    damageTexts.push({
+                        x: pos.x,
+                        y: pos.y - 15,
+                        text: '-1 ❤️',
+                        color: '#f87171',
+                        alpha: 1
+                    });
+
+                    if (baseHp <= 0) {
+                        endGame();
+                    }
+                }
+            }
+        });
+
+        // Отсеиваем побежденных врагов
+        enemies = enemies.filter(e => e.hp > 0);
+
+        // 2. ДЕЙСТВИЯ ОБОРОННЫХ СТРУКТУР (Атака)
+        let now = performance.now();
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                let cell = gridData[r][c];
+                if (cell.type === 'EMPTY' || cell.type === 'CORE' || cell.type === 'DEFENDER') continue;
+
+                let cooldown = cell.type === 'TOWER' ? 2200 : 900;
+                let range = cell.type === 'TOWER' ? 3.3 : 2.1;
+                let damage = cell.type === 'TOWER' ? 18 * cell.level : 6 * cell.level;
+
+                if (!cell.lastAttackTime) cell.lastAttackTime = 0;
+
+                if (now - cell.lastAttackTime >= cooldown) {
+                    let target = null;
+                    let minDist = 999;
+
+                    enemies.forEach(enemy => {
+                        let edx = enemy.x - c;
+                        let edy = enemy.y - r;
+                        let dist = Math.sqrt(edx*edx + edy*edy);
+
+                        if (dist <= range && dist < minDist) {
+                            target = enemy;
+                            minDist = dist;
+                        }
+                    });
+
+                    if (target) {
+                        cell.lastAttackTime = now;
+                        let startPos = cellToCanvas(r, c);
+                        
+                        bullets.push({
+                            startX: startPos.x,
+                            startY: startPos.y,
+                            x: startPos.x,
+                            y: startPos.y,
+                            targetRef: target,
+                            speed: cell.type === 'TOWER' ? 0.45 : 0.28,
+                            type: cell.type,
+                            damage: damage
+                        });
+
+                        if (cell.type === 'TOWER') {
+                            playSound('shoot_laser');
+                        } else {
+                            playSound('shoot_arrow');
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. ПЕРЕМЕЩЕНИЕ СНАРЯДОВ НА ЭКРАНЕ
+        bullets.forEach((bullet, bIdx) => {
+            if (bullet.targetRef.hp <= 0) {
+                bullets.splice(bIdx, 1);
+                return;
+            }
+
+            let targetPos = cellToCanvas(bullet.targetRef.y, bullet.targetRef.x);
+            let dx = targetPos.x - bullet.x;
+            let dy = targetPos.y - bullet.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+
+            if (dist < 15) {
+                // Наносим урон
+                bullet.targetRef.hp -= bullet.damage;
+                playSound('explosion');
+                createFlashEffect(Math.round(bullet.targetRef.y), Math.round(bullet.targetRef.x), bullet.type === 'TOWER' ? '#f59e0b' : '#10b981');
+
+                damageTexts.push({
+                    x: targetPos.x + (Math.random() - 0.5) * 10,
+                    y: targetPos.y - 12,
+                    text: `-${bullet.damage}`,
+                    color: bullet.type === 'TOWER' ? '#fbbf24' : '#34d399',
+                    alpha: 1
+                });
+
+                bullets.splice(bIdx, 1);
+            } else {
+                bullet.x += (dx / dist) * bullet.speed * dt;
+                bullet.y += (dy / dist) * bullet.speed * dt;
+            }
+        });
+
+        // Проверка завершения битвы (Победа ворот волны)
+        if (enemies.length === 0 && bullets.length === 0 && gamePhase === 'BATTLE_ACTIVE') {
+            endWaveSuccess();
+        }
+    }
+
+    /* STREAMING_CHUNK: Drawing VFX on Canvas... */
+    // Отрисовка всех эффектов на Canvas
+    function drawEffects() {
+        const cellSize = canvas.width / 7;
+
+        // 1. Отрисовка вспышек на клетках боя
+        cellAttackFlashes.forEach((flash, fIdx) => {
+            let cx = (flash.c + 0.5) * cellSize;
+            let cy = (flash.r + 0.5) * cellSize;
+
+            ctx.save();
+            ctx.globalAlpha = flash.alpha * 0.45;
+            ctx.fillStyle = flash.color;
+            ctx.beginPath();
+            ctx.arc(cx, cy, cellSize * 0.65, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            flash.alpha -= 0.06;
+            if (flash.alpha <= 0) {
+                cellAttackFlashes.splice(fIdx, 1);
+            }
+        });
+
+        // 2. Отрисовка врагов
+        enemies.forEach(enemy => {
+            let cx = (enemy.x + 0.5) * cellSize;
+            let cy = (enemy.y + 0.5) * cellSize;
+
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 4;
+
+            ctx.font = `${cellSize * 0.55}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(enemy.emoji, cx, cy);
+
+            ctx.shadowBlur = 0;
+
+            // Индикатор здоровья монстра
+            let hpBarW = cellSize * 0.7;
+            let hpBarH = 4;
+            let hpPercent = enemy.hp / enemy.maxHp;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(cx - hpBarW/2, cy - cellSize*0.35, hpBarW, hpBarH);
+
+            ctx.fillStyle = enemy.hp > enemy.maxHp * 0.4 ? '#22c55e' : '#ef4444';
+            ctx.fillRect(cx - hpBarW/2, cy - cellSize*0.35, hpBarW * hpPercent, hpBarH);
+        });
+
+        // 3. Отрисовка летящих стрел и лазеров
+        bullets.forEach(bullet => {
+            ctx.save();
+            if (bullet.type === 'TOWER') {
+                ctx.shadowColor = '#f59e0b';
+                ctx.shadowBlur = 8;
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.shadowColor = '#10b981';
+                ctx.shadowBlur = 4;
+                ctx.fillStyle = '#a7f3d0';
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        });
+
+        // 4. Отрисовка текста урона
+        damageTexts.forEach((dmg, dIdx) => {
+            ctx.save();
+            ctx.globalAlpha = dmg.alpha;
+            ctx.fillStyle = dmg.color;
+            ctx.font = 'bold 12px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText(dmg.text, dmg.x, dmg.y);
+            ctx.restore();
+
+            dmg.y -= 0.65;
+            dmg.alpha -= 0.025;
+            if (dmg.alpha <= 0) {
+                damageTexts.splice(dIdx, 1);
+            }
+        });
+    }
+
+    // Успешная зачистка волны
+    function endWaveSuccess() {
+        gamePhase = 'SPIN';
+        currentWave++;
+        spinsLeft = 5;
+        document.getElementById('wave-num').innerText = currentWave;
+        document.getElementById('game-phase').innerText = `Подготовка: Спины`;
+        document.getElementById('spins-counter').innerText = `Осталось крутить: 5`;
+        document.getElementById('action-log').innerHTML = `<span class="text-green-400 font-bold">Волна отражена! Нам зачислили 5 спинов. База разблокирована для строительства!</span>`;
+        
+        // Восстанавливаем защитников базы
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                if (gridData[r][c].type === 'DEFENDER') {
+                    gridData[r][c].defenderHp = gridData[r][c].maxDefenderHp;
+                }
+            }
+        }
+        
+        // Показываем замки обратно на заблокированных ячейках
+        updateGridUI();
+
+        document.getElementById('defense-panel').classList.add('hidden');
+        document.getElementById('slots-panel').classList.remove('hidden');
+        document.getElementById('spin-btn').disabled = false;
+        document.getElementById('start-wave-btn').disabled = false;
+    }
+
+    // Поражение
+    function endGame() {
+        gamePhase = 'GAMEOVER';
+        document.getElementById('slots-panel').classList.add('hidden');
+        document.getElementById('defense-panel').classList.add('hidden');
+        document.getElementById('restart-panel').classList.remove('hidden');
+
+        const title = document.getElementById('game-result-title');
+        const desc = document.getElementById('game-result-desc');
+
+        title.innerText = 'База Пала!';
+        title.style.color = '#ef4444';
+        desc.innerText = `Монстры прорвали каменный двор на ${currentWave}-й волне. Попробуйте укрепиться сильнее!`;
+    }
+
+    function restartGame() {
+        baseHp = 15;
+        spinsLeft = 5;
+        currentWave = 1;
+        gamePhase = 'SPIN';
+        enemies = [];
+        bullets = [];
+        damageTexts = [];
+        
+        document.getElementById('hp-text').innerText = baseHp;
+        document.getElementById('wave-num').innerText = currentWave;
+        document.getElementById('game-phase').innerText = `Подготовка: Спины`;
+        document.getElementById('spins-counter').innerText = `Осталось крутить: 5`;
+        document.getElementById('action-log').innerText = `Поля очищены. Начните с вращения слотов!`;
+
+        document.getElementById('restart-panel').classList.add('hidden');
+        document.getElementById('slots-panel').classList.remove('hidden');
+        document.getElementById('spin-btn').disabled = false;
+
+        initGrid();
+        initReels();
+        clearPaylineSVG();
+    }
+
+    /* =============================================
+       DRAG & MERGE MECHANICS
+       ============================================= */
+    let dragState = { active: false, fromR: -1, fromC: -1, ghostEl: null };
+
+    function getCellFromPoint(clientX, clientY) {
+        const gridEl = document.getElementById('battle-grid');
+        const rect = gridEl.getBoundingClientRect();
+        const cellW = rect.width / 7;
+        const cellH = rect.height / 7;
+        const c = Math.floor((clientX - rect.left) / cellW);
+        const r = Math.floor((clientY - rect.top) / cellH);
+        if (r >= 0 && r < 7 && c >= 0 && c < 7) return { r, c };
+        return null;
+    }
+
+    function startDrag(r, c, clientX, clientY) {
+        if (gamePhase !== 'SPIN' && gamePhase !== 'DEFENSE') return;
+        const cell = gridData[r][c];
+        if (cell.type === 'EMPTY' || cell.type === 'CORE' || cell.status !== 'unlocked') return;
+
+        const symb = Object.keys(SYMBOL_MAP).find(k => SYMBOL_MAP[k].type === cell.type);
+        dragState.active = true;
+        dragState.fromR = r;
+        dragState.fromC = c;
+
+        const ghost = document.createElement('div');
+        ghost.id = 'drag-ghost';
+        ghost.innerHTML = `<div>${symb}</div><div style="font-size:0.55rem;color:#fbbf24;letter-spacing:2px">${'★'.repeat(cell.level)}</div>`;
+        ghost.style.left = clientX + 'px';
+        ghost.style.top = clientY + 'px';
+        document.body.appendChild(ghost);
+        dragState.ghostEl = ghost;
+
+        document.getElementById(`cell-${r}-${c}`).style.opacity = '0.3';
+        highlightDropTargets(r, c);
+    }
+
+    function updateDrag(clientX, clientY) {
+        if (!dragState.active || !dragState.ghostEl) return;
+        dragState.ghostEl.style.left = clientX + 'px';
+        dragState.ghostEl.style.top = clientY + 'px';
+    }
+
+    function endDrag(clientX, clientY) {
+        if (!dragState.active) return;
+
+        clearDragHighlights();
+        const srcEl = document.getElementById(`cell-${dragState.fromR}-${dragState.fromC}`);
+        if (srcEl) srcEl.style.opacity = '';
+        if (dragState.ghostEl) { dragState.ghostEl.remove(); dragState.ghostEl = null; }
+
+        const target = getCellFromPoint(clientX, clientY);
+        if (target) {
+            const { r, c } = target;
+            const fromR = dragState.fromR;
+            const fromC = dragState.fromC;
+            const dstCell = gridData[r][c];
+            const srcCell = gridData[fromR][fromC];
+            const isCore = (r === 3 && c === 3);
+
+            if (!(fromR === r && fromC === c) && dstCell.status === 'unlocked' && !isCore) {
+                if (dstCell.type === 'EMPTY') {
+                    moveUnit(fromR, fromC, r, c);
+                } else if (dstCell.type === srcCell.type) {
+                    mergeUnits(fromR, fromC, r, c);
+                }
+            }
+        }
+
+        dragState.active = false;
+        dragState.fromR = -1;
+        dragState.fromC = -1;
+    }
+
+    function moveUnit(fromR, fromC, toR, toC) {
+        const src = gridData[fromR][fromC];
+        const dst = gridData[toR][toC];
+
+        dst.type = src.type;
+        dst.level = src.level;
+        dst.defenderHp = src.defenderHp;
+        dst.maxDefenderHp = src.maxDefenderHp;
+        dst.lastAttackTime = 0;
+
+        src.type = 'EMPTY';
+        src.level = 1;
+        src.defenderHp = 0;
+        src.maxDefenderHp = 40;
+        src.lastAttackTime = 0;
+
+        createFlashEffect(toR, toC, '#7dd3fc');
+        updateGridUI();
+        playSound('spin_stop');
+        document.getElementById('action-log').innerHTML = `<span class="text-sky-400">Юнит перемещён на новую позицию.</span>`;
+    }
+
+    function mergeUnits(fromR, fromC, toR, toC) {
+        const src = gridData[fromR][fromC];
+        const dst = gridData[toR][toC];
+
+        const newLevel = Math.min(src.level + dst.level, 5);
+        dst.level = newLevel;
+
+        if (dst.type === 'DEFENDER') {
+            dst.maxDefenderHp = 40 + (newLevel - 1) * 20;
+            dst.defenderHp = dst.maxDefenderHp;
+        }
+
+        src.type = 'EMPTY';
+        src.level = 1;
+        src.defenderHp = 0;
+        src.maxDefenderHp = 40;
+        src.lastAttackTime = 0;
+
+        createFlashEffect(toR, toC, '#fbbf24');
+        createFlashEffect(toR, toC, '#ffffff');
+        updateGridUI();
+        playSound('win');
+
+        const symb = Object.keys(SYMBOL_MAP).find(k => SYMBOL_MAP[k].type === dst.type);
+        document.getElementById('action-log').innerHTML =
+            `<span class="text-yellow-400 font-bold">⚡ Слияние! ${symb} → Уровень ${newLevel}${'★'.repeat(newLevel)}!</span>`;
+    }
+
+    function highlightDropTargets(fromR, fromC) {
+        const srcType = gridData[fromR][fromC].type;
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                if (r === fromR && c === fromC) continue;
+                const cell = gridData[r][c];
+                if (cell.status !== 'unlocked' || (r === 3 && c === 3)) continue;
+                const el = document.getElementById(`cell-${r}-${c}`);
+                if (cell.type === 'EMPTY') {
+                    el.classList.add('drop-valid');
+                } else if (cell.type === srcType) {
+                    el.classList.add('drop-merge');
+                }
+            }
+        }
+    }
+
+    function clearDragHighlights() {
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                document.getElementById(`cell-${r}-${c}`).classList.remove('drop-valid', 'drop-merge');
+            }
+        }
+    }
+
+    // Drag events — mouse
+    document.getElementById('battle-grid').addEventListener('mousedown', (e) => {
+        const cellEl = e.target.closest('[id^="cell-"]');
+        if (!cellEl) return;
+        const parts = cellEl.id.split('-');
+        startDrag(parseInt(parts[1]), parseInt(parts[2]), e.clientX, e.clientY);
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => { updateDrag(e.clientX, e.clientY); });
+    document.addEventListener('mouseup',   (e) => { endDrag(e.clientX, e.clientY); });
+
+    // Drag events — touch
+    document.getElementById('battle-grid').addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const cellEl = e.target.closest('[id^="cell-"]');
+        if (!cellEl) return;
+        const parts = cellEl.id.split('-');
+        startDrag(parseInt(parts[1]), parseInt(parts[2]), touch.clientX, touch.clientY);
+        e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+        if (dragState.active) {
+            updateDrag(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    document.addEventListener('touchend', (e) => {
+        if (dragState.active) {
+            const t = e.changedTouches[0];
+            endDrag(t.clientX, t.clientY);
+        }
+    });
+
+    // --- НАЗНАЧЕНИЕ КНОПОК ---
+    document.getElementById('spin-btn').addEventListener('click', spin);
+    document.getElementById('start-wave-btn').addEventListener('click', startBattle);
+    document.getElementById('restart-btn').addEventListener('click', restartGame);
+
+    // Первоначальный старт
+    initGrid();
+    initReels();
+</script>
+
+</body>
+</html>

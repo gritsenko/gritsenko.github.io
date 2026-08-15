@@ -1,0 +1,3343 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Rail Tower — Prototype</title>
+<style>
+  :root {
+    --bg: #1a1d28;
+    --panel: #242838;
+    --text: #e8ecf5;
+    --muted: #8a93a8;
+    --accent: #f5d76e;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%;
+    background: radial-gradient(circle at 50% 30%, #2a2f44, #0f111a 80%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+  .app {
+    display: flex; flex-direction: column;
+    max-width: 460px; margin: 0 auto; height: 100vh;
+    position: relative;
+  }
+  .hud {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--muted);
+    background: rgba(0,0,0,0.25);
+  }
+  .hud b { color: var(--text); font-size: 15px; }
+  .stage { position: relative; flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; }
+  .tap-prompt {
+    position: absolute;
+    top: 18%; left: 50%; transform: translate(-50%, -50%);
+    background: var(--accent);
+    color: #1a1d28;
+    font-weight: 800;
+    font-size: 18px;
+    padding: 10px 24px;
+    border-radius: 14px;
+    box-shadow: 0 0 40px rgba(245, 215, 110, 0.6);
+    animation: pulse 0.45s infinite alternate;
+    pointer-events: none;
+    z-index: 10;
+    letter-spacing: 0.5px;
+  }
+  @keyframes pulse {
+    from { transform: translate(-50%, -50%) scale(1); }
+    to   { transform: translate(-50%, -50%) scale(1.08); }
+  }
+  .hidden { display: none !important; }
+
+  /* ============ SCREENS ============ */
+  .screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    background: radial-gradient(circle at 50% 30%, #2a2f44, #0f111a 80%);
+    z-index: 30;
+  }
+  .screen-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+
+  /* Loading */
+  #screen-loading .logo {
+    font-size: 36px; font-weight: 800; letter-spacing: 4px;
+    color: var(--accent);
+    margin-bottom: 36px;
+  }
+  #screen-loading .logo small { color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 2px; display: block; margin-top: 6px; }
+  #screen-loading .progress { width: 240px; height: 6px; background: #2e3346; border-radius: 4px; overflow: hidden; }
+  #screen-loading .progress .bar { height: 100%; width: 0; background: var(--accent); transition: width 0.2s linear; }
+
+  /* Menu */
+  #screen-menu .menu-art {
+    width: 220px; height: 220px;
+    background: linear-gradient(135deg, #2e3858, #1c2238);
+    border: 2px solid #3a4365;
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 12px;
+    margin-bottom: 24px;
+  }
+  #screen-menu h1 { font-size: 28px; margin: 0 0 24px; letter-spacing: 2px; }
+  .menu-buttons { display: flex; flex-direction: column; gap: 12px; width: 220px; }
+  .menu-buttons button {
+    background: var(--accent); color: #1a1d28; border: none;
+    padding: 14px 24px; font-size: 15px; font-weight: 700; border-radius: 12px;
+    cursor: pointer; letter-spacing: 1px;
+  }
+  .menu-buttons button.secondary { background: #2e3346; color: var(--text); }
+
+  /* Top bar shared by cards/rules */
+  .screen .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: rgba(0,0,0,0.25); }
+  .screen .top-bar h2 { margin: 0; font-size: 16px; }
+  .screen .back-btn { background: transparent; border: 1px solid var(--muted); color: var(--text); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  #screen-cards .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 14px; }
+  #screen-cards .card-cell {
+    aspect-ratio: 1; border-radius: 10px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 6px;
+  }
+  #screen-cards .card-cell.empty { background: #1a1d28; border: 1px dashed #2e3346; cursor: default; }
+  #screen-cards .card-cell .swatch { width: 36px; height: 24px; border-radius: 5px; margin-bottom: 4px; }
+  #screen-cards .card-cell .name { font-size: 10px; color: var(--text); text-align: center; }
+  #screen-cards .card-cell.selected { outline: 2px solid var(--accent); }
+  #screen-cards .detail { padding: 14px 18px; background: #161924; border-top: 1px solid #2e3346; min-height: 140px; }
+  #screen-cards .detail h3 { margin: 0 0 4px; font-size: 16px; }
+  #screen-cards .detail .kind { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  #screen-cards .detail p { margin: 0 0 8px; font-size: 13px; color: var(--text); }
+  #screen-cards .detail .stats { font-size: 12px; color: var(--muted); }
+  #screen-cards .detail.empty p { color: var(--muted); font-style: italic; }
+
+  /* Rules */
+  #screen-rules .rules-body {
+    flex: 1; overflow-y: auto;
+    padding: 14px 22px;
+    font-size: 14px; line-height: 1.5;
+  }
+  #screen-rules .rules-body h3 { color: var(--accent); margin: 18px 0 6px; font-size: 14px; }
+  #screen-rules .rules-body p { margin: 0 0 8px; }
+  #screen-rules .rules-body ul { margin: 0 0 8px; padding-left: 18px; }
+  #screen-rules .rules-body li { margin-bottom: 4px; }
+
+  /* Battle screen overrides HUD layout to make room for the back chip on the left. */
+  #screen-battle .hud { padding-left: 78px; }
+  #battle-back {
+    position: absolute; top: 6px; left: 8px; z-index: 5;
+    background: rgba(0,0,0,0.55); color: var(--text);
+    border: 1px solid #3a3f55; border-radius: 8px;
+    padding: 4px 10px; font-size: 12px; cursor: pointer;
+    height: 26px;
+  }
+
+  .game-over {
+    position: absolute;
+    inset: 0;
+    background: rgba(10,12,18,0.88);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20;
+  }
+  .game-over h2 { font-size: 26px; margin: 0 0 10px; }
+  .game-over p { margin: 0 0 22px; color: var(--muted); }
+  .game-over button {
+    background: var(--accent);
+    color: #1a1d28;
+    border: none;
+    padding: 12px 32px;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="screen">
+    <div class="screen-body">
+      <div class="logo">MY.GAMES<small>placeholder</small></div>
+      <div class="progress"><div class="bar" id="loading-bar"></div></div>
+    </div>
+  </div>
+
+  <!-- MENU -->
+  <div id="screen-menu" class="screen hidden">
+    <div class="screen-body">
+      <div class="menu-art">артворк</div>
+      <h1>RAIL TOWER</h1>
+      <div class="menu-buttons">
+        <button data-go="battle">В БОЙ</button>
+        <button class="secondary" data-go="cards">КОЛЛЕКЦИЯ</button>
+        <button class="secondary" data-go="rules">ПРАВИЛА</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARDS -->
+  <div id="screen-cards" class="screen hidden">
+    <div class="top-bar">
+      <h2>Коллекция</h2>
+      <button class="back-btn" data-go="menu">← В меню</button>
+    </div>
+    <div class="grid" id="card-grid"></div>
+    <div class="detail empty" id="card-detail">
+      <p>Выбери карту, чтобы увидеть описание</p>
+    </div>
+  </div>
+
+  <!-- RULES -->
+  <div id="screen-rules" class="screen hidden">
+    <div class="top-bar">
+      <h2>Правила</h2>
+      <button class="back-btn" data-go="menu">← В меню</button>
+    </div>
+    <div class="rules-body">
+      <h3>Цель</h3>
+      <p>Защищай стену в центре арены. Если HP стены падает до нуля — игра окончена.</p>
+
+      <h3>Раунды</h3>
+      <p>Игра идёт по 9-раундовому циклу:</p>
+      <ul>
+        <li><b>Фарм</b> (1, 2, 4, 5, 7) — спавнятся слабые мобы-фермеры. Бьёшь их → +1 монета за каждого.</li>
+        <li><b>Штурм</b> (3, 6) — скелеты + щитоносцы, с 4-го раунда — рой летучих и духи.</li>
+        <li><b>Элита</b> (8) — рой, духи, демоны, зомби-слон. С 8 волны количество мобов выше.</li>
+        <li><b>Босс</b> (9) — мозг-горгона стреляет по кругу + демоны + щитоносцы.</li>
+      </ul>
+
+      <h3>Монстры</h3>
+      <ul>
+        <li><b>Скелет</b> — обычный юнит, бьёт стену в упор.</li>
+        <li><b>Скелет со щитом</b> — 35% шанс отбить пулю (рикошет).</li>
+        <li><b>Зомби-слон</b> — танк с большим HP.</li>
+        <li><b>Дух</b> — летит по спирали, трудно попасть.</li>
+        <li><b>Рой летучих</b> — слабые, но очень быстрые.</li>
+        <li><b>Демон</b> — останавливается за 70px от стены и кидает огненные шары.</li>
+        <li><b>Босс — мозг-горгона</b> — каждые 3.2с залп 12 снарядов по кругу.</li>
+      </ul>
+
+      <h3>Тележки и колода</h3>
+      <p>В колоде стартуют 3 случайные карты. Тап на карту → тележка выезжает на трек по часовой или против. Стреляет автоматически. После боезапаса уезжает на перезарядку. На карте есть стрелка следующего направления.</p>
+
+      <h3>Карты (12 шт.)</h3>
+      <p><b>Оружия (8):</b> Пулемёт, Пушка, Дробовик, Пистолет, Лазер, Рейлган, Снайперка, Пила. <b>Эффекты/баффы (4):</b> Ускоритель, Огонь, Лёд, Заработок.</p>
+
+      <h3>Шоп</h3>
+      <p>После фарма открывается магазин с 3 предложениями: новая карта, апгрейд (+25% урон / +25% AS / −1с перезарядка / Перк LV3 / Перк LV5) или реролл за 2 монеты. Перк LV5 доступен только если куплен LV3. Колода растёт до 6 слотов.</p>
+
+      <h3>Синергии</h3>
+      <p><b>180°</b>: 2 одинаковых типа на противоположных сторонах квадрата.</p>
+      <ul>
+        <li>Оружия: вертикаль = ×2 урон, горизонталь = ×2 AS</li>
+        <li>Огонь: пули становятся разрывными</li>
+        <li>Лёд: пули получают стан-импульс</li>
+        <li>Деньги: ×4 монет</li>
+        <li>Ускоритель: вертикаль — ×2 урон ауры, горизонталь — ×2 AS ауры</li>
+      </ul>
+      <p><b>Касание</b>: 2 тележки рядом на треке (≤50px). Одинаковые типы → ×2 урон + спецэффект (взрыв/100 монет/глобальный буст/...). Огонь/Лёд + стрелковое → пули получают огонь/лёд.</p>
+    </div>
+  </div>
+
+  <!-- BATTLE -->
+  <div id="screen-battle" class="screen hidden">
+    <button id="battle-back">← Меню</button>
+    <div class="hud">
+      <div>Раунд <b id="round">1</b></div>
+      <div>HP <b id="wallhp">100</b></div>
+      <div>Монет <b id="coins">0</b></div>
+      <div>Врагов <b id="enemyCount">0</b></div>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="game" width="460" height="820"></canvas>
+      <div id="game-over" class="game-over hidden">
+        <h2>Башня пала</h2>
+        <p>Дошли до раунда <span id="final-wave"></span></p>
+        <button id="restart">Заново</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+'use strict';
+
+// ============ CONSTANTS ============
+const CANVAS_W = 460;
+const CANVAS_H = 820;
+
+const GAME_AREA_TOP = 0;
+const GAME_AREA_BOTTOM = 600;
+const QUEUE_AREA_TOP = 600;
+const QUEUE_AREA_BOTTOM = 820;
+
+// Track (square ring)
+const TRACK_PAD = 24;
+const TRACK_WIDTH = 56;
+const T_OUT_L = TRACK_PAD;
+const T_OUT_R = CANVAS_W - TRACK_PAD;
+const T_OUT_T = 30;
+const T_OUT_B = GAME_AREA_BOTTOM - 30;
+
+const T_CL_L = T_OUT_L + TRACK_WIDTH / 2;
+const T_CL_R = T_OUT_R - TRACK_WIDTH / 2;
+const T_CL_T = T_OUT_T + TRACK_WIDTH / 2;
+const T_CL_B = T_OUT_B - TRACK_WIDTH / 2;
+
+const WALL_L = T_OUT_L + TRACK_WIDTH;
+const WALL_R = T_OUT_R - TRACK_WIDTH;
+const WALL_T = T_OUT_T + TRACK_WIDTH;
+const WALL_B = T_OUT_B - TRACK_WIDTH;
+
+const SIDE_H = T_CL_R - T_CL_L;
+const SIDE_V = T_CL_B - T_CL_T;
+const PERIM = 2 * (SIDE_H + SIDE_V);
+
+// corner t-values (CCW from BL): 0, SIDE_H, SIDE_H+SIDE_V, 2*SIDE_H+SIDE_V
+const CORNERS = [0, SIDE_H, SIDE_H + SIDE_V, 2 * SIDE_H + SIDE_V];
+const CORNER_ZONE = 18; // px from corner where cart doesn't shoot (turn area)
+
+const HOLE_X = (WALL_L + WALL_R) / 2;
+const HOLE_Y = (WALL_T + WALL_B) / 2;
+const HOLE_R = 28;
+
+// Entry point: middle of bottom side. Newly deployed carts spawn here.
+const ENTRY_T = SIDE_H / 2;
+
+// Early-deploy threshold: slot becomes deployable at this fraction of reload progress.
+// Ammo on deploy scales linearly from this fraction up to 100%.
+const MIN_DEPLOY_PROGRESS = 0.4;
+
+// ============ CART TYPES ============
+// All carts share the same track speed (85). Differentiate by ammo / fire pattern.
+const CART_SPEED = 85;
+const CART_TYPES = {
+  mg: {
+    name: 'Пулемёт', color: '#4ec0e8', accent: '#7fd6f5',
+    kind: 'weapon',
+    ammo: 120, cooldown: 0.16, damage: 2, speed: CART_SPEED,
+    reloadTime: 5.5, bulletSpeed: 540, bulletRadius: 3,
+    bulletColor: '#cfeefb',
+    desc: 'Скорострельный. Большая обойма, низкий урон по пуле. Бьёт перпендикулярно треку.',
+    perk3Desc: '30% пуль летят в ближайшую цель.',
+    perk5Desc: 'Все пули в ближайшие цели + 30% урона.',
+  },
+  aoe: {
+    name: 'Пушка', color: '#e85a4f', accent: '#f3877e',
+    kind: 'weapon',
+    aimed: true, aimRange: 400, aimMode: 'cluster',
+    ammo: 3, cooldown: 1.3, damage: 6, speed: CART_SPEED,
+    reloadTime: 7.0, bulletSpeed: 260, aoeRadius: 52,
+    perk3AmmoBonus: 3, perk5AmmoBonus: 5,
+    bulletColor: '#ffae54',
+    desc: 'Лобовая ракета с взрывом в самое плотное скопление. Радиус AOE 52px. Малая обойма — догружай перками.',
+    perk3Desc: 'Доп. взрыв + ёмкость +3 патрона.',
+    perk5Desc: '+30% радиус и +30% урон, ёмкость +5 патронов.',
+  },
+  shotgun: {
+    name: 'Дробовик', color: '#f0a83e', accent: '#fbc25e',
+    kind: 'weapon',
+    ammo: 36, cooldown: 0.7, damage: 1.2, speed: CART_SPEED,
+    reloadTime: 6.0, bulletSpeed: 380, bulletRadius: 2,
+    pellets: 5, spreadAngle: 0.55,
+    bulletColor: '#ffd680',
+    desc: '5 дробинок веером. Опасен в упор, рассеивается на дистанции.',
+    perk3Desc: '30% шанс выстрелить второй залп.',
+    perk5Desc: 'Гарантированный двойной залп + 30% урона.',
+  },
+  boost: {
+    name: 'Ускоритель', color: '#4ec97a', accent: '#7fd693',
+    kind: 'buff',
+    ammo: 16, cooldown: 0, damage: 0, speed: CART_SPEED,
+    reloadTime: 5.0,
+    buffRadius: 130,
+    buffAttackMul: 2.0,
+    bulletColor: '#a8f0c4',
+    desc: 'Не стреляет. Аура R=130px вокруг тележки даёт ×2 к скорости атаки соседям. 16с работы.',
+    perk3Desc: 'Бойцы в ауре получают +30% к остатку патронов разово.',
+    perk5Desc: 'Бойцы в ауре получают +50% к остатку патронов разово.',
+  },
+  fire: {
+    name: 'Огонь', color: '#e8542a', accent: '#fb8054',
+    kind: 'effect',
+    ammo: 16, cooldown: 0, damage: 0, speed: CART_SPEED,
+    reloadTime: 6.0,
+    buffRadius: 120,
+    dotDamage: 1.6, dotDuration: 2.5, dotTickInterval: 0.5,
+    bulletColor: '#fbb068',
+    desc: 'Не стреляет. Аура R=120px — пули соседних оружий получают огонь (DOT на врагах).',
+    perk3Desc: 'Раз в 3.5с тележка стреляет файерболом с AOE.',
+    perk5Desc: 'Раз в 1.8с тележка стреляет файерболом с AOE.',
+  },
+  pistol: {
+    name: 'Пистолет', color: '#9faec7', accent: '#cfd9ec',
+    kind: 'weapon',
+    aimed: true,
+    ammo: 30, cooldown: 0.4, damage: 1.5, speed: CART_SPEED,
+    reloadTime: 4.5, bulletSpeed: 480, bulletRadius: 2.5,
+    bulletColor: '#e3eaf8',
+    aimRange: 300,
+    desc: 'Прицельная стрельба по ближайшему врагу. Пропускает выстрел если цели нет в радиусе 300px.',
+    perk3Desc: 'Пуля раздваивается после попадания.',
+    perk5Desc: 'Крит +25%, 30% шанс на раздвоение раздвоения.',
+  },
+  laser: {
+    name: 'Лазер', color: '#a166e0', accent: '#c899ff',
+    kind: 'weapon',
+    continuous: true,
+    ammo: 15, cooldown: 0, damage: 4, speed: CART_SPEED,
+    reloadTime: 8.0,
+    beamLength: 150, beamWidth: 6, beamTickRate: 0.12,
+    bulletColor: '#d99eff',
+    desc: 'Стреляет толстым лучом внутрь арены. Луч живёт пока есть «секунды» (15с активной стрельбы).',
+    perk3Desc: '+30% длина луча.',
+    perk5Desc: 'Луч движется по дуге + 30% урона.',
+  },
+  railgun: {
+    name: 'Рейлган', color: '#e8e85a', accent: '#fff4a3',
+    kind: 'weapon',
+    aimed: true, aimRange: 600, aimMode: 'fattest',
+    ammo: 2, cooldown: 1.8, damage: 14, speed: CART_SPEED,
+    reloadTime: 7.0, beamWidth: 7, beamDuration: 0.5, beamPierce: true,
+    bulletColor: '#fff4a3',
+    desc: 'Пробивающий луч в самого жирного врага. Дамажит всех на траектории.',
+    perk3Desc: '+30% ширина и убивает всех в траектории.',
+    perk5Desc: 'Два луча смерти.',
+  },
+  sniper: {
+    name: 'Снайперка', color: '#7faedb', accent: '#b6d6f5',
+    kind: 'weapon',
+    aimed: true, aimRange: 500, aimMode: 'nearest',
+    ammo: 5, cooldown: 2.4, damage: 9, speed: CART_SPEED,
+    reloadTime: 6.5, critChance: 0.35, critMul: 2.5, bulletSpeed: 660, bulletRadius: 2.5,
+    bulletColor: '#cfe2f7',
+    desc: 'Прицельный высокоурочный выстрел. 35% шанс крита (×2.5). ~5 выстрелов за круг.',
+    perk3Desc: 'Разрывные патроны (небольшой AOE).',
+    perk5Desc: 'Два выстрела сразу с AOE.',
+  },
+  saw: {
+    name: 'Бензопила', color: '#a8b3c5', accent: '#dde2ec',
+    kind: 'weapon',
+    melee: true,
+    ammo: 2, cooldown: 0, damage: 3, speed: CART_SPEED,
+    reloadTime: 7.0,
+    bladeLength: 78, bladeWidth: 14, sawTickRate: 0.18, lapsLife: 2,
+    bulletColor: '#dde2ec',
+    desc: 'Бензопила. Клинок торчит внутрь от тележки. Живёт 2 круга, рвёт всех на лезвии каждые 0.18с.',
+    perk3Desc: '+30% длина клинка.',
+    perk5Desc: 'При касании двух пил — длиннее и шире.',
+  },
+  ice: {
+    name: 'Лед', color: '#5ec0e8', accent: '#a3dcf2',
+    kind: 'effect',
+    ammo: 14, cooldown: 0, damage: 0, speed: CART_SPEED,
+    reloadTime: 6.0,
+    buffRadius: 120,
+    slowDuration: 2.5, slowMul: 0.45, stunChance: 0.18, stunDuration: 1.0,
+    bulletColor: '#cdeefb',
+    desc: 'Не стреляет. Аура R=120px — пули соседних оружий замедляют и иногда станят врагов.',
+    perk3Desc: 'Раз в 3.5с тележка стреляет ледяной стрелой с AOE-станом.',
+    perk5Desc: 'Раз в 1.8с тележка стреляет ледяной стрелой.',
+  },
+  money: {
+    name: 'Заработок', color: '#dfa86b', accent: '#f0d291',
+    kind: 'buff',
+    ammo: 12, cooldown: 0, damage: 0, speed: CART_SPEED,
+    reloadTime: 9.0,
+    buffRadius: 9999, // global aura
+    coinMul: 2,
+    bulletColor: '#f0d291',
+    desc: 'Не стреляет. Пока на треке — все монеты ×2. 12с активна.',
+    perk3Desc: 'Раз в 3с генерит +1 монету пассивно.',
+    perk5Desc: 'Раз в 3с генерит +3 монеты пассивно.',
+  },
+};
+
+const ALL_TYPES = ['mg', 'aoe', 'shotgun', 'pistol', 'laser', 'railgun', 'sniper', 'saw', 'boost', 'fire', 'ice', 'money'];
+// Starter deck: 3 distinct random types. More cards bought from the shop later.
+function buildStarterDeck() {
+  const pool = ALL_TYPES.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 3);
+}
+let DECK = buildStarterDeck();
+
+// ============ ENEMY TYPES ============
+const ENEMY_TYPES = {
+  skeleton:       { hp: 6,  speed: 16, radius: 11, damage: 4,  color: '#e8e4d8', name: 'скелет',           behavior: 'march' },
+  shieldSkeleton: { hp: 10, speed: 14, radius: 12, damage: 5,  color: '#cfd5e6', name: 'скелет со щитом',   behavior: 'march', deflectChance: 0.35 },
+  elephantZombie: { hp: 42, speed: 9,  radius: 20, damage: 12, color: '#9a8db5', name: 'зомби-слон',         behavior: 'march' },
+  ghost:          { hp: 8,  speed: 22, radius: 10, damage: 4,  color: '#b6dcff', name: 'дух',                behavior: 'spiral' },
+  batSwarm:       { hp: 3,  speed: 36, radius: 8,  damage: 3,  color: '#7c5da6', name: 'рой летучих',       behavior: 'march' },
+  demon:          { hp: 14, speed: 12, radius: 13, damage: 0,  color: '#c95040', name: 'демон',              behavior: 'ranged', shootInterval: 2.6, shootDamage: 9, projectileSpeed: 180 },
+  gorgonBoss:     { hp: 200, speed: 8, radius: 26, damage: 14, color: '#8fa860', name: 'мозг-горгона',       behavior: 'march', radialInterval: 3.2, radialCount: 12, radialDamage: 5, isBoss: true },
+  farmer:         { hp: 3,  speed: 32, radius: 10, damage: 0,  color: '#aab3c5', name: 'фармер',             behavior: 'wander', coin: 1 },
+};
+
+// ============ STATE ============
+const game = {
+  carts: [],
+  slots: [],       // deck slots: { type, idx, state: 'ready'|'on_track'|'reloading', reloadLeft, reloadTotal, _box }
+  lastWeaponDir: null, // shared counter for weapon carts (mg/aoe/shotgun). Reset to null when no weapons on track.
+  lastDirByType: {}, // per-type direction for buff/effect carts (boost/fire).
+  enemies: [],
+  bullets: [],
+  explosions: [],
+  damageMarks: [],
+  coinPopups: [],
+  wallHP: 100, wallHPMax: 100,
+  coins: 0,
+  round: 1,
+  phase: 'farm',           // 'farm' | 'shop' | 'battle'
+  // farm phase
+  farmTimer: 0,
+  farmSpawnTimer: 0,
+  farmSpawnLeft: 0,
+  // battle phase (atttacking waves)
+  waveQueue: [], waveSpawnTimer: 0, waveInterval: 1.0,
+  // shop
+  shopOptions: [],
+  shopRerolled: false,
+  shopBoxes: [],
+  rerollBox: null,
+  leaveBox: null,
+  // upgrades per cart type
+  upgrades: {},
+  activeSynergies: [],
+  gameOver: false,
+  time: 0,
+  shakeAmount: 0,
+  flashSynergy: 0,
+};
+
+const OPPOSITE_SIDE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+
+// ============ TRACK PARAMETRIZATION ============
+// t=0 at BL, CCW: bottom (→), right (↑), top (←), left (↓)
+function trackPos(t) {
+  t = ((t % PERIM) + PERIM) % PERIM;
+  let side, x, y, dir, motion;
+  if (t < SIDE_H) {
+    side = 'bottom';
+    x = T_CL_L + t; y = T_CL_B;
+    dir = { x: 0, y: -1 };  // inward = up
+    motion = { x: 1, y: 0 };
+  } else if (t < SIDE_H + SIDE_V) {
+    side = 'right';
+    x = T_CL_R; y = T_CL_B - (t - SIDE_H);
+    dir = { x: -1, y: 0 };  // inward = left
+    motion = { x: 0, y: -1 };
+  } else if (t < 2 * SIDE_H + SIDE_V) {
+    side = 'top';
+    x = T_CL_R - (t - SIDE_H - SIDE_V); y = T_CL_T;
+    dir = { x: 0, y: 1 };  // inward = down
+    motion = { x: -1, y: 0 };
+  } else {
+    side = 'left';
+    x = T_CL_L; y = T_CL_T + (t - 2 * SIDE_H - SIDE_V);
+    dir = { x: 1, y: 0 };  // inward = right
+    motion = { x: 0, y: 1 };
+  }
+  let atCorner = false;
+  for (const c of CORNERS) {
+    const d1 = Math.abs(t - c);
+    const d2 = Math.abs(t - c - PERIM);
+    const d3 = Math.abs(t - c + PERIM);
+    if (Math.min(d1, d2, d3) < CORNER_ZONE) { atCorner = true; break; }
+  }
+  return { x, y, side, dir, motion, atCorner };
+}
+
+// ============ SPAWNING ============
+// Find a safe t near the entry point (avoid overlapping with cart already there)
+function safeEntryT() {
+  let t = ENTRY_T;
+  const MIN_GAP = 30;
+  // if existing cart is within MIN_GAP of entry, place new cart MIN_GAP behind (against CCW)
+  const close = game.carts.find(c => {
+    let d = (c.t - t + PERIM) % PERIM;
+    if (d > PERIM - MIN_GAP) d -= PERIM;
+    return Math.abs(d) < MIN_GAP;
+  });
+  if (close) {
+    t = ((close.t - MIN_GAP) % PERIM + PERIM) % PERIM;
+  }
+  return t;
+}
+
+function slotProgress(slot) {
+  if (slot.state === 'on_track') return 0;
+  if (slot.state === 'ready' || slot.reloadTotal === 0) return 1;
+  return Math.max(0, Math.min(1, 1 - slot.reloadLeft / slot.reloadTotal));
+}
+
+function slotDeployable(slot) {
+  if (!slot || slot.state === 'on_track') return false;
+  return slotProgress(slot) >= MIN_DEPLOY_PROGRESS;
+}
+
+// Direction for the next deploy from a slot.
+// weapon carts (mg/aoe/shotgun) → shared counter, alternates per deploy across the whole track
+// buff/effect carts (boost/fire) → per-type counter, first of type CCW, next of same type opposite
+function nextDirForSlot(slot) {
+  const kind = CART_TYPES[slot.type].kind;
+  if (kind === 'weapon') {
+    const prev = game.lastWeaponDir;
+    return prev === null ? 1 : -prev;
+  }
+  const prev = game.lastDirByType[slot.type];
+  return prev === undefined ? 1 : -prev;
+}
+
+function recordDirForSlot(slot, dir) {
+  const kind = CART_TYPES[slot.type].kind;
+  if (kind === 'weapon') game.lastWeaponDir = dir;
+  else game.lastDirByType[slot.type] = dir;
+}
+
+function deployFromSlot(slotIdx) {
+  const slot = game.slots[slotIdx];
+  if (!slot || !slotDeployable(slot)) return;
+  if (game.gameOver) return;
+  const progress = slotProgress(slot);
+  const fullAmmo = effAmmo(slot.type);
+  const ammo = Math.max(1, Math.ceil(fullAmmo * progress));
+  slot.state = 'on_track';
+  slot.reloadLeft = 0;
+  slot.reloadTotal = 0;
+  const t = safeEntryT();
+  const dir = nextDirForSlot(slot);
+  recordDirForSlot(slot, dir);
+  game.cartIdSeq = (game.cartIdSeq || 0) + 1;
+  game.carts.push({
+    id: game.cartIdSeq,
+    type: slot.type,
+    deckIdx: slotIdx,
+    t,
+    dir,
+    ammoLeft: ammo,
+    shootCD: 0.35,
+    buff: null,
+    activeSynergy: false,
+    enterAnim: 1.0,
+    lastSide: trackPos(t).side,
+    distanceTraveled: 0,
+  });
+}
+
+// Sides enemies are allowed to head toward, by round. Bottom is never used (entry is there).
+function allowedSidesForWave(n) {
+  if (n <= 4) return ['left', 'right'];
+  return ['left', 'right', 'top'];
+}
+
+// Pick a launch angle aimed at the chosen wall side, with small spread.
+function pickEnemyAngle(n) {
+  const sides = allowedSidesForWave(n);
+  const side = sides[Math.floor(Math.random() * sides.length)];
+  // base angle in screen coords: right=0, down=+π/2, left=π, up=-π/2
+  const base = side === 'right' ? 0 : side === 'left' ? Math.PI : -Math.PI / 2;
+  const spread = (Math.random() - 0.5) * (Math.PI / 3); // ±30°
+  return base + spread;
+}
+
+// ============ EFFECTIVE CART STATS (with shop upgrades) ============
+function effDamage(type)    { const u = game.upgrades[type]; return CART_TYPES[type].damage    * (u?.damageMul || 1); }
+function effCooldown(type)  { const u = game.upgrades[type]; return CART_TYPES[type].cooldown  / (u?.attackMul || 1); }
+function effReload(type)    { const u = game.upgrades[type]; return Math.max(1, CART_TYPES[type].reloadTime - (u?.reloadCut || 0)); }
+function effDotDamage(type) { const u = game.upgrades[type]; return (CART_TYPES[type].dotDamage || 0) * (u?.damageMul || 1); }
+// Effects/buffs scale ammoLeft (= seconds) via durationBonus, weapons via perk ammo bonus.
+function effAmmo(type) {
+  const ct = CART_TYPES[type];
+  const u = game.upgrades[type];
+  let base = ct.ammo;
+  if (u?.perk3 && ct.perk3AmmoBonus) base += ct.perk3AmmoBonus;
+  if (u?.perk5 && ct.perk5AmmoBonus) base += ct.perk5AmmoBonus;
+  base *= (1 + (u?.durationBonus || 0));
+  return Math.ceil(base);
+}
+
+function spawnEnemy(type) {
+  const et = ENEMY_TYPES[type];
+  const angle = et.behavior === 'wander'
+    ? Math.random() * Math.PI * 2
+    : pickEnemyAngle(game.round);
+  const r = HOLE_R + 4;
+  game.enemies.push({
+    type,
+    x: HOLE_X + Math.cos(angle) * r,
+    y: HOLE_Y + Math.sin(angle) * r,
+    vx: Math.cos(angle), vy: Math.sin(angle),
+    hp: et.hp, hpMax: et.hp,
+    radius: et.radius,
+    attackingWall: false, wallDamageTimer: 0,
+    deathFlash: 0, hitCrit: false,
+    walkPhase: Math.random() * Math.PI * 2,
+    wanderTimer: et.behavior === 'wander' ? (0.8 + Math.random() * 1.2) : 0,
+  });
+}
+
+// ============ UPDATE ============
+function update(dt) {
+  if (game.gameOver) return;
+  game.time += dt;
+  // shop pauses gameplay; only cosmetic animations tick
+  if (game.phase === 'shop') {
+    updateCoinPopups(dt);
+    if (game.shakeAmount > 0) game.shakeAmount = Math.max(0, game.shakeAmount - dt * 35);
+    if (game.flashSynergy > 0) game.flashSynergy = Math.max(0, game.flashSynergy - dt * 4);
+    return;
+  }
+  if (game.globalBurst) {
+    game.globalBurst.timeLeft -= dt;
+    if (game.globalBurst.timeLeft <= 0) game.globalBurst = null;
+  }
+  updateCarts(dt);
+  updateBullets(dt);
+  updateEnemies(dt);
+  updateExplosions(dt);
+  updateDamageMarks(dt);
+  updateCoinPopups(dt);
+  if (game.phase === 'farm') updateFarm(dt);
+  else if (game.phase === 'battle') updateBattle(dt);
+  updateSlots(dt);
+  updateAutoSynergies(dt);
+
+  if (game.shakeAmount > 0) game.shakeAmount = Math.max(0, game.shakeAmount - dt * 35);
+  if (game.flashSynergy > 0) game.flashSynergy = Math.max(0, game.flashSynergy - dt * 4);
+
+  if (game.wallHP <= 0 && !game.gameOver) {
+    game.gameOver = true;
+    showGameOver();
+  }
+}
+
+// ============ TOUCH SYNERGY ============
+// Two carts within TOUCH_RANGE along the track combo. Same-type → ×2 damage.
+// mg+fire → mg bullets gain DOT. More pairs can be added in touchEffect().
+const TOUCH_RANGE = 50;
+
+function tDistance(a, b) {
+  let d = Math.abs(a.t - b.t);
+  if (d > PERIM / 2) d = PERIM - d;
+  return d;
+}
+
+// Same-type touch: each card has its own flavor. All include ×2 damage.
+// Special pairs: gun + fire → fire bullets, gun + ice → ice bullets.
+function touchEffect(t1, t2) {
+  if (t1 === t2) {
+    const base = { damageMul: 2, sameType: t1 };
+    switch (t1) {
+      case 'mg':       return base;
+      case 'aoe':      return { ...base, extraShot: true };
+      case 'shotgun':  return { ...base, wideSpread: true };
+      case 'pistol':   return base; // crit handled inside shootCart
+      case 'laser':    return { ...base, beamExtendMul: 1.5 };
+      case 'railgun':  return { ...base, widthMul: 1.3 };
+      case 'sniper':   return { ...base, extraShots: 2 };
+      case 'saw':      return { ...base, sawTempTrigger: true };
+      case 'boost':    return { ...base, oneShotGlobalBoost: true };
+      case 'fire':     return { ...base, oneShotCluster: 'fire' };
+      case 'ice':      return { ...base, oneShotCluster: 'ice' };
+      case 'money':    return { ...base, oneShotCoins: 100 };
+    }
+  }
+  const a = t1 < t2 ? t1 : t2;
+  const b = t1 < t2 ? t2 : t1;
+  const GUNS = new Set(['mg', 'pistol', 'shotgun', 'sniper', 'railgun']);
+  if (a === 'fire' && GUNS.has(b)) return { addFire: true };
+  if (a === 'ice'  && GUNS.has(b)) return { addIce: true };
+  return null;
+}
+
+function applyTouchToCart(c, eff) {
+  const prev = c.touchBuff || { damageMul: 1, attackMul: 1, addFire: false, addIce: false, beamExtendMul: 1, widthMul: 1, extraShot: false, wideSpread: false, extraShots: 0 };
+  c.touchBuff = {
+    damageMul: prev.damageMul * (eff.damageMul || 1),
+    attackMul: prev.attackMul * (eff.attackMul || 1),
+    addFire: prev.addFire || !!eff.addFire,
+    addIce: prev.addIce || !!eff.addIce,
+    beamExtendMul: prev.beamExtendMul * (eff.beamExtendMul || 1),
+    widthMul: prev.widthMul * (eff.widthMul || 1),
+    extraShot: prev.extraShot || !!eff.extraShot,
+    wideSpread: prev.wideSpread || !!eff.wideSpread,
+    extraShots: prev.extraShots + (eff.extraShots || 0),
+  };
+}
+
+function pairKey(a, b) {
+  // unique key based on cart references (use cart.id assigned on push)
+  const ka = a.id, kb = b.id;
+  return ka < kb ? ka + '|' + kb : kb + '|' + ka;
+}
+
+function recomputeTouchBuffs() {
+  for (const c of game.carts) c.touchBuff = null;
+  const carts = game.carts;
+  game.touchPairs = [];
+  game.touchPairsActive = game.touchPairsActive || new Set();
+  const stillTouching = new Set();
+  for (let i = 0; i < carts.length; i++) {
+    for (let j = i + 1; j < carts.length; j++) {
+      const a = carts[i], b = carts[j];
+      if (tDistance(a, b) > TOUCH_RANGE) continue;
+      const eff = touchEffect(a.type, b.type);
+      if (!eff) continue;
+      applyTouchToCart(a, eff);
+      applyTouchToCart(b, eff);
+      game.touchPairs.push({ a, b, eff });
+      const key = pairKey(a, b);
+      stillTouching.add(key);
+      if (!game.touchPairsActive.has(key)) {
+        fireTouchEvent(a, b, eff);
+        game.touchPairsActive.add(key);
+      }
+    }
+  }
+  // remove pairs that no longer touch
+  for (const k of [...game.touchPairsActive]) {
+    if (!stillTouching.has(k)) game.touchPairsActive.delete(k);
+  }
+}
+
+// One-shot events triggered when same-type carts FIRST touch.
+function fireTouchEvent(a, b, eff) {
+  const mid = midpointOnTrack(a, b);
+  if (eff.oneShotGlobalBoost) {
+    // 1-second global ×2 dmg ×2 atk burst
+    game.globalBurst = { timeLeft: 1.0 };
+  }
+  if (eff.oneShotCluster === 'fire') {
+    explodeAt(mid.x, mid.y, 80, 8 + game.round * 1.5);
+  }
+  if (eff.oneShotCluster === 'ice') {
+    iceStormAt(mid.x, mid.y, 80);
+  }
+  if (eff.oneShotCoins) {
+    game.coins += eff.oneShotCoins;
+    game.coinPopups.push({ x: mid.x, y: mid.y, life: 1.2, lifeMax: 1.2, text: '+' + eff.oneShotCoins });
+  }
+  if (eff.sawTempTrigger) {
+    // Both saws get +50% blade for 2.5s. Persists after they separate.
+    a.tempBladeBuff = { timeLeft: 2.5, lengthMul: 1.5, widthMul: 1.3 };
+    b.tempBladeBuff = { timeLeft: 2.5, lengthMul: 1.5, widthMul: 1.3 };
+  }
+}
+
+function midpointOnTrack(a, b) {
+  const pa = trackPos(a.t), pb = trackPos(b.t);
+  return { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+}
+
+// Effective buff radius for fire/ice/boost auras (radius perk for fire/ice).
+function effBuffRadius(type) {
+  const ct = CART_TYPES[type];
+  const u = game.upgrades[type];
+  return (ct.buffRadius || 0) * (1 + (u?.radiusBonus || 0));
+}
+
+function applyAuras() {
+  for (const c of game.carts) {
+    c.auraBuff = null;
+    c.fireAura = false;
+    c.iceAura = false;
+  }
+  for (const buff of game.carts) {
+    const ct = CART_TYPES[buff.type];
+    const isAura = ct.kind === 'buff' || ct.kind === 'effect';
+    if (!isAura) continue;
+    if (buff.ammoLeft <= 0) continue;
+    const synAtk = buff.buff?.auraAtkBoost || 1;
+    const synDmg = buff.buff?.auraDmgBoost || 1;
+    const radius = effBuffRadius(buff.type);
+    for (const c of game.carts) {
+      if (c === buff) continue;
+      if (CART_TYPES[c.type].kind !== 'weapon') continue;
+      let tDist = Math.abs(c.t - buff.t);
+      if (tDist > PERIM / 2) tDist = PERIM - tDist;
+      if (tDist > radius) continue;
+      // boost: AS / damage aura
+      if (ct.buffAttackMul || ct.buffDamageMul) {
+        const prev = c.auraBuff || { attackMul: 1, damageMul: 1 };
+        c.auraBuff = {
+          attackMul: prev.attackMul * ((ct.buffAttackMul || 1) * synAtk),
+          damageMul: prev.damageMul * ((ct.buffDamageMul || 1) * synDmg),
+        };
+      }
+      // fire/ice: tag weapon to apply DOT/freeze on its next bullets
+      if (buff.type === 'fire') c.fireAura = true;
+      if (buff.type === 'ice')  c.iceAura = true;
+      // boost perk3/perk5: one-shot ammo bonus when cart first enters aura
+      if (buff.type === 'boost') {
+        const u = game.upgrades.boost;
+        if (u && (u.perk3 || u.perk5)) {
+          c.boostedBy = c.boostedBy || new Set();
+          if (!c.boostedBy.has(buff.id)) {
+            const maxAmmo = CART_TYPES[c.type].ammo;
+            const pct = u.perk5 ? 0.5 : 0.3;
+            c.ammoLeft = Math.min(maxAmmo * 1.5, c.ammoLeft + Math.ceil(maxAmmo * pct));
+            c.boostedBy.add(buff.id);
+          }
+        }
+      }
+    }
+  }
+}
+
+function updateCarts(dt) {
+  applyAuras();
+  recomputeTouchBuffs();
+  const toRemove = [];
+  for (const cart of game.carts) {
+    if (cart.enterAnim > 0) cart.enterAnim = Math.max(0, cart.enterAnim - dt * 2.5);
+
+    const ctype = CART_TYPES[cart.type];
+    const speedMul = cart.buff?.speedMul || 1;
+    const moveDist = ctype.speed * speedMul * dt;
+    cart.t = ((cart.t + cart.dir * moveDist) % PERIM + PERIM) % PERIM;
+    cart.distanceTraveled = (cart.distanceTraveled || 0) + Math.abs(moveDist);
+    const pos = trackPos(cart.t);
+    cart.lastSide = pos.side;
+
+    if (ctype.kind === 'buff' || ctype.kind === 'effect') {
+      // buff/effect cart: ammoLeft counts down by dt seconds, no regular shooting
+      cart.ammoLeft -= dt;
+      // money L3/L5: passive coin generation
+      if (cart.type === 'money') {
+        const u = game.upgrades.money;
+        if (u && (u.perk3 || u.perk5)) {
+          cart.passiveCoinT = (cart.passiveCoinT || 0) + dt;
+          if (cart.passiveCoinT >= 3.0) {
+            const give = u.perk5 ? 3 : 1;
+            game.coins += give;
+            game.coinPopups.push({ x: pos.x, y: pos.y - 6, life: 0.8, lifeMax: 0.8, text: '+' + give });
+            cart.passiveCoinT = 0;
+          }
+        }
+      }
+      // fire/ice perks: occasional projectile from the effect cart itself
+      if ((cart.type === 'fire' || cart.type === 'ice')) {
+        const u = game.upgrades[cart.type];
+        if (u && (u.perk3 || u.perk5) && !pos.atCorner) {
+          cart.fxFireT = (cart.fxFireT || 0) - dt;
+          if (cart.fxFireT <= 0) {
+            shootEffectProjectile(cart, pos);
+            cart.fxFireT = u.perk5 ? 1.8 : 3.5;
+          }
+        }
+      }
+      if (cart.ammoLeft <= 0) toRemove.push(cart);
+      continue;
+    }
+
+    // melee weapons (chainsaw): blade sticks INWARD from cart, hit-tested as a line segment.
+    if (ctype.melee) {
+      // tick temporary blade buff (from same-type saw touch)
+      if (cart.tempBladeBuff) {
+        cart.tempBladeBuff.timeLeft -= dt;
+        if (cart.tempBladeBuff.timeLeft <= 0) cart.tempBladeBuff = null;
+      }
+      cart.meleeCD = (cart.meleeCD || 0) - dt;
+      if (cart.meleeCD <= 0 && !pos.atCorner) {
+        const tempLen = cart.tempBladeBuff?.lengthMul || 1;
+        const tempWidth = cart.tempBladeBuff?.widthMul || 1;
+        const lenBonus = tempLen
+          * (game.upgrades[cart.type]?.perk3 ? 1.3 : 1)
+          * (game.upgrades[cart.type]?.perk5 ? 1.3 : 1);
+        const len = ctype.bladeLength * lenBonus;
+        const halfW = (ctype.bladeWidth * tempWidth) / 2;
+        const x2 = pos.x + pos.dir.x * len;
+        const y2 = pos.y + pos.dir.y * len;
+        const synDmg = cart.buff?.damageMul || 1;
+        const auraDmg = cart.auraBuff?.damageMul || 1;
+        const touchDmg = cart.touchBuff?.damageMul || 1;
+        const dmg = effDamage(cart.type) * synDmg * auraDmg * touchDmg;
+        for (const e of game.enemies) {
+          if (e.hp <= 0) continue;
+          const d = pointToSegmentDist(e.x, e.y, pos.x, pos.y, x2, y2);
+          if (d < halfW + e.radius) {
+            e.hp -= dmg;
+            e.deathFlash = 0.1;
+          }
+        }
+        cart.meleeCD = ctype.sawTickRate;
+      }
+      cart.ammoLeft = Math.max(0, Math.ceil(ctype.lapsLife - cart.distanceTraveled / PERIM));
+      if (cart.distanceTraveled >= ctype.lapsLife * PERIM) toRemove.push(cart);
+      continue;
+    }
+
+    // continuous-fire weapons (laser): no per-shot cooldown, drains ammoLeft by dt
+    if (ctype.continuous) {
+      if (cart.ammoLeft > 0 && !pos.atCorner) {
+        cart.ammoLeft -= dt;
+        cart.laserTickCD = (cart.laserTickCD || 0) - dt;
+        if (cart.laserTickCD <= 0) {
+          shootCart(cart, pos, null);
+          cart.laserTickCD = ctype.beamTickRate;
+        }
+      } else if (cart.ammoLeft <= 0) {
+        toRemove.push(cart);
+      }
+      continue;
+    }
+
+    cart.shootCD -= dt;
+
+    if (!pos.atCorner && cart.shootCD <= 0 && cart.ammoLeft > 0) {
+      const aimed = ctype.aimed;
+      let target = null;
+      if (aimed) {
+        if (ctype.aimMode === 'fattest') target = fattestEnemy(pos.x, pos.y, ctype.aimRange || 600);
+        else if (ctype.aimMode === 'cluster') target = clusterCenter(pos.x, pos.y, ctype.aimRange || 400);
+        else target = nearestEnemy(pos.x, pos.y, ctype.aimRange || 300);
+      }
+      if (!aimed || target) {
+        shootCart(cart, pos, target);
+        const synAttack = cart.buff?.attackMul || 1;
+        const auraAttack = cart.auraBuff?.attackMul || 1;
+        const touchAttack = cart.touchBuff?.attackMul || 1;
+        const burstAttack = game.globalBurst ? 2 : 1;
+        cart.shootCD = effCooldown(cart.type) / (synAttack * auraAttack * touchAttack * burstAttack);
+      } else {
+        cart.shootCD = 0.1;
+      }
+    }
+
+    if (cart.ammoLeft <= 0 && cart.shootCD <= 0.5) {
+      toRemove.push(cart);
+    }
+  }
+  for (const cart of toRemove) removeCartFromTrack(cart);
+}
+
+function nearestEnemy(x, y, maxDist) {
+  let best = null, bestD = Infinity;
+  for (const e of game.enemies) {
+    if (e.hp <= 0) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  if (!best) return null;
+  if (maxDist && bestD > maxDist) return null;
+  return best;
+}
+
+// Pick the enemy with the highest hpMax within range. Falls back to nearest if none.
+function fattestEnemy(x, y, maxDist) {
+  let best = null, bestHp = -1;
+  for (const e of game.enemies) {
+    if (e.hp <= 0) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (maxDist && d > maxDist) continue;
+    if (e.hpMax > bestHp) { bestHp = e.hpMax; best = e; }
+  }
+  return best;
+}
+
+// Find the densest cluster of enemies; return a target point at the cluster center.
+function clusterCenter(x, y, maxDist) {
+  const R = 60;
+  const enemies = game.enemies.filter(e => e.hp > 0);
+  if (enemies.length === 0) return null;
+  let bestE = null, bestCount = 0, bestCx = 0, bestCy = 0;
+  for (const e of enemies) {
+    if (maxDist && Math.hypot(e.x - x, e.y - y) > maxDist) continue;
+    let count = 0, sx = 0, sy = 0;
+    for (const o of enemies) {
+      if (Math.hypot(o.x - e.x, o.y - e.y) < R) { count++; sx += o.x; sy += o.y; }
+    }
+    if (count > bestCount) { bestCount = count; bestE = e; bestCx = sx / count; bestCy = sy / count; }
+  }
+  if (!bestE) return null;
+  return { x: bestCx, y: bestCy, hp: bestE.hp, hpMax: bestE.hpMax, radius: bestE.radius };
+}
+
+function shootCart(cart, pos, aimTarget) {
+  const ctype = CART_TYPES[cart.type];
+  const synDmg = cart.buff?.damageMul || 1;
+  const auraDmg = cart.auraBuff?.damageMul || 1;
+  const touchDmg = cart.touchBuff?.damageMul || 1;
+  const burstDmg = game.globalBurst ? 2 : 1;
+  const damageMul = synDmg * auraDmg * touchDmg * burstDmg;
+  const fireFromTouch = !!cart.touchBuff?.addFire || !!cart.fireAura;
+  const iceFromTouch = !!cart.touchBuff?.addIce || !!cart.iceAura;
+  const explosiveSynergy = !!cart.buff?.addExplosiveBullets;
+  const stunSynergy = !!cart.buff?.addStunBullets;
+  const fireDot = CART_TYPES.fire;
+  const iceCt = CART_TYPES.ice;
+  const upg = game.upgrades[cart.type];
+  const perk3 = upg?.perk3, perk5 = upg?.perk5;
+
+  const baseDmg = effDamage(cart.type) * (perk5 ? 1.3 : 1);
+
+  const baseBullet = () => ({
+    damage: baseDmg * damageMul,
+    life: 2.0,
+    type: 'mg',
+    isFire: fireFromTouch || explosiveSynergy && cart.type === 'fire',
+    isIce: iceFromTouch || stunSynergy && cart.type === 'ice',
+    dotDamage: cart.type === 'fire' ? effDotDamage(cart.type) : fireDot.dotDamage,
+    dotDuration: cart.type === 'fire' ? ctype.dotDuration : fireDot.dotDuration,
+    dotTickInterval: cart.type === 'fire' ? ctype.dotTickInterval : fireDot.dotTickInterval,
+    slowDuration: iceCt.slowDuration, slowMul: iceCt.slowMul,
+    stunChance: iceCt.stunChance, stunDuration: iceCt.stunDuration,
+    color: ctype.bulletColor,
+    radius: ctype.bulletRadius,
+  });
+
+  if (cart.type === 'pistol' && aimTarget) {
+    const dx = aimTarget.x - pos.x, dy = aimTarget.y - pos.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const isCrit = touchDmg > 1.5 && Math.random() < 0.35; // touch=×2 → crit
+    const finalDmg = baseDmg * damageMul * (isCrit ? 2 : 1);
+    game.bullets.push({
+      ...baseBullet(),
+      x: pos.x + (dx / d) * 10, y: pos.y + (dy / d) * 10,
+      vx: dx / d * ctype.bulletSpeed, vy: dy / d * ctype.bulletSpeed,
+      damage: finalDmg,
+      life: 1.5,
+      split: perk3 || perk5 ? (perk5 ? 2 : 1) : 0,
+      isCrit,
+    });
+    cart.ammoLeft--;
+    return;
+  }
+
+  if (cart.type === 'sniper' && aimTarget) {
+    const isCrit = Math.random() < (ctype.critChance + (perk5 ? 0.2 : 0));
+    const dx = aimTarget.x - pos.x, dy = aimTarget.y - pos.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const shots = perk5 ? 2 : 1;
+    const targets = [aimTarget];
+    if (shots === 2) {
+      const t2 = secondTarget(aimTarget);
+      if (t2) targets.push(t2);
+    }
+    const repeat = (cart.touchBuff?.extraShots || 0) + 1;
+    for (let s = 0; s < repeat; s++) {
+      for (const tg of targets) {
+        const tdx = tg.x - pos.x, tdy = tg.y - pos.y;
+        const td = Math.hypot(tdx, tdy) || 1;
+        const useAOE = perk3 || perk5;
+        game.bullets.push({
+          ...baseBullet(),
+          x: pos.x + (tdx / td) * 10, y: pos.y + (tdy / td) * 10,
+          vx: tdx / td * ctype.bulletSpeed, vy: tdy / td * ctype.bulletSpeed,
+          damage: baseDmg * damageMul * (isCrit ? ctype.critMul : 1),
+          life: 1.5,
+          isCrit,
+          aoeOnHit: useAOE ? (perk5 ? 38 : 28) : 0,
+          color: ctype.bulletColor,
+          radius: ctype.bulletRadius,
+        });
+      }
+    }
+    cart.ammoLeft--;
+    return;
+  }
+
+  if (cart.type === 'railgun' && aimTarget) {
+    const dx = aimTarget.x - pos.x, dy = aimTarget.y - pos.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const beams = perk5 ? 2 : 1;
+    for (let i = 0; i < beams; i++) {
+      const ang = Math.atan2(dy, dx) + (beams === 2 ? (i === 0 ? -0.15 : 0.15) : 0);
+      const len = 600;
+      const widthMul = (cart.touchBuff?.widthMul || 1) * (perk3 ? 1.3 : 1);
+      game.bullets.push({
+        x: pos.x, y: pos.y,
+        x2: pos.x + Math.cos(ang) * len, y2: pos.y + Math.sin(ang) * len,
+        damage: baseDmg * damageMul,
+        life: ctype.beamDuration,
+        lifeMax: ctype.beamDuration,
+        type: 'railbeam',
+        width: ctype.beamWidth * widthMul,
+        pierce: true,
+        damaged: new Set(),
+        color: ctype.bulletColor,
+      });
+    }
+    cart.ammoLeft--;
+    return;
+  }
+
+  if (cart.type === 'laser') {
+    const lenMul = (cart.touchBuff?.beamExtendMul || 1) * (perk3 ? 1.3 : 1) * (perk5 ? 1.5 : 1);
+    const len = ctype.beamLength * lenMul;
+    game.bullets.push({
+      x: pos.x, y: pos.y,
+      x2: pos.x + pos.dir.x * len, y2: pos.y + pos.dir.y * len,
+      damage: baseDmg * damageMul,
+      life: ctype.beamTickRate * 1.4,
+      lifeMax: ctype.beamTickRate * 1.4,
+      type: 'laserbeam',
+      width: ctype.beamWidth + (perk5 ? 2 : 0),
+      color: ctype.bulletColor,
+    });
+    return;
+  }
+
+  if (cart.type === 'mg') {
+    // mg perk3: 30% homing, perk5: 100% homing + extra dmg
+    let homingTarget = null;
+    const homeChance = perk5 ? 1 : (perk3 ? 0.3 : 0);
+    if (Math.random() < homeChance) homingTarget = nearestEnemy(pos.x, pos.y, 400);
+    let vx = pos.dir.x * ctype.bulletSpeed, vy = pos.dir.y * ctype.bulletSpeed;
+    if (homingTarget) {
+      const dx = homingTarget.x - pos.x, dy = homingTarget.y - pos.y;
+      const d = Math.hypot(dx, dy) || 1;
+      vx = dx / d * ctype.bulletSpeed; vy = dy / d * ctype.bulletSpeed;
+    }
+    game.bullets.push({
+      ...baseBullet(),
+      x: pos.x + pos.dir.x * 12, y: pos.y + pos.dir.y * 12,
+      vx, vy,
+      isFire: fireFromTouch, isIce: iceFromTouch,
+    });
+  } else if (cart.type === 'shotgun') {
+    const pellets = ctype.pellets || 5;
+    const spread = (ctype.spreadAngle || 0.5) * (cart.touchBuff?.wideSpread ? 1.6 : 1);
+    const waves = (perk5 ? 2 : 1) + (perk3 && Math.random() < 0.3 ? 1 : 0);
+    for (let w = 0; w < waves; w++) {
+      for (let p = 0; p < pellets; p++) {
+        const t = pellets === 1 ? 0 : (p / (pellets - 1) - 0.5);
+        const angle = t * spread + (Math.random() - 0.5) * 0.08;
+        const cs = Math.cos(angle), sn = Math.sin(angle);
+        const vx = (pos.dir.x * cs - pos.dir.y * sn) * ctype.bulletSpeed;
+        const vy = (pos.dir.x * sn + pos.dir.y * cs) * ctype.bulletSpeed;
+        game.bullets.push({
+          ...baseBullet(),
+          x: pos.x + pos.dir.x * 10, y: pos.y + pos.dir.y * 10,
+          vx, vy,
+          life: 0.55,
+          color: ctype.bulletColor,
+          radius: ctype.bulletRadius,
+        });
+      }
+    }
+  } else if (cart.type === 'aoe') {
+    // aimed at densest cluster, fallback to random wall area
+    let tx, ty;
+    if (aimTarget) { tx = aimTarget.x; ty = aimTarget.y; }
+    else {
+      const margin = 25;
+      tx = WALL_L + margin + Math.random() * (WALL_R - WALL_L - 2 * margin);
+      ty = WALL_T + margin + Math.random() * (WALL_B - WALL_T - 2 * margin);
+    }
+    const dx = tx - pos.x, dy = ty - pos.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const aoeR = ctype.aoeRadius * (cart.buff?.radiusMul || 1) * (perk5 ? 1.3 : 1);
+    const extra = (cart.touchBuff?.extraShot || perk3) ? 1 : 0;
+    const totalShots = 1 + extra;
+    for (let i = 0; i < totalShots; i++) {
+      const off = i === 0 ? 0 : (Math.random() - 0.5) * 50;
+      game.bullets.push({
+        x: pos.x, y: pos.y,
+        vx: dx / dist * ctype.bulletSpeed, vy: dy / dist * ctype.bulletSpeed,
+        targetX: tx + off, targetY: ty + off * 0.5,
+        damage: baseDmg * damageMul,
+        aoeRadius: aoeR,
+        life: 3.0,
+        type: 'aoe',
+        color: ctype.bulletColor,
+      });
+    }
+  }
+  cart.ammoLeft--;
+}
+
+// Periodic fireball/ice arrow from fire/ice effect carts (perk LV3/LV5 only).
+function shootEffectProjectile(cart, pos) {
+  const fireCt = CART_TYPES.fire;
+  const iceCt  = CART_TYPES.ice;
+  const target = nearestEnemy(pos.x, pos.y, 500) || { x: pos.x + pos.dir.x * 200, y: pos.y + pos.dir.y * 200 };
+  const dx = target.x - pos.x, dy = target.y - pos.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const sp = 320;
+  if (cart.type === 'fire') {
+    game.bullets.push({
+      x: pos.x + (dx/d) * 12, y: pos.y + (dy/d) * 12,
+      vx: dx/d * sp, vy: dy/d * sp,
+      damage: 4 + game.round * 0.5,
+      life: 2.0, type: 'mg',
+      isFire: true,
+      dotDamage: fireCt.dotDamage * 1.5, dotDuration: fireCt.dotDuration, dotTickInterval: fireCt.dotTickInterval,
+      aoeOnHit: 42,
+      color: fireCt.bulletColor, radius: 5,
+    });
+  } else {
+    game.bullets.push({
+      x: pos.x + (dx/d) * 12, y: pos.y + (dy/d) * 12,
+      vx: dx/d * sp, vy: dy/d * sp,
+      damage: 2 + game.round * 0.4,
+      life: 2.0, type: 'mg',
+      isIce: true,
+      slowDuration: iceCt.slowDuration * 1.4, slowMul: 0.3, stunChance: 0.5, stunDuration: 1.2,
+      iceStorm: 38,
+      color: iceCt.bulletColor, radius: 4.5,
+    });
+  }
+}
+
+// Pick a second target distinct from `t1` for sniper perk5.
+function secondTarget(t1) {
+  let best = null, bestD = Infinity;
+  for (const e of game.enemies) {
+    if (e.hp <= 0 || e === t1) continue;
+    const d = Math.hypot(e.x - t1.x, e.y - t1.y);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best;
+}
+
+function removeCartFromTrack(cart) {
+  if (cart.activeSynergy) {
+    game.activeSynergies = game.activeSynergies.filter(syn => {
+      if (syn.carts.includes(cart)) {
+        for (const c of syn.carts) { c.buff = null; c.activeSynergy = false; }
+        return false;
+      }
+      return true;
+    });
+  }
+  game.carts = game.carts.filter(c => c !== cart);
+  // reset shared weapon-direction counter when no weapons remain on the track
+  if (CART_TYPES[cart.type].kind === 'weapon') {
+    const hasWeaponOnTrack = game.carts.some(c => CART_TYPES[c.type].kind === 'weapon');
+    if (!hasWeaponOnTrack) game.lastWeaponDir = null;
+  }
+  // mark slot as reloading; player must re-tap once it's ready
+  const slot = game.slots[cart.deckIdx];
+  if (slot) {
+    const rt = effReload(cart.type);
+    slot.state = 'reloading';
+    slot.reloadLeft = rt;
+    slot.reloadTotal = rt;
+  }
+}
+
+function updateSlots(dt) {
+  for (const slot of game.slots) {
+    if (slot.state === 'reloading') {
+      slot.reloadLeft -= dt;
+      if (slot.reloadLeft <= 0) slot.state = 'ready';
+    }
+  }
+}
+
+function applyHitEffects(e, b) {
+  if (b.isFire) {
+    e.burning = {
+      damage: b.dotDamage || 1.5,
+      timeLeft: b.dotDuration || 2.5,
+      tickInterval: b.dotTickInterval || 0.5,
+      tickTimer: b.dotTickInterval || 0.5,
+    };
+  }
+  if (b.isIce) {
+    const slowDur = b.slowDuration || 2.5;
+    if (!e.slowed || e.slowed.timeLeft < slowDur) {
+      e.slowed = { timeLeft: slowDur, mul: b.slowMul || 0.5 };
+    }
+    if (Math.random() < (b.stunChance || 0)) {
+      e.stunned = { timeLeft: b.stunDuration || 1.0 };
+    }
+  }
+}
+
+function explodeAt(x, y, r, dmg) {
+  game.explosions.push({ x, y, r: 0, maxR: r, life: 0.4, lifeMax: 0.4 });
+  for (const e of game.enemies) {
+    if (e.hp <= 0) continue;
+    const ed = Math.hypot(e.x - x, e.y - y);
+    if (ed < r + e.radius) {
+      e.hp -= dmg;
+      e.deathFlash = 0.12;
+    }
+  }
+  game.shakeAmount += 4;
+}
+
+function iceStormAt(x, y, r) {
+  game.explosions.push({ x, y, r: 0, maxR: r, life: 0.45, lifeMax: 0.45, ice: true });
+  for (const e of game.enemies) {
+    if (e.hp <= 0) continue;
+    const ed = Math.hypot(e.x - x, e.y - y);
+    if (ed < r + e.radius) {
+      e.stunned = { timeLeft: 1.2 };
+      e.slowed = { timeLeft: 3.0, mul: 0.35 };
+      e.deathFlash = 0.1;
+    }
+  }
+}
+
+function pointToSegmentDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+function updateBullets(dt) {
+  for (const b of game.bullets) {
+    if (b.type === 'enemyShot') {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+      // hit wall? — damage and disappear
+      if (b.x <= WALL_L + 3 || b.x >= WALL_R - 3 || b.y <= WALL_T + 3 || b.y >= WALL_B - 3) {
+        game.wallHP = Math.max(0, game.wallHP - (b.wallDamage || 4));
+        game.damageMarks.push({ x: b.x, y: b.y, life: 0.4, lifeMax: 0.4 });
+        game.shakeAmount += 2;
+        b.dead = true;
+      }
+      if (b.life <= 0) b.dead = true;
+      continue;
+    }
+    if (b.type === 'laserbeam' || b.type === 'railbeam') {
+      b.life -= dt;
+      // damage enemies on the line segment
+      const segR = (b.width || 6) * 0.5;
+      for (const e of game.enemies) {
+        if (e.hp <= 0) continue;
+        if (b.type === 'railbeam' && b.damaged.has(e)) continue;
+        const d = pointToSegmentDist(e.x, e.y, b.x, b.y, b.x2, b.y2);
+        if (d < segR + e.radius) {
+          e.hp -= b.damage;
+          e.deathFlash = 0.1;
+          e.hitCrit = !!b.isCrit;
+          if (b.type === 'railbeam') b.damaged.add(e);
+        }
+      }
+      if (b.life <= 0) b.dead = true;
+      continue;
+    }
+
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt;
+
+    if (b.type === 'aoe') {
+      const d = Math.hypot(b.x - b.targetX, b.y - b.targetY);
+      if (d < 14 || b.life <= 0) {
+        explodeAt(b.x, b.y, b.aoeRadius, b.damage);
+        b.dead = true;
+      }
+    } else {
+      for (const e of game.enemies) {
+        if (e.hp <= 0) continue;
+        const ed = Math.hypot(e.x - b.x, e.y - b.y);
+        if (ed < e.radius + (b.radius || 3)) {
+          // shieldSkeleton: chance to deflect — reverse velocity, halve damage, mark bullet as deflected once.
+          const et = ENEMY_TYPES[e.type];
+          if (et.deflectChance && !b.deflected && Math.random() < et.deflectChance) {
+            b.vx = -b.vx; b.vy = -b.vy;
+            b.deflected = true;
+            b.damage *= 0.5;
+            e.shieldFlash = 0.15;
+            // nudge bullet out of enemy so it doesn't re-collide immediately
+            const nx = (b.x - e.x) / (ed || 1), ny = (b.y - e.y) / (ed || 1);
+            b.x = e.x + nx * (e.radius + 4);
+            b.y = e.y + ny * (e.radius + 4);
+            break;
+          }
+          e.hp -= b.damage;
+          e.deathFlash = 0.08;
+          e.hitCrit = !!b.isCrit;
+          applyHitEffects(e, b);
+          if (b.aoeOnHit) explodeAt(b.x, b.y, b.aoeOnHit, b.damage * 0.5);
+          if (b.iceStorm) iceStormAt(b.x, b.y, b.iceStorm);
+          // pistol split: spawn fragments after first hit
+          if (b.split && !b.fromSplit) {
+            const fragments = b.split * 2;
+            for (let i = 0; i < fragments; i++) {
+              const ang = (i / fragments) * Math.PI * 2 + Math.random() * 0.3;
+              const sp = 280;
+              game.bullets.push({
+                x: b.x, y: b.y,
+                vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+                damage: b.damage * 0.5,
+                life: 0.7,
+                type: 'mg',
+                color: b.color, radius: (b.radius || 3) * 0.8,
+                fromSplit: true,
+              });
+            }
+          }
+          b.dead = true;
+          break;
+        }
+      }
+    }
+    if (b.life <= 0) b.dead = true;
+    if (b.x < WALL_L - 20 || b.x > WALL_R + 20 || b.y < WALL_T - 20 || b.y > WALL_B + 20) {
+      if (b.type === 'mg') b.dead = true;
+    }
+  }
+  game.bullets = game.bullets.filter(b => !b.dead);
+}
+
+function updateEnemies(dt) {
+  for (const e of game.enemies) {
+    const et = ENEMY_TYPES[e.type];
+    if (e.deathFlash > 0) {
+      e.deathFlash = Math.max(0, e.deathFlash - dt);
+      if (e.deathFlash <= 0) e.hitCrit = false;
+    }
+    if (e.slowed) { e.slowed.timeLeft -= dt; if (e.slowed.timeLeft <= 0) e.slowed = null; }
+    if (e.stunned) { e.stunned.timeLeft -= dt; if (e.stunned.timeLeft <= 0) e.stunned = null; }
+    const stunned = !!e.stunned;
+    const speedMul = stunned ? 0 : (e.slowed?.mul || 1);
+    // walk-stretch phase: progress only while actually moving on foot
+    const noStretch = e.type === 'ghost' || e.type === 'batSwarm' || e.type === 'gorgonBoss';
+    const stillRanged = e.attackingWall && et.behavior === 'ranged';
+    const isWalking = !noStretch && !stunned && !stillRanged;
+    if (isWalking) e.walkPhase += dt * 10 * (e.slowed ? e.slowed.mul : 1);
+    if (e.burning) {
+      e.burning.timeLeft -= dt;
+      e.burning.tickTimer -= dt;
+      if (e.burning.tickTimer <= 0) {
+        e.hp -= e.burning.damage;
+        e.deathFlash = 0.06;
+        e.burning.tickTimer = e.burning.tickInterval;
+      }
+      if (e.burning.timeLeft <= 0) e.burning = null;
+    }
+    if (et.behavior === 'wander') {
+      e.wanderTimer -= dt;
+      if (e.wanderTimer <= 0) {
+        const a = Math.random() * Math.PI * 2;
+        e.vx = Math.cos(a); e.vy = Math.sin(a);
+        e.wanderTimer = 0.8 + Math.random() * 1.2;
+      }
+      const sp = et.speed * speedMul;
+      e.x += e.vx * sp * dt;
+      e.y += e.vy * sp * dt;
+      // bounce off outer walls
+      if (e.x <= WALL_L + e.radius) { e.x = WALL_L + e.radius; e.vx = Math.abs(e.vx); }
+      else if (e.x >= WALL_R - e.radius) { e.x = WALL_R - e.radius; e.vx = -Math.abs(e.vx); }
+      if (e.y <= WALL_T + e.radius) { e.y = WALL_T + e.radius; e.vy = Math.abs(e.vy); }
+      else if (e.y >= WALL_B - e.radius) { e.y = WALL_B - e.radius; e.vy = -Math.abs(e.vy); }
+      // bounce off central hole
+      const dx = e.x - HOLE_X, dy = e.y - HOLE_Y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = HOLE_R + e.radius;
+      if (dist < minDist && dist > 0.0001) {
+        const nx = dx / dist, ny = dy / dist;
+        e.x = HOLE_X + nx * minDist;
+        e.y = HOLE_Y + ny * minDist;
+        const dot = e.vx * nx + e.vy * ny;
+        if (dot < 0) { e.vx -= 2 * dot * nx; e.vy -= 2 * dot * ny; }
+      }
+    } else if (e.attackingWall) {
+      if (!stunned) {
+        if (et.behavior === 'ranged') {
+          // demons stand off and lob projectiles at the wall
+          e.shootCD = (e.shootCD || et.shootInterval * 0.5) - dt;
+          if (e.shootCD <= 0) {
+            const wallCx = (WALL_L + WALL_R) / 2, wallCy = (WALL_T + WALL_B) / 2;
+            const dx = wallCx - e.x, dy = wallCy - e.y;
+            const d = Math.hypot(dx, dy) || 1;
+            game.bullets.push({
+              x: e.x, y: e.y,
+              vx: (dx/d) * et.projectileSpeed, vy: (dy/d) * et.projectileSpeed,
+              damage: 0, life: 4.0,
+              type: 'enemyShot',
+              targetX: wallCx, targetY: wallCy,
+              wallDamage: et.shootDamage,
+              color: '#ff7040',
+            });
+            e.shootCD = et.shootInterval;
+          }
+        } else {
+          e.wallDamageTimer -= dt;
+          if (e.wallDamageTimer <= 0) {
+            game.wallHP = Math.max(0, game.wallHP - et.damage);
+            game.damageMarks.push({ x: e.x, y: e.y, life: 0.4, lifeMax: 0.4 });
+            game.shakeAmount += 3;
+            e.wallDamageTimer = 0.9;
+          }
+        }
+        // boss radial burst — fires from anywhere, including while pressed to wall
+        if (et.radialInterval) {
+          e.radialCD = (e.radialCD || et.radialInterval) - dt;
+          if (e.radialCD <= 0) {
+            const n = et.radialCount;
+            for (let i = 0; i < n; i++) {
+              const a = (i / n) * Math.PI * 2 + game.time * 0.5;
+              game.bullets.push({
+                x: e.x, y: e.y,
+                vx: Math.cos(a) * 160, vy: Math.sin(a) * 160,
+                damage: 0, life: 2.0,
+                type: 'enemyShot',
+                wallDamage: et.radialDamage,
+                color: '#b9d062',
+              });
+            }
+            game.shakeAmount += 6;
+            e.radialCD = et.radialInterval;
+          }
+        }
+      }
+    } else if (et.behavior === 'spiral') {
+      // ghost: spiral inward — keep moving forward but rotate velocity each frame
+      e.spiralAngle = (e.spiralAngle || 0) + dt * 2.2;
+      const sp = et.speed * speedMul;
+      const baseAng = Math.atan2(e.vy, e.vx);
+      const newAng = baseAng + Math.sin(e.spiralAngle) * 1.4 * dt;
+      e.vx = Math.cos(newAng);
+      e.vy = Math.sin(newAng);
+      e.x += e.vx * sp * dt;
+      e.y += e.vy * sp * dt;
+      if (e.x <= WALL_L + e.radius || e.x >= WALL_R - e.radius ||
+          e.y <= WALL_T + e.radius || e.y >= WALL_B - e.radius) {
+        e.attackingWall = true;
+        e.wallDamageTimer = 0.4;
+        e.x = Math.max(WALL_L + e.radius, Math.min(WALL_R - e.radius, e.x));
+        e.y = Math.max(WALL_T + e.radius, Math.min(WALL_B - e.radius, e.y));
+      }
+    } else {
+      const sp = et.speed * speedMul;
+      e.x += e.vx * sp * dt;
+      e.y += e.vy * sp * dt;
+      // ranged stops shy of the wall (acts like attackingWall to use its shooter)
+      if (et.behavior === 'ranged') {
+        const stopMargin = 70;
+        if (e.x <= WALL_L + e.radius + stopMargin || e.x >= WALL_R - e.radius - stopMargin ||
+            e.y <= WALL_T + e.radius + stopMargin || e.y >= WALL_B - e.radius - stopMargin) {
+          e.attackingWall = true;
+          e.wallDamageTimer = 0.4;
+        }
+      } else {
+        if (e.x <= WALL_L + e.radius || e.x >= WALL_R - e.radius ||
+            e.y <= WALL_T + e.radius || e.y >= WALL_B - e.radius) {
+          e.attackingWall = true;
+          e.wallDamageTimer = 0.4;
+          e.x = Math.max(WALL_L + e.radius, Math.min(WALL_R - e.radius, e.x));
+          e.y = Math.max(WALL_T + e.radius, Math.min(WALL_B - e.radius, e.y));
+        }
+      }
+    }
+  }
+  // reward coins for dead farmers, drop death popups. Money cart multiplies coin gain.
+  const mul = currentCoinMultiplier();
+  for (const e of game.enemies) {
+    if (e.hp <= 0 && ENEMY_TYPES[e.type].coin) {
+      const give = ENEMY_TYPES[e.type].coin * mul;
+      game.coins += give;
+      game.coinPopups.push({ x: e.x, y: e.y, life: 0.8, lifeMax: 0.8, text: '+' + give });
+    }
+  }
+  game.enemies = game.enemies.filter(e => e.hp > 0);
+}
+
+// Money cart multiplier (×2 base; ×4 in 180° pair — pair overrides base, not stacks).
+function currentCoinMultiplier() {
+  let m = 1;
+  for (const c of game.carts) {
+    if (c.type !== 'money' || c.ammoLeft <= 0) continue;
+    const cm = c.buff?.coinMul || CART_TYPES.money.coinMul;
+    m = Math.max(m, cm);
+  }
+  return m;
+}
+
+function updateCoinPopups(dt) {
+  for (const p of game.coinPopups) p.life -= dt;
+  game.coinPopups = game.coinPopups.filter(p => p.life > 0);
+}
+
+function updateExplosions(dt) {
+  for (const ex of game.explosions) {
+    ex.life -= dt;
+    const p = 1 - (ex.life / ex.lifeMax);
+    ex.r = ex.maxR * (p < 0.5 ? p * 2 : 1);
+  }
+  game.explosions = game.explosions.filter(ex => ex.life > 0);
+}
+
+function updateDamageMarks(dt) {
+  for (const d of game.damageMarks) d.life -= dt;
+  game.damageMarks = game.damageMarks.filter(d => d.life > 0);
+}
+
+// ============ PHASE CONTROL ============
+// Round loop: farm (spawn farmers → kill for coins) → shop → battle (attackers) → next round farm
+// 9-round cycle: 1,2,4,5,7 farm; 3,6 assault; 8 elite; 9 boss. Each new cycle is stronger.
+
+function roundType(r) {
+  const cycle = ((r - 1) % 9) + 1;
+  if (cycle === 9) return 'boss';
+  if (cycle === 8) return 'elite';
+  if (cycle === 3 || cycle === 6) return 'assault';
+  return 'farm';
+}
+
+function roundCycleIndex(r) { return Math.floor((r - 1) / 9); }
+
+function battleCountForRound(r) {
+  const t = roundType(r);
+  const mul = 1 + roundCycleIndex(r) * 0.5;
+  // From wave 8 onward the rounds are stuffed harder — elite/boss get a 1.7× bump.
+  const stuffMul = r >= 8 ? 1.7 : 1;
+  if (t === 'farm') return 0;
+  if (t === 'assault') return Math.round(4 * mul * (r >= 8 ? 1.3 : 1));
+  if (t === 'elite') return Math.round(8 * mul * stuffMul);
+  if (t === 'boss') return Math.round(6 * mul * stuffMul);
+  return 0;
+}
+
+const ROUND_LABEL = { farm: 'Фарм', assault: 'Штурм', elite: 'Элита', boss: 'Босс' };
+const ROUND_COLOR = { farm: '#4ec97a', assault: '#e85a4f', elite: '#a87fe8', boss: '#f5d76e' };
+
+function farmCountForRound(r) {
+  return Math.min(28, 8 + Math.floor(r * 1.6));
+}
+
+function startFarmPhase(round) {
+  game.round = round;
+  game.phase = 'farm';
+  game.farmTimer = 15;
+  game.farmSpawnLeft = farmCountForRound(round);
+  game.farmSpawnTimer = 0.3;
+}
+
+// ============ SHOP ============
+const MAX_DECK_SIZE = 6;
+const UPGRADE_LABEL = {
+  damage: '+25% урон',
+  attack: '+25% скорость атаки',
+  reload: '−1.0с перезарядка',
+  duration: '+25% длительность',
+  radius: '+20% радиус ауры',
+  perk3: 'Перк LV3',
+  perk5: 'Перк LV5',
+};
+const UPGRADE_MAX = { damage: 3, attack: 3, reload: 2, duration: 3, radius: 2, perk3: 1, perk5: 1 };
+
+// Which stat-upgrade subs apply to which card kind. Perk3/perk5 apply to all.
+function statSubsForType(type) {
+  const ct = CART_TYPES[type];
+  if (ct.kind === 'weapon') return ['damage', 'attack', 'reload'];
+  if (ct.kind === 'buff') return ['duration'];
+  if (ct.kind === 'effect') return ['duration', 'radius'];
+  return [];
+}
+
+function getUpg(type) {
+  if (!game.upgrades[type]) {
+    game.upgrades[type] = {
+      damageMul: 1, attackMul: 1, reloadCut: 0, durationBonus: 0, radiusBonus: 0,
+      damageLvl: 0, attackLvl: 0, reloadLvl: 0, durationLvl: 0, radiusLvl: 0,
+      perk3: false, perk5: false, perk3Lvl: 0, perk5Lvl: 0,
+    };
+  }
+  return game.upgrades[type];
+}
+
+// Sum of stat upgrade levels already purchased for this type (excludes perks).
+function statUpgCount(type) {
+  const u = getUpg(type);
+  return (u.damageLvl || 0) + (u.attackLvl || 0) + (u.reloadLvl || 0)
+       + (u.durationLvl || 0) + (u.radiusLvl || 0);
+}
+
+function upgradeAvailable(type, sub) {
+  const u = getUpg(type);
+  // Sequential gating: perk3 needs ≥1 stat upgrade, perk5 needs perk3 + ≥3 stat upgrades.
+  if (sub === 'perk3' && statUpgCount(type) < 1) return false;
+  if (sub === 'perk5') {
+    if (!u.perk3) return false;
+    if (statUpgCount(type) < 3) return false;
+  }
+  if (sub !== 'perk3' && sub !== 'perk5' && !statSubsForType(type).includes(sub)) return false;
+  return (u[sub + 'Lvl'] || 0) < UPGRADE_MAX[sub];
+}
+
+function upgradeCost(type, sub) {
+  const u = getUpg(type);
+  if (sub === 'perk3') return 25 + Math.floor(game.round * 1.5);
+  if (sub === 'perk5') return 50 + Math.floor(game.round * 2);
+  const lvl = u[sub + 'Lvl'] || 0;
+  return 6 + lvl * 5 + Math.floor(game.round / 2);
+}
+
+function cardCost(type) {
+  return 10 + Math.floor(game.round * 1.5);
+}
+
+function generateShopOptions() {
+  const pool = [];
+  // new card offers (only if deck has room)
+  if (game.slots.length < MAX_DECK_SIZE) {
+    for (const t of ALL_TYPES) {
+      pool.push({ kind: 'card', type: t, cost: cardCost(t) });
+    }
+  }
+  // upgrade offers — only the subs that apply to each owned card type
+  const uniq = [...new Set(game.slots.map(s => s.type))];
+  for (const t of uniq) {
+    for (const sub of statSubsForType(t)) {
+      if (upgradeAvailable(t, sub)) {
+        // 2 copies → more likely to be picked than perks
+        pool.push({ kind: 'upg', type: t, sub, cost: upgradeCost(t, sub) });
+        pool.push({ kind: 'upg', type: t, sub, cost: upgradeCost(t, sub) });
+      }
+    }
+    for (const sub of ['perk3', 'perk5']) {
+      if (upgradeAvailable(t, sub)) {
+        pool.push({ kind: 'upg', type: t, sub, cost: upgradeCost(t, sub) });
+      }
+    }
+  }
+  // shuffle, then take 3 distinct (avoid same option appearing twice)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const out = [];
+  const seen = new Set();
+  for (const o of pool) {
+    const key = o.kind + ':' + o.type + ':' + (o.sub || '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(o);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function tryBuy(idx) {
+  const opt = game.shopOptions[idx];
+  if (!opt) return;
+  if (game.coins < opt.cost) return;
+  game.coins -= opt.cost;
+  if (opt.kind === 'card') {
+    const nextIdx = game.slots.length;
+    game.slots.push({ type: opt.type, idx: nextIdx, state: 'ready', reloadLeft: 0, reloadTotal: 0, _box: null });
+  } else if (opt.kind === 'upg') {
+    const u = getUpg(opt.type);
+    if (opt.sub === 'damage')      { u.damageMul *= 1.25; u.damageLvl++; }
+    else if (opt.sub === 'attack') { u.attackMul *= 1.25; u.attackLvl++; }
+    else if (opt.sub === 'reload') { u.reloadCut += 1.0;  u.reloadLvl++; }
+    else if (opt.sub === 'duration') { u.durationBonus += 0.25; u.durationLvl++; }
+    else if (opt.sub === 'radius') { u.radiusBonus += 0.20; u.radiusLvl++; }
+    else if (opt.sub === 'perk3')  { u.perk3 = true; u.perk3Lvl = 1; }
+    else if (opt.sub === 'perk5')  { u.perk5 = true; u.perk5Lvl = 1; }
+  }
+  // one purchase per shop visit
+  leaveShop();
+}
+
+function rerollShop() {
+  if (game.shopRerolled) return;
+  if (game.coins < 2) return;
+  game.coins -= 2;
+  game.shopRerolled = true;
+  game.shopOptions = generateShopOptions();
+}
+
+function updateFarm(dt) {
+  game.farmTimer = Math.max(0, game.farmTimer - dt);
+  game.farmSpawnTimer -= dt;
+  if (game.farmSpawnTimer <= 0 && game.farmSpawnLeft > 0 && game.farmTimer > 1.5) {
+    spawnEnemy('farmer');
+    game.farmSpawnLeft--;
+    game.farmSpawnTimer = 0.42;
+  }
+  // move to shop once all spawns done and arena cleared (auto-kill stragglers after timer expires)
+  if (game.farmTimer <= 0 && game.farmSpawnLeft === 0 && game.enemies.length === 0) {
+    startShop();
+  } else if (game.farmTimer <= 0 && game.farmSpawnLeft > 0) {
+    // no more spawning if timer hit zero; just wait for cleanup
+    game.farmSpawnLeft = 0;
+  }
+}
+
+function startShop() {
+  game.phase = 'shop';
+  game.shopOptions = generateShopOptions();
+  game.shopRerolled = false;
+}
+
+function leaveShop() {
+  const n = battleCountForRound(game.round);
+  if (n === 0) {
+    startFarmPhase(game.round + 1);
+  } else {
+    startBattle(n);
+  }
+}
+
+function startBattle(count) {
+  game.phase = 'battle';
+  const t = roundType(game.round);
+  const queue = [];
+  const round = game.round;
+  // Each round-type has its own mix. Higher rounds unlock more dangerous types.
+  for (let i = 0; i < count; i++) {
+    const r = Math.random();
+    let type = 'skeleton';
+    if (t === 'boss') {
+      // boss: front-load gorgonBoss(es) then meaty mix
+      if (i === 0) type = 'gorgonBoss';
+      else if (round >= 9 && r < 0.4) type = 'elephantZombie';
+      else if (r < 0.55) type = 'demon';
+      else if (r < 0.75) type = 'shieldSkeleton';
+      else type = 'skeleton';
+    } else if (t === 'elite') {
+      // elite: lots of bats, some demons, some ghosts, some shields
+      if (r < 0.32) type = 'batSwarm';
+      else if (r < 0.52) type = 'ghost';
+      else if (r < 0.7)  type = 'shieldSkeleton';
+      else if (r < 0.85) type = 'demon';
+      else type = 'elephantZombie';
+    } else {
+      // assault
+      if (round >= 6 && r < 0.18) type = 'demon';
+      else if (round >= 5 && r < 0.30) type = 'ghost';
+      else if (round >= 4 && r < 0.45) type = 'batSwarm';
+      else if (round >= 3 && r < 0.55) type = 'shieldSkeleton';
+      else type = 'skeleton';
+    }
+    queue.push(type);
+  }
+  game.waveQueue = queue;
+  game.waveInterval = Math.max(0.28, 0.85 - game.round * 0.04);
+  game.waveSpawnTimer = 0.4;
+}
+
+function updateBattle(dt) {
+  game.waveSpawnTimer -= dt;
+  if (game.waveSpawnTimer <= 0 && game.waveQueue.length > 0) {
+    spawnEnemy(game.waveQueue.shift());
+    game.waveSpawnTimer = game.waveInterval;
+  }
+  if (game.waveQueue.length === 0 && game.enemies.length === 0) {
+    startFarmPhase(game.round + 1);
+  }
+}
+
+// ============ SYNERGY (180°, auto-activated) ============
+// Axis-based buff:
+//   weapons: vertical = ×2 damage, horizontal = ×2 attack speed
+//   fire:    bullets become explosive (same on both axes)
+//   ice:     bullets gain stun pulse (same on both axes)
+//   money:   coin gain ×4 (same on both axes)
+//   boost:   vertical = aura damage ×2, horizontal = aura speed ×2
+function buffForPair(type, axis) {
+  if (type === 'fire') return { addExplosiveBullets: true, axis };
+  if (type === 'ice')  return { addStunBullets: true, axis };
+  if (type === 'money') return { coinMul: 4, axis };
+  if (type === 'boost') {
+    return axis === 'vertical'
+      ? { auraDmgBoost: 2, axis }
+      : { auraAtkBoost: 2, axis };
+  }
+  if (axis === 'vertical') return { damageMul: 2.0, attackMul: 1.0, axis };
+  return { attackMul: 2.0, damageMul: 1.0, axis };
+}
+
+function sideAxis(side) {
+  return (side === 'top' || side === 'bottom') ? 'vertical' : 'horizontal';
+}
+
+function clearSynergy(syn) {
+  for (const c of syn.carts) {
+    c.buff = null;
+    c.activeSynergy = false;
+  }
+}
+
+function updateAutoSynergies(dt) {
+  // 1) drop synergies whose pair is no longer eligible (cart left or sides not opposite)
+  game.activeSynergies = game.activeSynergies.filter(syn => {
+    const [a, b] = syn.carts;
+    if (!game.carts.includes(a) || !game.carts.includes(b)) {
+      clearSynergy(syn);
+      return false;
+    }
+    const sA = trackPos(a.t).side, sB = trackPos(b.t).side;
+    if (OPPOSITE_SIDE[sA] !== sB) {
+      clearSynergy(syn);
+      return false;
+    }
+    // refresh axis (and buff) in case pair re-aligned on different axis
+    const axis = sideAxis(sA);
+    if (syn.axis !== axis) {
+      syn.axis = axis;
+      const buff = buffForPair(a.type, axis);
+      for (const c of syn.carts) c.buff = buff;
+    }
+    return true;
+  });
+
+  // 2) detect new pairs among free carts and auto-activate
+  const free = game.carts.filter(c => !c.activeSynergy);
+  for (let i = 0; i < free.length; i++) {
+    for (let j = i + 1; j < free.length; j++) {
+      const a = free[i], b = free[j];
+      if (a.type !== b.type) continue;
+      if (a.activeSynergy || b.activeSynergy) continue;
+      const sA = trackPos(a.t).side, sB = trackPos(b.t).side;
+      if (OPPOSITE_SIDE[sA] === sB) {
+        const axis = sideAxis(sA);
+        const buff = buffForPair(a.type, axis);
+        a.buff = buff; a.activeSynergy = true;
+        b.buff = buff; b.activeSynergy = true;
+        game.activeSynergies.push({ type: a.type, axis, carts: [a, b] });
+        game.flashSynergy = 1.0;
+        game.shakeAmount += 2;
+      }
+    }
+  }
+}
+
+// ============ RENDER ============
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+function render() {
+  const sx = (Math.random() - 0.5) * game.shakeAmount;
+  const sy = (Math.random() - 0.5) * game.shakeAmount;
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  ctx.fillStyle = '#1a1d28';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // game area bg
+  ctx.fillStyle = '#222637';
+  ctx.fillRect(0, 0, CANVAS_W, GAME_AREA_BOTTOM);
+
+  renderRoundIndicator();
+  renderTrack();
+  renderEntryMarker();
+  renderHole();
+  renderDamageMarks();
+  renderEnemies();
+  renderBullets();
+  renderExplosions();
+  renderCarts();
+  renderSynergyIndicator();
+  renderCoinPopups();
+  renderDeck();
+  renderSynergyBanner();
+  renderPhaseBanner();
+  if (game.phase === 'shop') renderShop();
+
+  // synergy flash overlay
+  if (game.flashSynergy > 0) {
+    ctx.fillStyle = `rgba(245, 215, 110, ${game.flashSynergy * 0.25})`;
+    ctx.fillRect(0, 0, CANVAS_W, GAME_AREA_BOTTOM);
+  }
+  if (game.globalBurst) {
+    const a = Math.min(1, game.globalBurst.timeLeft) * 0.18;
+    ctx.fillStyle = `rgba(120, 220, 140, ${a})`;
+    ctx.fillRect(0, 0, CANVAS_W, GAME_AREA_BOTTOM);
+  }
+
+  ctx.restore();
+
+  // HUD updates
+  document.getElementById('round').textContent = game.round;
+  document.getElementById('wallhp').textContent = Math.ceil(game.wallHP);
+  document.getElementById('coins').textContent = game.coins;
+  document.getElementById('enemyCount').textContent = game.enemies.length + game.waveQueue.length;
+
+}
+
+function renderTrack() {
+  // outer rounded ring background
+  ctx.fillStyle = '#2b3047';
+  roundRect(T_OUT_L, T_OUT_T, T_OUT_R - T_OUT_L, T_OUT_B - T_OUT_T, 30);
+  ctx.fill();
+
+  // inner cutout
+  ctx.fillStyle = '#1a1d28';
+  roundRect(WALL_L, WALL_T, WALL_R - WALL_L, WALL_B - WALL_T, 10);
+  ctx.fill();
+
+  // wall ring (HP-tinted)
+  const hpRatio = game.wallHP / game.wallHPMax;
+  const wallCol = hpRatio > 0.6 ? '#b8a980' : hpRatio > 0.3 ? '#c97a47' : '#8b3a2a';
+  ctx.strokeStyle = wallCol;
+  ctx.lineWidth = 4;
+  roundRect(WALL_L, WALL_T, WALL_R - WALL_L, WALL_B - WALL_T, 10);
+  ctx.stroke();
+
+  // outer rim line
+  ctx.strokeStyle = '#3a3f55';
+  ctx.lineWidth = 2;
+  roundRect(T_OUT_L + 1, T_OUT_T + 1, T_OUT_R - T_OUT_L - 2, T_OUT_B - T_OUT_T - 2, 30);
+  ctx.stroke();
+
+  // rail tracks (subtle inner lines)
+  ctx.strokeStyle = '#3a3f55';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  const railOffset = 8;
+  // outer rail
+  roundRect(T_CL_L - railOffset, T_CL_T - railOffset,
+            (T_CL_R - T_CL_L) + 2 * railOffset, (T_CL_B - T_CL_T) + 2 * railOffset, 22);
+  ctx.stroke();
+  roundRect(T_CL_L + railOffset, T_CL_T + railOffset,
+            (T_CL_R - T_CL_L) - 2 * railOffset, (T_CL_B - T_CL_T) - 2 * railOffset, 16);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function renderHole() {
+  const grd = ctx.createRadialGradient(HOLE_X, HOLE_Y, 0, HOLE_X, HOLE_Y, HOLE_R + 14);
+  grd.addColorStop(0, '#000');
+  grd.addColorStop(0.65, '#0a0c12');
+  grd.addColorStop(1, 'rgba(10,12,18,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.arc(HOLE_X, HOLE_Y, HOLE_R + 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(HOLE_X, HOLE_Y, HOLE_R, 0, Math.PI * 2);
+  ctx.fill();
+
+  // glow particles
+  const t = game.time;
+  for (let i = 0; i < 8; i++) {
+    const a = t * 0.8 + i * Math.PI / 4;
+    const r = HOLE_R + 8 + Math.sin(t * 2.3 + i) * 4;
+    ctx.fillStyle = `rgba(232, 90, 79, ${0.3 + 0.3 * Math.sin(t * 3 + i)})`;
+    ctx.beginPath();
+    ctx.arc(HOLE_X + Math.cos(a) * r, HOLE_Y + Math.sin(a) * r, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function renderCarts() {
+  // pass 1: aura halos behind buff carts, saw radius halos behind melee carts
+  for (const cart of game.carts) {
+    const ctype = CART_TYPES[cart.type];
+    if (cart.ammoLeft <= 0) continue;
+    const pos = trackPos(cart.t);
+    if ((ctype.kind === 'buff' || ctype.kind === 'effect') && (ctype.buffRadius || 0) < 1000 && ctype.buffRadius) {
+      const r = effBuffRadius(cart.type);
+      const pulse = 0.4 + Math.sin(game.time * 3) * 0.15;
+      let auraCol = '78, 201, 122';
+      if (cart.type === 'money') auraCol = '245, 215, 110';
+      else if (cart.type === 'fire') auraCol = '232, 110, 50';
+      else if (cart.type === 'ice')  auraCol = '110, 200, 240';
+      ctx.fillStyle = `rgba(${auraCol}, ${0.10 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${auraCol}, ${0.45 * pulse})`;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (ctype.kind === 'buff' && ctype.buffRadius >= 1000) {
+      // global aura — subtle glow around the cart only
+      const pulse = 0.4 + Math.sin(game.time * 3) * 0.2;
+      ctx.fillStyle = `rgba(245, 215, 110, ${0.18 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (ctype.melee) {
+      const tempLen = cart.tempBladeBuff?.lengthMul || 1;
+      const tempWidth = cart.tempBladeBuff?.widthMul || 1;
+      const lenBonus = tempLen
+        * (game.upgrades[cart.type]?.perk3 ? 1.3 : 1)
+        * (game.upgrades[cart.type]?.perk5 ? 1.3 : 1);
+      const len = ctype.bladeLength * lenBonus;
+      const bw = ctype.bladeWidth * tempWidth;
+      // blade base offset (just outside the cart body inward)
+      const baseOff = 10;
+      const x1 = pos.x + pos.dir.x * baseOff;
+      const y1 = pos.y + pos.dir.y * baseOff;
+      const x2 = pos.x + pos.dir.x * len;
+      const y2 = pos.y + pos.dir.y * len;
+      const ang = Math.atan2(pos.dir.y, pos.dir.x);
+      ctx.save();
+      ctx.translate((x1 + x2) / 2, (y1 + y2) / 2);
+      ctx.rotate(ang);
+      const bladeLen = len - baseOff;
+      // chainsaw bar (rectangle with rounded tip)
+      ctx.fillStyle = '#3a3f55';
+      roundRect(-bladeLen / 2, -bw / 2, bladeLen, bw, bw / 2);
+      ctx.fill();
+      // metallic core
+      ctx.fillStyle = '#c8cfe0';
+      roundRect(-bladeLen / 2 + 2, -bw / 2 + 2, bladeLen - 4, bw - 4, (bw - 4) / 2);
+      ctx.fill();
+      // running teeth — small dark notches along both sides, scrolling
+      const teethSpeed = game.time * 60;
+      const toothSpacing = 6;
+      const tCount = Math.floor(bladeLen / toothSpacing);
+      ctx.fillStyle = '#1a1d28';
+      for (let i = 0; i < tCount; i++) {
+        const tx = -bladeLen / 2 + (i * toothSpacing + (teethSpeed % toothSpacing));
+        if (tx > bladeLen / 2 - 2) continue;
+        // top edge
+        ctx.fillRect(tx, -bw / 2, 2.5, 2.5);
+        // bottom edge offset
+        ctx.fillRect(tx + 3, bw / 2 - 2.5, 2.5, 2.5);
+      }
+      ctx.restore();
+      // engine spark at the cart side
+      const spark = 0.5 + Math.sin(game.time * 40) * 0.5;
+      ctx.fillStyle = `rgba(255, 200, 80, ${spark * 0.85})`;
+      ctx.beginPath();
+      ctx.arc(x1, y1, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  for (const cart of game.carts) {
+    const pos = trackPos(cart.t);
+    const ctype = CART_TYPES[cart.type];
+
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    // rotate by actual motion direction (CCW: motion as-is; CW: flip 180°)
+    const ang = Math.atan2(pos.motion.y * cart.dir, pos.motion.x * cart.dir);
+    ctx.rotate(ang);
+
+    const w = 36, h = 24;
+    const animScale = 1 - cart.enterAnim * 0.4;
+    ctx.scale(animScale, animScale);
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    roundRect(-w / 2, -h / 2 + 3, w, h, 6);
+    ctx.fill();
+
+    // body
+    ctx.fillStyle = ctype.color;
+    roundRect(-w / 2, -h / 2, w, h, 6);
+    ctx.fill();
+
+    // highlight strip — front of cart (positive x = forward)
+    ctx.fillStyle = ctype.accent;
+    roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, 5, 2);
+    ctx.fill();
+
+    // barrel — toward inward direction. For CCW (dir=+1), inward = left of motion = local -y. For CW (dir=-1), inward = right of motion = local +y.
+    const barrelY = cart.dir > 0 ? -h / 2 - 9 : h / 2 - 1;
+    ctx.fillStyle = '#22252e';
+    ctx.fillRect(-3, barrelY, 6, 10);
+    ctx.fillStyle = '#3a3f55';
+    ctx.fillRect(-2, barrelY, 4, 4);
+
+    // direction indicator — small triangle/chevron at the front
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(w / 2 - 4, -3);
+    ctx.lineTo(w / 2 + 2, 0);
+    ctx.lineTo(w / 2 - 4, 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // synergy active ring
+    if (cart.activeSynergy) {
+      ctx.strokeStyle = 'rgba(245, 215, 110, 0.95)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(w, h) * 0.65 + Math.sin(game.time * 6) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // touch-synergy ring (orange if fire-combo, yellow if same-type)
+    if (cart.touchBuff) {
+      const ringR = Math.max(w, h) * 0.78 + Math.sin(game.time * 7) * 1.5;
+      const col = cart.touchBuff.addFire ? 'rgba(255, 130, 50, 0.95)' : 'rgba(255, 220, 100, 0.85)';
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+
+    // touch-buff label above the cart
+    if (cart.touchBuff) {
+      const labels = [];
+      if (cart.touchBuff.damageMul > 1) labels.push('×' + cart.touchBuff.damageMul);
+      if (cart.touchBuff.addFire) labels.push('ОГОНЬ');
+      if (labels.length) {
+        const txt = labels.join(' ');
+        ctx.font = 'bold 10px system-ui';
+        const tw = ctx.measureText(txt).width + 8;
+        const lx = pos.x - tw / 2, ly = pos.y - 28;
+        ctx.fillStyle = cart.touchBuff.addFire ? 'rgba(255,130,50,0.95)' : 'rgba(255,220,100,0.95)';
+        roundRect(lx, ly, tw, 13, 4);
+        ctx.fill();
+        ctx.fillStyle = '#1a1d28';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(txt, pos.x, ly + 7);
+        ctx.textBaseline = 'alphabetic';
+      }
+    }
+
+    // ammo counter — placed just inward
+    const txx = pos.x + pos.dir.x * 22;
+    const tyy = pos.y + pos.dir.y * 22;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.arc(txx, tyy, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // buff/effect/continuous/melee: time/laps tick by dt → ceil. Otherwise integer ammo.
+    const isTimeBased = ctype.kind === 'buff' || ctype.kind === 'effect' || ctype.continuous || ctype.melee;
+    const ammoDisplay = isTimeBased ? Math.ceil(cart.ammoLeft) : cart.ammoLeft;
+    ctx.fillText(ammoDisplay, txx, tyy + 1);
+    ctx.textBaseline = 'alphabetic';
+
+    // aura-receiving indicator (small green dot on top of cart)
+    if (cart.auraBuff) {
+      const dotR = 3;
+      const dy = ctype.kind === 'weapon' || ctype.kind === 'effect' ? -22 : -18;
+      ctx.fillStyle = '#4ec97a';
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y + dy, dotR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+  }
+}
+
+function renderEnemies() {
+  for (const e of game.enemies) {
+    const et = ENEMY_TYPES[e.type];
+    if (e.shieldFlash > 0) e.shieldFlash = Math.max(0, e.shieldFlash - 1/60);
+    // shadow (drawn before transform — never stretches)
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.arc(e.x, e.y + 2, e.radius, 0, Math.PI * 2);
+    ctx.fill();
+    // compute body scale: walk-stretch for foot-walkers, breath for boss
+    let sx = 1, sy = 1;
+    if (e.type === 'gorgonBoss') {
+      const br = 1 + Math.sin(game.time * 1.2) * 0.03;
+      sx = sy = br;
+    } else {
+      const noStretch = e.type === 'ghost' || e.type === 'batSwarm';
+      const stillRanged = e.attackingWall && et.behavior === 'ranged';
+      if (!noStretch && !e.stunned && !stillRanged) {
+        const amp = e.type === 'farmer' ? 0.05 : 0.08;
+        const ampX = e.type === 'farmer' ? 0.025 : 0.04;
+        const s = Math.sin(e.walkPhase);
+        sx = 1 - ampX * s;
+        sy = 1 + amp * s;
+      }
+    }
+    ctx.save();
+    if (sx !== 1 || sy !== 1) {
+      const ax = e.x, ay = e.y + e.radius;
+      ctx.translate(ax, ay);
+      ctx.scale(sx, sy);
+      ctx.translate(-ax, -ay);
+    }
+    // ghost: semi-transparent, ethereal
+    if (e.type === 'ghost') ctx.globalAlpha = 0.65;
+    // body — flashes white on hit, red on crit
+    ctx.fillStyle = e.deathFlash > 0 ? (e.hitCrit ? '#ff3838' : '#fff') : et.color;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // eyes (cute)
+    ctx.fillStyle = '#1a1d28';
+    ctx.beginPath();
+    ctx.arc(e.x - e.radius * 0.3, e.y - e.radius * 0.1, e.radius * 0.18, 0, Math.PI * 2);
+    ctx.arc(e.x + e.radius * 0.3, e.y - e.radius * 0.1, e.radius * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    // skeleton: jaw line
+    if (e.type === 'skeleton' || e.type === 'shieldSkeleton') {
+      ctx.strokeStyle = '#1a1d28';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = -1; i <= 1; i++) {
+        ctx.moveTo(e.x + i * 3, e.y + e.radius * 0.25);
+        ctx.lineTo(e.x + i * 3, e.y + e.radius * 0.55);
+      }
+      ctx.stroke();
+    }
+    // shieldSkeleton: shield disc
+    if (e.type === 'shieldSkeleton') {
+      const sx = e.x - e.radius - 4, sy = e.y - 2;
+      ctx.fillStyle = e.shieldFlash > 0 ? '#fff' : '#6b7a96';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2b3047';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#dde2ec';
+      ctx.fillRect(sx - 1, sy - 6, 2, 12);
+      ctx.fillRect(sx - 6, sy - 1, 12, 2);
+    }
+    // demon: horns
+    if (e.type === 'demon') {
+      ctx.fillStyle = '#1a1d28';
+      ctx.beginPath();
+      ctx.moveTo(e.x - e.radius * 0.5, e.y - e.radius * 0.6);
+      ctx.lineTo(e.x - e.radius * 0.8, e.y - e.radius * 1.1);
+      ctx.lineTo(e.x - e.radius * 0.2, e.y - e.radius * 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(e.x + e.radius * 0.5, e.y - e.radius * 0.6);
+      ctx.lineTo(e.x + e.radius * 0.8, e.y - e.radius * 1.1);
+      ctx.lineTo(e.x + e.radius * 0.2, e.y - e.radius * 0.8);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // gorgonBoss: tentacle-snakes around head
+    if (e.type === 'gorgonBoss') {
+      ctx.strokeStyle = '#3a553c';
+      ctx.lineWidth = 3;
+      const T = game.time;
+      for (let k = 0; k < 6; k++) {
+        const a0 = (k / 6) * Math.PI * 2 + T * 0.3;
+        const x0 = e.x + Math.cos(a0) * e.radius;
+        const y0 = e.y + Math.sin(a0) * e.radius;
+        const x1 = x0 + Math.cos(a0 + Math.sin(T * 2 + k) * 0.6) * 14;
+        const y1 = y0 + Math.sin(a0 + Math.sin(T * 2 + k) * 0.6) * 14;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+        ctx.fillStyle = '#a8c97f';
+        ctx.beginPath();
+        ctx.arc(x1, y1, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // batSwarm: tiny wings
+    if (e.type === 'batSwarm') {
+      ctx.fillStyle = 'rgba(20,20,30,0.85)';
+      const wph = (Math.sin(game.time * 18 + e.x * 0.1) + 1) * 0.5;
+      ctx.beginPath();
+      ctx.ellipse(e.x - e.radius * 1.0, e.y - 1, 5 + wph * 2, 3, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(e.x + e.radius * 1.0, e.y - 1, 5 + wph * 2, 3, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // burn + frozen body tint (averaged when both active)
+    let burnA = e.burning ? 0.45 : 0;
+    let frozA = e.stunned ? 0.55 : (e.slowed ? 0.3 : 0);
+    if (burnA && frozA) { burnA *= 0.7; frozA *= 0.7; }
+    if (frozA) {
+      ctx.fillStyle = `rgba(150, 200, 240, ${frozA})`;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (burnA) {
+      ctx.fillStyle = `rgba(255, 140, 40, ${burnA})`;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // stunned snowflake mark (above head, not stretched)
+    if (e.stunned) {
+      ctx.strokeStyle = '#cdeefb';
+      ctx.lineWidth = 1.5;
+      const ts = game.time * 4 + e.x * 0.05;
+      for (let k = 0; k < 3; k++) {
+        const ang = ts + k * Math.PI / 3;
+        ctx.beginPath();
+        ctx.moveTo(e.x + Math.cos(ang) * 3, e.y - e.radius - 5 + Math.sin(ang) * 3);
+        ctx.lineTo(e.x - Math.cos(ang) * 3, e.y - e.radius - 5 - Math.sin(ang) * 3);
+        ctx.stroke();
+      }
+    }
+    // burning flame indicator (above head, not stretched)
+    if (e.burning) {
+      const fy = e.y - e.radius - 9;
+      const flick = Math.sin(game.time * 18 + e.x * 0.1) * 0.5 + 0.5;
+      ctx.fillStyle = `rgba(255, 140, 40, ${0.7 + flick * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(e.x - 3, fy + 1, 2.4, 0, Math.PI * 2);
+      ctx.arc(e.x + 3, fy + 1, 2.4, 0, Math.PI * 2);
+      ctx.arc(e.x, fy - 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255, 230, 100, ${0.6 + flick * 0.4})`;
+      ctx.beginPath();
+      ctx.arc(e.x, fy - 1, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // hp bar
+    if (e.hp < e.hpMax) {
+      const bw = e.radius * 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(e.x - bw / 2, e.y - e.radius - 7, bw, 3);
+      ctx.fillStyle = '#7fc97f';
+      ctx.fillRect(e.x - bw / 2, e.y - e.radius - 7, bw * (e.hp / e.hpMax), 3);
+    }
+  }
+}
+
+function renderBullets() {
+  for (const b of game.bullets) {
+    if (b.type === 'enemyShot') {
+      const col = b.color || '#ff7040';
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // tail
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - b.vx * 0.025, b.y - b.vy * 0.025);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    if (b.type === 'laserbeam') {
+      const alpha = Math.max(0.4, b.life / b.lifeMax);
+      const grd = ctx.createLinearGradient(b.x, b.y, b.x2, b.y2);
+      grd.addColorStop(0, `rgba(220, 150, 255, ${alpha})`);
+      grd.addColorStop(0.5, `rgba(180, 100, 230, ${alpha * 0.85})`);
+      grd.addColorStop(1, `rgba(140, 60, 200, 0)`);
+      ctx.strokeStyle = grd;
+      ctx.lineWidth = b.width;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+      // bright core
+      ctx.strokeStyle = `rgba(255, 230, 255, ${alpha})`;
+      ctx.lineWidth = Math.max(1, b.width * 0.35);
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      continue;
+    }
+    if (b.type === 'railbeam') {
+      const alpha = Math.max(0.4, b.life / b.lifeMax);
+      ctx.strokeStyle = `rgba(255, 245, 130, ${alpha})`;
+      ctx.lineWidth = b.width;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+      // bright core
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.lineWidth = Math.max(1, b.width * 0.45);
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      continue;
+    }
+    if (b.type === 'mg') {
+      if (b.isFire) {
+        const tail = 0.030;
+        const grd = ctx.createLinearGradient(b.x, b.y, b.x - b.vx * tail, b.y - b.vy * tail);
+        grd.addColorStop(0, '#ffd24a');
+        grd.addColorStop(0.4, '#ff8030');
+        grd.addColorStop(1, 'rgba(255, 80, 20, 0)');
+        ctx.strokeStyle = grd;
+        ctx.lineWidth = 3.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - b.vx * tail, b.y - b.vy * tail);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+        ctx.fillStyle = '#fff5c0';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, (b.radius || 3) + 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (b.isIce) {
+        const tail = 0.025;
+        const grd = ctx.createLinearGradient(b.x, b.y, b.x - b.vx * tail, b.y - b.vy * tail);
+        grd.addColorStop(0, '#d0f3ff');
+        grd.addColorStop(0.5, '#5ec0e8');
+        grd.addColorStop(1, 'rgba(70, 150, 220, 0)');
+        ctx.strokeStyle = grd;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - b.vx * tail, b.y - b.vy * tail);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+        ctx.fillStyle = '#eaf8ff';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, (b.radius || 3) + 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - b.vx * 0.012, b.y - b.vy * 0.012);
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius || 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+}
+
+function renderExplosions() {
+  for (const ex of game.explosions) {
+    const alpha = ex.life / ex.lifeMax;
+    if (ex.ice) {
+      ctx.fillStyle = `rgba(94, 192, 232, ${alpha * 0.45})`;
+      ctx.beginPath();
+      ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(205, 238, 251, ${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = `rgba(232, 90, 79, ${alpha * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 200, 100, ${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+}
+
+function renderDamageMarks() {
+  for (const d of game.damageMarks) {
+    const a = d.life / d.lifeMax;
+    ctx.fillStyle = `rgba(232, 80, 60, ${a * 0.8})`;
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, 14 * (1 - a) + 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function renderSynergyIndicator() {
+  for (const syn of game.activeSynergies) {
+    const [a, b] = syn.carts;
+    const pA = trackPos(a.t), pB = trackPos(b.t);
+    const alpha = 0.5 + Math.sin(game.time * 6) * 0.25;
+    ctx.strokeStyle = `rgba(245, 215, 110, ${alpha})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(pA.x, pA.y);
+    ctx.lineTo(pB.x, pB.y);
+    ctx.stroke();
+  }
+  // touch synergy arc — short bright link between adjacent carts
+  if (game.touchPairs) {
+    for (const tp of game.touchPairs) {
+      const pA = trackPos(tp.a.t), pB = trackPos(tp.b.t);
+      const alpha = 0.7 + Math.sin(game.time * 8) * 0.25;
+      const col = tp.eff.addFire ? `rgba(255, 130, 50, ${alpha})` : `rgba(255, 220, 100, ${alpha})`;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(pA.x, pA.y);
+      ctx.lineTo(pB.x, pB.y);
+      ctx.stroke();
+    }
+  }
+}
+
+function renderSynergyBanner() {
+  if (game.activeSynergies.length === 0) return;
+  // group by type so we show one line per cart type
+  const byType = {};
+  for (const syn of game.activeSynergies) {
+    if (!byType[syn.type]) byType[syn.type] = syn;
+  }
+  const lines = Object.values(byType);
+  const bannerY = 6;
+  const lineH = 24;
+
+  const PLURAL = {
+    mg: 'ПУЛЕМЁТЫ', aoe: 'ПУШКИ', shotgun: 'ДРОБОВИКИ', pistol: 'ПИСТОЛЕТЫ',
+    laser: 'ЛАЗЕРЫ', railgun: 'РЕЙЛГАНЫ', sniper: 'СНАЙПЕРКИ', saw: 'БЕНЗОПИЛЫ',
+    boost: 'УСКОРИТЕЛИ', fire: 'ОГОНЬ', ice: 'ЛЁД', money: 'ЗАРАБОТОК',
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const syn = lines[i];
+    const label = PLURAL[syn.type] || syn.type.toUpperCase();
+    let effect;
+    if (syn.type === 'fire') effect = 'РАЗРЫВНЫЕ ПУЛИ';
+    else if (syn.type === 'ice') effect = 'СТАН НА ПОПАДАНИЕ';
+    else if (syn.type === 'money') effect = 'МОНЕТЫ ×4';
+    else if (syn.type === 'boost') effect = syn.axis === 'vertical' ? 'АУРА ×2 УРОН' : 'АУРА ×2 СКОРОСТЬ';
+    else effect = syn.axis === 'vertical' ? '×2 УРОН' : '×2 СКОРОСТЬ';
+    const text = `⚡ ${label} ${effect}`;
+
+    ctx.font = 'bold 13px system-ui';
+    const tw = ctx.measureText(text).width + 24;
+    const tx = (CANVAS_W - tw) / 2;
+    const ty = bannerY + i * lineH;
+
+    // pulse
+    const pulse = 0.85 + Math.sin(game.time * 5 + i) * 0.15;
+    ctx.fillStyle = `rgba(245, 215, 110, ${pulse})`;
+    roundRect(tx, ty, tw, 20, 10);
+    ctx.fill();
+
+    ctx.fillStyle = '#1a1d28';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, CANVAS_W / 2, ty + 11);
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
+function renderDeck() {
+  // bottom panel bg
+  ctx.fillStyle = '#161924';
+  ctx.fillRect(0, QUEUE_AREA_TOP, CANVAS_W, QUEUE_AREA_BOTTOM - QUEUE_AREA_TOP);
+
+  ctx.fillStyle = '#8a93a8';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText('КОЛОДА — ТАП ЧТОБЫ ВЫПУСТИТЬ', 16, QUEUE_AREA_TOP + 16);
+
+  const slotW = 70, slotH = 145, gap = 5;
+  const totalW = game.slots.length * (slotW + gap) - gap;
+  let sx = Math.max(8, (CANVAS_W - totalW) / 2);
+  const sy = QUEUE_AREA_TOP + 28;
+
+  for (const slot of game.slots) {
+    const c = CART_TYPES[slot.type];
+    const deployable = slotDeployable(slot);
+    const progress = slotProgress(slot);
+
+    // deployable glow (pulsating) — for ready OR early-deployable carts
+    if (deployable) {
+      const glow = 0.5 + Math.sin(game.time * 4 + slot.idx) * 0.3;
+      ctx.fillStyle = `rgba(245, 215, 110, ${glow * 0.35})`;
+      roundRect(sx - 3, sy - 3, slotW + 6, slotH + 6, 11);
+      ctx.fill();
+    }
+
+    // slot bg
+    ctx.fillStyle = slot.state === 'on_track' ? '#0a0c12' : '#0d0f17';
+    roundRect(sx, sy, slotW, slotH, 9);
+    ctx.fill();
+    ctx.strokeStyle = deployable ? '#f5d76e' : '#2e3346';
+    ctx.lineWidth = deployable ? 2.5 : 1;
+    ctx.stroke();
+
+    // cart icon
+    ctx.globalAlpha = slot.state === 'on_track' ? 0.3 : 1;
+    ctx.fillStyle = c.color;
+    roundRect(sx + 12, sy + 14, slotW - 24, 24, 5);
+    ctx.fill();
+    ctx.fillStyle = c.accent;
+    roundRect(sx + 14, sy + 18, slotW - 28, 4, 2);
+    ctx.fill();
+    ctx.fillStyle = '#22252e';
+    ctx.fillRect(sx + slotW / 2 - 2, sy + 8, 4, 8);
+    ctx.globalAlpha = 1;
+
+    // type label
+    ctx.fillStyle = '#cfd5e6';
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.name, sx + slotW / 2, sy + 56);
+
+    // next-direction arrow (top-right corner). dir=+1 → CCW → bottom side moves to the right
+    if (slot.state !== 'on_track') {
+      const dir = nextDirForSlot(slot);
+      const ax = sx + slotW - 11, ay = sy + 9;
+      ctx.fillStyle = '#f5d76e';
+      ctx.beginPath();
+      if (dir > 0) {
+        ctx.moveTo(ax + 5, ay + 4);
+        ctx.lineTo(ax - 3, ay);
+        ctx.lineTo(ax - 3, ay + 8);
+      } else {
+        ctx.moveTo(ax - 5, ay + 4);
+        ctx.lineTo(ax + 3, ay);
+        ctx.lineTo(ax + 3, ay + 8);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    const unit = (c.kind === 'buff' || c.kind === 'effect') ? 'с' : (c.melee ? 'кр.' : (c.continuous ? 'с' : 'патр.'));
+    // footer per state
+    if (slot.state === 'on_track') {
+      ctx.fillStyle = '#5e6a85';
+      ctx.font = '11px system-ui';
+      ctx.fillText('в игре', sx + slotW / 2, sy + 85);
+      const cart = game.carts.find(c => c.deckIdx === slot.idx);
+      if (cart) {
+        ctx.fillStyle = '#cfd5e6';
+        ctx.font = 'bold 14px system-ui';
+        const isTimeBased = c.kind === 'buff' || c.kind === 'effect' || c.continuous || c.melee;
+        const ammoOnTrack = isTimeBased ? Math.ceil(cart.ammoLeft) : cart.ammoLeft;
+        ctx.fillText(ammoOnTrack + ' ' + unit, sx + slotW / 2, sy + 108);
+      }
+    } else {
+      // ready or reloading — show progress bar + deploy-now option
+      const ammoOnDeploy = Math.max(1, Math.ceil(effAmmo(slot.type) * progress));
+
+      // progress bar with threshold marker
+      const barX = sx + 10, barY = sy + 90, barW = slotW - 20;
+      ctx.fillStyle = '#2e3346';
+      roundRect(barX, barY, barW, 7, 3);
+      ctx.fill();
+      const barCol = progress >= 1 ? '#f5d76e' : deployable ? '#a8c97f' : '#5e6a85';
+      ctx.fillStyle = barCol;
+      roundRect(barX, barY, barW * progress, 7, 3);
+      ctx.fill();
+      // threshold tick mark at MIN_DEPLOY_PROGRESS
+      const tickX = barX + barW * MIN_DEPLOY_PROGRESS;
+      ctx.fillStyle = progress >= MIN_DEPLOY_PROGRESS ? 'rgba(245,215,110,0.85)' : 'rgba(168,201,127,0.85)';
+      ctx.fillRect(tickX - 1, barY - 2, 2, 11);
+
+      if (deployable) {
+        ctx.fillStyle = '#f5d76e';
+        ctx.font = 'bold 12px system-ui';
+        ctx.fillText('▶ ТАП', sx + slotW / 2, sy + 82);
+        ctx.fillStyle = '#cfd5e6';
+        ctx.font = 'bold 12px system-ui';
+        ctx.fillText(`${ammoOnDeploy} ${unit}`, sx + slotW / 2, sy + 114);
+        if (progress < 1) {
+          ctx.fillStyle = '#8a93a8';
+          ctx.font = '9px system-ui';
+          ctx.fillText(`или ждать ${slot.reloadLeft.toFixed(1)}с`, sx + slotW / 2, sy + 130);
+        } else {
+          ctx.fillStyle = '#8a93a8';
+          ctx.font = '9px system-ui';
+          ctx.fillText(`полный ${c.reloadTime}с`, sx + slotW / 2, sy + 130);
+        }
+      } else {
+        ctx.fillStyle = '#8a93a8';
+        ctx.font = '10px system-ui';
+        ctx.fillText('зарядка', sx + slotW / 2, sy + 82);
+        ctx.fillStyle = '#5e6a85';
+        ctx.font = '11px system-ui';
+        ctx.fillText(`готов ${(slot.reloadLeft - (slot.reloadTotal * (1 - MIN_DEPLOY_PROGRESS))).toFixed(1)}с`, sx + slotW / 2, sy + 114);
+        ctx.fillStyle = '#3e4658';
+        ctx.font = '9px system-ui';
+        ctx.fillText(`(полный ${slot.reloadLeft.toFixed(1)}с)`, sx + slotW / 2, sy + 130);
+      }
+    }
+
+    slot._box = { x: sx, y: sy, w: slotW, h: slotH };
+    sx += slotW + gap;
+  }
+}
+
+function renderEntryMarker() {
+  const pos = trackPos(ENTRY_T);
+  // arrow pointing along motion (CCW on bottom = +x)
+  const pulse = 0.55 + Math.sin(game.time * 4) * 0.3;
+  ctx.strokeStyle = `rgba(245, 215, 110, ${pulse})`;
+  ctx.fillStyle = `rgba(245, 215, 110, ${pulse * 0.6})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  const ax = pos.x, ay = pos.y + 22;
+  ctx.moveTo(ax - 8, ay);
+  ctx.lineTo(ax + 8, ay);
+  ctx.lineTo(ax + 8, ay - 4);
+  ctx.lineTo(ax + 14, ay + 2);
+  ctx.lineTo(ax + 8, ay + 8);
+  ctx.lineTo(ax + 8, ay + 4);
+  ctx.lineTo(ax - 8, ay + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(245, 215, 110, ${pulse})`;
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('ВХОД', ax, ay + 22);
+}
+
+function renderRoundIndicator() {
+  // Show 7 rounds centered around the current one (current is highlighted).
+  const VIS = 7;
+  const half = Math.floor(VIS / 2);
+  const startRound = Math.max(1, game.round - half);
+  const cellW = 44, cellH = 22, gap = 4;
+  const totalW = VIS * (cellW + gap) - gap;
+  const y = 4;
+  const x0 = (CANVAS_W - totalW) / 2;
+  ctx.font = 'bold 10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < VIS; i++) {
+    const r = startRound + i;
+    const t = roundType(r);
+    const isCurrent = r === game.round;
+    const isPast = r < game.round;
+    const cx = x0 + i * (cellW + gap);
+    const col = ROUND_COLOR[t];
+    ctx.globalAlpha = isCurrent ? 1 : (isPast ? 0.35 : 0.7);
+    ctx.fillStyle = isCurrent ? col : '#2e3346';
+    roundRect(cx, y, cellW, cellH, 5);
+    ctx.fill();
+    if (!isCurrent) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    ctx.fillStyle = isCurrent ? '#0d130f' : col;
+    ctx.fillText(`${r} ${ROUND_LABEL[t]}`, cx + cellW / 2, y + cellH / 2);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textBaseline = 'alphabetic';
+}
+
+function renderPhaseBanner() {
+  if (game.phase === 'farm') {
+    const txt = `ФАРМ · ${Math.ceil(game.farmTimer)}с`;
+    ctx.font = 'bold 12px system-ui';
+    const w = ctx.measureText(txt).width + 22;
+    const x = (CANVAS_W - w) / 2, y = GAME_AREA_BOTTOM - 28;
+    ctx.fillStyle = 'rgba(78, 201, 122, 0.85)';
+    roundRect(x, y, w, 20, 10);
+    ctx.fill();
+    ctx.fillStyle = '#0d130f';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(txt, CANVAS_W / 2, y + 11);
+    ctx.textBaseline = 'alphabetic';
+  } else if (game.phase === 'battle') {
+    const txt = `БОЙ · ${game.waveQueue.length + game.enemies.length} осталось`;
+    ctx.font = 'bold 12px system-ui';
+    const w = ctx.measureText(txt).width + 22;
+    const x = (CANVAS_W - w) / 2, y = GAME_AREA_BOTTOM - 28;
+    ctx.fillStyle = 'rgba(232, 90, 79, 0.9)';
+    roundRect(x, y, w, 20, 10);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(txt, CANVAS_W / 2, y + 11);
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
+function renderCoinPopups() {
+  for (const p of game.coinPopups) {
+    const t = 1 - (p.life / p.lifeMax);
+    const alpha = p.life / p.lifeMax;
+    const y = p.y - 24 * t;
+    ctx.fillStyle = `rgba(245, 215, 110, ${alpha})`;
+    ctx.font = 'bold 13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.text || '+1', p.x, y);
+  }
+}
+
+function renderShop() {
+  // opaque background — fully hides the track during shop
+  ctx.fillStyle = '#10131c';
+  ctx.fillRect(0, 0, CANVAS_W, GAME_AREA_BOTTOM);
+
+  // title
+  ctx.fillStyle = '#f5d76e';
+  ctx.font = 'bold 22px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('ШОП', CANVAS_W / 2, 50);
+  ctx.fillStyle = '#cfd5e6';
+  ctx.font = '13px system-ui';
+  ctx.fillText(`Монет: ${game.coins}`, CANVAS_W / 2, 72);
+
+  // 3 option boxes — vertical stack
+  game.shopBoxes = [];
+  const boxW = CANVAS_W - 60, boxH = 80, gap = 12;
+  const startY = 100;
+  for (let i = 0; i < game.shopOptions.length; i++) {
+    const opt = game.shopOptions[i];
+    const bx = 30, by = startY + i * (boxH + gap);
+    game.shopBoxes.push({ x: bx, y: by, w: boxW, h: boxH });
+
+    const affordable = game.coins >= opt.cost;
+    ctx.fillStyle = affordable ? '#1f2433' : '#15171f';
+    roundRect(bx, by, boxW, boxH, 10);
+    ctx.fill();
+    ctx.strokeStyle = affordable ? '#4ec97a' : '#3a3f55';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // type swatch
+    const ct = CART_TYPES[opt.type];
+    ctx.fillStyle = ct.color;
+    roundRect(bx + 12, by + 16, 48, 48, 8);
+    ctx.fill();
+    ctx.fillStyle = ct.accent;
+    roundRect(bx + 16, by + 20, 40, 6, 2);
+    ctx.fill();
+
+    // text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 15px system-ui';
+    ctx.textAlign = 'left';
+    if (opt.kind === 'card') {
+      ctx.fillText(`Новая: ${ct.name}`, bx + 72, by + 28);
+      ctx.fillStyle = '#8a93a8';
+      ctx.font = '12px system-ui';
+      ctx.fillText('добавить в колоду', bx + 72, by + 48);
+    } else {
+      ctx.fillText(`${ct.name}: апгрейд`, bx + 72, by + 28);
+      ctx.fillStyle = opt.sub === 'perk3' || opt.sub === 'perk5' ? '#f5d76e' : '#a8c97f';
+      ctx.font = '12px system-ui';
+      let label = UPGRADE_LABEL[opt.sub];
+      if (opt.sub === 'perk3') label = 'LV3: ' + (ct.perk3Desc || 'перк');
+      else if (opt.sub === 'perk5') label = 'LV5: ' + (ct.perk5Desc || 'перк');
+      // truncate long labels
+      const maxLen = 40;
+      if (label.length > maxLen) label = label.slice(0, maxLen - 1) + '…';
+      ctx.fillText(label, bx + 72, by + 48);
+      const u = getUpg(opt.type);
+      const lvl = u[opt.sub + 'Lvl'] || 0;
+      ctx.fillStyle = '#5e6a85';
+      ctx.font = '11px system-ui';
+      if (opt.sub === 'perk3' || opt.sub === 'perk5') {
+        ctx.fillText('одноразовый перк', bx + 72, by + 64);
+      } else {
+        ctx.fillText(`уровень ${lvl} → ${lvl + 1}`, bx + 72, by + 64);
+      }
+    }
+
+    // price
+    ctx.fillStyle = affordable ? '#f5d76e' : '#5e6a85';
+    ctx.font = 'bold 16px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${opt.cost} м`, bx + boxW - 14, by + 46);
+  }
+
+  if (game.shopOptions.length === 0) {
+    ctx.fillStyle = '#8a93a8';
+    ctx.font = '14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Предложений нет', CANVAS_W / 2, startY + 40);
+  }
+
+  // reroll + leave buttons at bottom
+  const btnY = startY + 3 * (boxH + gap) + 8;
+  const rerollW = 160, leaveW = 160, btnH = 36, btnGap = 12;
+  const totalW = rerollW + leaveW + btnGap;
+  const rx = (CANVAS_W - totalW) / 2, lx = rx + rerollW + btnGap;
+
+  const rerollEnabled = !game.shopRerolled && game.coins >= 2;
+  game.rerollBox = { x: rx, y: btnY, w: rerollW, h: btnH };
+  ctx.fillStyle = rerollEnabled ? '#2e3346' : '#15171f';
+  roundRect(rx, btnY, rerollW, btnH, 8);
+  ctx.fill();
+  ctx.strokeStyle = rerollEnabled ? '#8a93a8' : '#3a3f55';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = rerollEnabled ? '#cfd5e6' : '#5e6a85';
+  ctx.font = 'bold 13px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(game.shopRerolled ? 'Реролл — занят' : 'Реролл — 2 м', rx + rerollW / 2, btnY + btnH / 2);
+
+  game.leaveBox = { x: lx, y: btnY, w: leaveW, h: btnH };
+  ctx.fillStyle = '#4ec97a';
+  roundRect(lx, btnY, leaveW, btnH, 8);
+  ctx.fill();
+  ctx.fillStyle = '#0d130f';
+  ctx.fillText('Дальше →', lx + leaveW / 2, btnY + btnH / 2);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function roundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ============ GAME OVER / RESTART ============
+function showGameOver() {
+  document.getElementById('final-wave').textContent = game.round;
+  document.getElementById('game-over').classList.remove('hidden');
+}
+
+function restart() {
+  game.carts.length = 0;
+  game.enemies.length = 0;
+  game.bullets.length = 0;
+  game.explosions.length = 0;
+  game.damageMarks.length = 0;
+  game.coinPopups.length = 0;
+  game.wallHP = 100;
+  game.wallHPMax = 100;
+  game.coins = 0;
+  game.waveQueue.length = 0;
+  game.shopOptions.length = 0;
+  game.shopBoxes.length = 0;
+  game.rerollBox = null;
+  game.leaveBox = null;
+  game.shopRerolled = false;
+  game.upgrades = {};
+  game.activeSynergies.length = 0;
+  game.gameOver = false;
+  game.time = 0;
+  game.shakeAmount = 0;
+  game.flashSynergy = 0;
+  game.lastDirByType = {};
+  game.lastWeaponDir = null;
+
+  DECK = buildStarterDeck();
+  game.slots = DECK.map((type, idx) => ({
+    type, idx,
+    state: 'ready',
+    reloadLeft: 0,
+    reloadTotal: 0,
+    _box: null,
+  }));
+
+  document.getElementById('game-over').classList.add('hidden');
+  startFarmPhase(1);
+}
+
+document.getElementById('restart').addEventListener('click', restart);
+
+// ============ INPUT ============
+function getCanvasCoords(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left) * (CANVAS_W / rect.width),
+    y: (clientY - rect.top) * (CANVAS_H / rect.height),
+  };
+}
+
+function inBox(coords, box) {
+  return box && coords.x >= box.x && coords.x <= box.x + box.w &&
+         coords.y >= box.y && coords.y <= box.y + box.h;
+}
+
+function handleTap(coords) {
+  if (game.gameOver) return;
+  if (!coords) return;
+  if (game.phase === 'shop') {
+    for (let i = 0; i < game.shopBoxes.length; i++) {
+      if (inBox(coords, game.shopBoxes[i])) { tryBuy(i); return; }
+    }
+    if (inBox(coords, game.rerollBox) && !game.shopRerolled && game.coins >= 2) { rerollShop(); return; }
+    if (inBox(coords, game.leaveBox)) { leaveShop(); return; }
+    return;
+  }
+  for (const slot of game.slots) {
+    if (!slot._box) continue;
+    if (!slotDeployable(slot)) continue;
+    const b = slot._box;
+    if (coords.x >= b.x && coords.x <= b.x + b.w &&
+        coords.y >= b.y && coords.y <= b.y + b.h) {
+      deployFromSlot(slot.idx);
+      return;
+    }
+  }
+}
+
+canvas.addEventListener('click', e => handleTap(getCanvasCoords(e.clientX, e.clientY)));
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  handleTap(getCanvasCoords(t.clientX, t.clientY));
+}, { passive: false });
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'KeyR') restart();
+  // 1-5 hot keys to deploy slots
+  if (e.code.startsWith('Digit')) {
+    const n = parseInt(e.code.slice(5), 10);
+    if (n >= 1 && n <= game.slots.length) {
+      deployFromSlot(n - 1);
+    }
+  }
+});
+
+// ============ RESPONSIVE ============
+function resize() {
+  // canvas always fits inside the .app column (max 460 wide) and the viewport height
+  const maxW = Math.min(window.innerWidth, 460);
+  const maxH = window.innerHeight - 36; // minus hud
+  const aspect = CANVAS_W / CANVAS_H;
+  let cssW = maxW;
+  let cssH = cssW / aspect;
+  if (cssH > maxH) { cssH = maxH; cssW = cssH * aspect; }
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ============ SCREEN ROUTER ============
+let currentScreen = 'loading';
+function showScreen(id) {
+  for (const s of document.querySelectorAll('.screen')) s.classList.add('hidden');
+  const el = document.getElementById('screen-' + id);
+  if (el) el.classList.remove('hidden');
+  currentScreen = id;
+  if (id === 'battle') restart();
+  if (id === 'cards') renderCardGrid();
+}
+
+document.querySelectorAll('[data-go]').forEach(b => {
+  b.addEventListener('click', () => showScreen(b.dataset.go));
+});
+document.getElementById('battle-back').addEventListener('click', () => showScreen('menu'));
+
+// Card collection: 4×3 grid. 8 weapons + 4 effects/buffs = 12 cards.
+const COLLECTION_ORDER = ['mg', 'pistol', 'shotgun', 'aoe', 'laser', 'railgun', 'sniper', 'saw', 'boost', 'fire', 'ice', 'money'];
+let selectedCardType = null;
+function renderCardGrid() {
+  const grid = document.getElementById('card-grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < COLLECTION_ORDER.length; i++) {
+    const type = COLLECTION_ORDER[i];
+    const cell = document.createElement('div');
+    cell.className = 'card-cell' + (selectedCardType === type ? ' selected' : '');
+    const ct = CART_TYPES[type];
+    cell.style.background = ct.kind === 'weapon' ? '#1f2433' : '#1d2030';
+    cell.style.border = '1px solid ' + (ct.kind === 'weapon' ? '#3a4365' : '#3a553c');
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = ct.color;
+    sw.style.boxShadow = `inset 0 -4px 0 ${ct.accent}`;
+    cell.appendChild(sw);
+    const nm = document.createElement('div');
+    nm.className = 'name';
+    nm.textContent = ct.name;
+    cell.appendChild(nm);
+    cell.addEventListener('click', () => { selectedCardType = type; renderCardGrid(); renderCardDetail(); });
+    grid.appendChild(cell);
+  }
+  renderCardDetail();
+}
+
+function renderCardDetail() {
+  const d = document.getElementById('card-detail');
+  if (!selectedCardType) {
+    d.className = 'detail empty';
+    d.innerHTML = '<p>Выбери карту, чтобы увидеть описание</p>';
+    return;
+  }
+  const ct = CART_TYPES[selectedCardType];
+  const stats = [];
+  if (ct.kind === 'buff' || ct.kind === 'effect') {
+    if (ct.buffRadius < 1000) stats.push(`Аура R=${ct.buffRadius}px · ${ct.ammo}с активна`);
+    else stats.push(`Глобальная аура · ${ct.ammo}с активна`);
+    if (ct.buffAttackMul) stats.push(`×${ct.buffAttackMul} AS соседям`);
+    if (ct.coinMul) stats.push(`×${ct.coinMul} монет`);
+    if (ct.dotDamage) stats.push(`Огонь: DOT ${ct.dotDamage}×${Math.round(ct.dotDuration/ct.dotTickInterval)} тиков (${ct.dotDuration}с)`);
+    if (ct.slowDuration) stats.push(`Лёд: −${Math.round((1-ct.slowMul)*100)}% скорость ${ct.slowDuration}с, ${Math.round(ct.stunChance*100)}% стан`);
+  } else if (ct.melee) {
+    stats.push(`Милишная · клинок ${ct.bladeLength}×${ct.bladeWidth}px · ${ct.lapsLife} круга`);
+    stats.push(`Урон ${ct.damage} каждые ${ct.sawTickRate}с`);
+  } else if (ct.continuous) {
+    stats.push(`Луч · длина ${ct.beamLength}px · ${ct.ammo}с активной стрельбы`);
+    stats.push(`Урон ${ct.damage} каждые ${ct.beamTickRate}с`);
+  } else if (ct.beamPierce) {
+    stats.push(`${ct.ammo} зар · ${ct.cooldown}с/выстрел · пробивающий луч`);
+    stats.push(`Урон ${ct.damage} · авто-цель: самый жирный`);
+  } else {
+    stats.push(`${ct.ammo} патр · ${ct.cooldown}с/выстрел · урон ${ct.damage}`);
+    if (ct.aimed) stats.push(`Прицельный · радиус наводки ${ct.aimRange}px`);
+    if (ct.critChance) stats.push(`Шанс крита ${Math.round(ct.critChance * 100)}% · ×${ct.critMul}`);
+  }
+  stats.push(`Скорость ${ct.speed} · перезарядка ${ct.reloadTime}с`);
+  const perkLines = [];
+  if (ct.perk3Desc) perkLines.push(`<b>LV3:</b> ${ct.perk3Desc}`);
+  if (ct.perk5Desc) perkLines.push(`<b>LV5:</b> ${ct.perk5Desc}`);
+  d.className = 'detail';
+  d.innerHTML = `
+    <h3 style="color:${ct.color}">${ct.name}</h3>
+    <div class="kind">${ct.kind}</div>
+    <p>${ct.desc || ''}</p>
+    <div class="stats">${stats.join('<br>')}${perkLines.length ? '<br><br>' + perkLines.join('<br>') : ''}</div>
+  `;
+}
+
+// ============ MAIN LOOP ============
+let lastT = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  if (currentScreen === 'battle') {
+    update(dt);
+    render();
+  }
+  requestAnimationFrame(loop);
+}
+
+// Boot: loading screen with progress bar → menu.
+let loadingProgress = 0;
+function bootLoading() {
+  const bar = document.getElementById('loading-bar');
+  const iv = setInterval(() => {
+    loadingProgress += 5 + Math.random() * 10;
+    if (loadingProgress >= 100) { loadingProgress = 100; clearInterval(iv); setTimeout(() => showScreen('menu'), 250); }
+    bar.style.width = loadingProgress + '%';
+  }, 90);
+}
+
+requestAnimationFrame(loop);
+bootLoading();
+</script>
+</body>
+</html>

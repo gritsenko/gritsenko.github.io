@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Tower Defense - Green Fields Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Metamorphous&family=Inter:wght@400;700&display=swap');
+        
+        body {
+            background-color: #0d0c0c;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .gothic-title {
+            font-family: 'Cinzel', serif;
+            text-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+        }
+
+        /* Симуляция экрана 9:16 с красивой рамкой */
+        .game-viewport {
+            aspect-ratio: 9/16;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.1);
+            background: radial-gradient(circle at center, #141f16 0%, #070a08 100%);
+            border: 4px solid #1e2d24;
+        }
+
+        /* STREAMING_CHUNK: Styling grid cells... */
+        /* Стили ячеек поля */
+        .grid-cell {
+            position: relative;
+            transition: all 0.25s ease;
+        }
+
+        /* Заблокированное зеленое поле (дикая природа) */
+        .cell-locked {
+            background: radial-gradient(circle, #274d30 0%, #132b18 100%);
+            border: 1px solid #1e5c31;
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.3);
+        }
+
+        /* Разблокированная территория базы (каменный двор) */
+        .cell-unlocked {
+            background: radial-gradient(circle, #44403c 0%, #1c1917 100%);
+            border: 1px solid #57534e;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.7);
+        }
+
+        /* Бежевая дорога — по ней движутся монстры */
+        .cell-road {
+            background: radial-gradient(circle, #d8c19a 0%, #b08d5c 100%);
+            border: 1px solid #8a6d44;
+            box-shadow: inset 0 0 6px rgba(80,55,25,0.55);
+        }
+
+        /* Сердце базы */
+        .cell-core {
+            background: radial-gradient(circle, #991b1b 0%, #450a0a 100%);
+            border: 2px solid #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
+            animation: pulse-core 2s infinite alternate;
+        }
+
+        @keyframes pulse-core {
+            0% { transform: scale(1); box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+            100% { transform: scale(1.06); box-shadow: 0 0 18px rgba(239, 68, 68, 0.9); }
+        }
+
+        /* Покерные фишки (5 в ряд) */
+        .poker-chip {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 7 / 8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            border-radius: 12px;
+            background: radial-gradient(circle at 50% 35%, #15241a 0%, #070d09 100%);
+            border: 2px solid #1b3a24;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
+            cursor: pointer;
+            user-select: none;
+            transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+        }
+        .poker-chip:hover { transform: translateY(-3px); }
+
+        /* Фишка, отмеченная игроком НА ЗАМЕНУ (будет рерольнута) */
+        .poker-chip.marked-reroll {
+            border-color: #ef4444;
+            border-style: dashed;
+            box-shadow: inset 0 0 10px rgba(239,68,68,.35);
+            opacity: .5;
+            transform: translateY(2px);
+        }
+        .poker-chip.marked-reroll::after {
+            content: '🔄';
+            position: absolute;
+            top: -10px;
+            right: -6px;
+            font-size: .8rem;
+            filter: drop-shadow(0 0 4px #000);
+        }
+
+        /* Фишки, входящие в выигрышную комбинацию */
+        .poker-chip.matched {
+            border-color: #22c55e;
+            box-shadow: 0 0 14px rgba(34,197,94,.6), inset 0 0 10px rgba(34,197,94,.3);
+        }
+
+        /* Анимация прокрутки во время рерола */
+        .poker-chip.rolling { animation: chip-roll .12s linear infinite; }
+        @keyframes chip-roll {
+            0%   { transform: translateY(-2px) rotate(-4deg) scale(1.04); }
+            50%  { transform: translateY(2px)  rotate(4deg)  scale(0.96); }
+            100% { transform: translateY(-2px) rotate(-4deg) scale(1.04); }
+        }
+
+        /* Скрываем скроллбар */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Перетаскивание и мердж юнитов */
+        .drop-valid {
+            outline: 2px solid rgba(34, 197, 94, 0.85) !important;
+            box-shadow: inset 0 0 14px rgba(34, 197, 94, 0.4) !important;
+        }
+        .drop-merge {
+            outline: 2px solid rgba(234, 179, 8, 0.95) !important;
+            animation: merge-glow 0.65s infinite alternate;
+        }
+        @keyframes merge-glow {
+            from { box-shadow: inset 0 0 8px rgba(234,179,8,0.4); }
+            to   { box-shadow: inset 0 0 22px rgba(234,179,8,0.95), 0 0 14px rgba(234,179,8,0.6); }
+        }
+        #drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            font-size: 1.9rem;
+            line-height: 1;
+            opacity: 0.92;
+            transform: translate(-50%, -65%) scale(1.3);
+            filter: drop-shadow(0 0 12px rgba(255,255,200,0.9));
+            text-align: center;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="flex justify-center items-center min-h-screen p-2 text-gray-200">
+
+    <div class="game-viewport flex flex-col justify-between rounded-2xl overflow-hidden relative">
+        
+        <!-- Верхний Хедер состояния -->
+        <div class="px-4 py-3 bg-black/70 border-b border-green-900/30 flex justify-between items-center z-20">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">❤️</span>
+                <span id="hp-text" class="font-bold text-red-500 text-lg tracking-wider gothic-title">25</span>
+            </div>
+            <div class="text-center">
+                <h1 id="game-phase" class="text-xs uppercase tracking-widest text-emerald-400 gothic-title">Подготовка: Покер</h1>
+                <p id="spins-counter" class="text-[10px] text-gray-400">Рука 1/3 · Реролл: 2</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-yellow-500 font-bold text-xs">ВОЛНА: <span id="wave-num" class="text-sm">1</span></span>
+            </div>
+        </div>
+
+        <!-- Центральный игровой экран (Поле боя) -->
+        <div class="flex-1 relative flex flex-col items-center justify-center p-3 overflow-hidden">
+            <!-- STREAMING_CHUNK: Defining playfield container... -->
+            <!-- Контейнер для поля боя, чтобы холст ложился ровно поверх сетки -->
+            <div class="relative w-full aspect-square max-w-[340px] z-10">
+                <!-- Сетка 7х7 -->
+                <div id="battle-grid" class="grid grid-cols-7 grid-rows-7 gap-[2px] w-full h-full">
+                    <!-- Ячейки сгенерируются в JS -->
+                </div>
+                <!-- Холст, точно перекрывающий сетку -->
+                <canvas id="effects-canvas" class="absolute inset-0 pointer-events-none z-30"></canvas>
+            </div>
+        </div>
+
+        <!-- Нижний блок управления -->
+        <div class="bg-black/90 border-t-4 border-green-950 p-4 flex flex-col justify-between min-h-[220px] relative z-20">
+            <!-- Лог действий / Инструкции -->
+            <div class="text-center min-h-[36px] flex items-center justify-center px-2">
+                <p id="action-log" class="text-xs text-amber-400 font-medium leading-tight">Собирай покерные комбинации! Отмечай 🔄 лишние фишки и жми Реролл.</p>
+            </div>
+
+            <!-- ПОКЕРНЫЕ ФИШКИ (5 в ряд) -->
+            <div id="slots-panel" class="relative my-2">
+                <div class="grid grid-cols-5 gap-2 p-2 bg-green-950/20 rounded-lg border border-green-900/40">
+                    <div class="poker-chip" id="chip-0"></div>
+                    <div class="poker-chip" id="chip-1"></div>
+                    <div class="poker-chip" id="chip-2"></div>
+                    <div class="poker-chip" id="chip-3"></div>
+                    <div class="poker-chip" id="chip-4"></div>
+                </div>
+
+                <!-- Название комбинации и предстоящая награда -->
+                <div id="hand-name" class="text-center text-[11px] font-bold mt-2 min-h-[20px] px-1 leading-tight gothic-title"></div>
+
+                <!-- Кнопки: Реролл незафиксированных фишек и Взять комбинацию -->
+                <div class="grid grid-cols-2 gap-2 mt-1">
+                    <button id="reroll-btn" class="py-3 px-2 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-600 hover:to-emerald-500 active:scale-95 transition-all border border-emerald-400/30 disabled:opacity-40 disabled:cursor-not-allowed">
+                        🎲 Реролл (2)
+                    </button>
+                    <button id="take-btn" class="py-3 px-2 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 active:scale-95 transition-all border border-amber-400/30 disabled:opacity-40 disabled:cursor-not-allowed">
+                        ✅ Взять
+                    </button>
+                </div>
+            </div>
+
+            <!-- STREAMING_CHUNK: Defense panel initialization... -->
+            <!-- ИНТЕРФЕЙС ФАЗЫ ЗАЩИТЫ -->
+            <div id="defense-panel" class="hidden flex-1 flex flex-col justify-center items-center gap-3">
+                <div class="text-center">
+                    <p class="text-red-500 font-bold tracking-widest text-sm uppercase">Орда приближается!</p>
+                    <p class="text-[11px] text-gray-400">Враги кружат по кольцу. Первый круг — бесплатно, но за каждый <span class="text-red-400 font-bold">следующий</span> круг монстр кусает ядро (−1 ❤️). Добивай их за один оборот!</p>
+                </div>
+                <button id="start-wave-btn" class="w-full py-4 rounded-lg font-bold text-white uppercase tracking-wider bg-gradient-to-r from-red-700 via-red-600 to-red-800 hover:from-red-600 hover:to-red-700 active:scale-95 transition-all border border-red-500/40 shadow-lg shadow-red-950">
+                    ⚔️ Начать битву
+                </button>
+            </div>
+
+            <!-- ЭКРАН РЕСТАРТА -->
+            <div id="restart-panel" class="hidden flex-1 flex flex-col justify-center items-center gap-3">
+                <div class="text-center">
+                    <p id="game-result-title" class="text-2xl font-bold tracking-widest uppercase gothic-title text-red-500">Поражение</p>
+                    <p id="game-result-desc" class="text-xs text-gray-400">Вы продержались до волны 1</p>
+                </div>
+                <button id="restart-btn" class="w-full py-3 rounded-lg font-bold text-white uppercase tracking-wider bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 transition-all">
+                    🔄 Начать заново
+                </button>
+            </div>
+
+            <!-- Подсказка линий -->
+            <div id="info-footer" class="text-[9px] text-gray-500 text-center mt-1 leading-snug">
+                🏰 башня · 🏹 лучник · 🛡️ страж · 🔮 маг · ❄️ мороз · 💣 бомба<br>
+                Пара→юнит · 2пары→+⭐ · Тройка→+🔓 · Каре→+🔓+⭐ · Фулл-хаус→бафф+⭐ · Пятёрка→бафф+🔓×2
+            </div>
+        </div>
+    </div>
+
+<script>
+    /* STREAMING_CHUNK: Audio Engine Setup... */
+    // --- ЗВУКОВОЙ ДВИЖОК (Web Audio API Synthesizer) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        try {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'spin_tick') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'spin_stop') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(330, audioCtx.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'win') {
+                const now = audioCtx.currentTime;
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(261.6, now);
+                osc.frequency.setValueAtTime(329.6, now + 0.1);
+                osc.frequency.setValueAtTime(392.0, now + 0.2);
+                osc.frequency.setValueAtTime(523.3, now + 0.3);
+                gainNode.gain.setValueAtTime(0.12, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start();
+                osc.stop(now + 0.5);
+            } else if (type === 'shoot_arrow') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'shoot_laser') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'explosion') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.4);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } else if (type === 'core_damage') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(90, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        } catch (e) {
+            console.log("Audio Context issue:", e);
+        }
+    }
+
+    /* STREAMING_CHUNK: Game Configurations... */
+    // --- КОНФИГУРАЦИЯ ИГРЫ ---
+    // На кубиках — только 6 БОЕВЫХ юнитов. Эффекты 🔓 (расширение) и ⭐ (апгрейд)
+    // больше не выпадают как фишки — их выдают за сложные покерные комбинации.
+    const SYMBOLS = ['🏰', '🏹', '🛡️', '🔮', '❄️', '💣'];
+    const SYMBOL_MAP = {
+        '🏰': { name: 'Башня',  type: 'TOWER',    color: '#f59e0b' },
+        '🏹': { name: 'Лучник', type: 'ARCHER',   color: '#10b981' },
+        '🛡️': { name: 'Страж',  type: 'DEFENDER', color: '#60a5fa' },
+        '🔮': { name: 'Маг',    type: 'MAGE',     color: '#e879f9' },
+        '❄️': { name: 'Мороз',  type: 'FROST',    color: '#38bdf8' },
+        '💣': { name: 'Бомба',  type: 'BOMB',     color: '#fb923c' }
+    };
+    // Цвета бонусов-эффектов (выдаются за комбинации, не лежат на фишках)
+    const EXPAND_COLOR = '#a855f7', UPGRADE_COLOR = '#eab308', BUFF_COLOR = '#fde047';
+
+    /* STREAMING_CHUNK: Defense Balance Config... */
+    // --- БАЛАНС ОБОРОНЫ (все рычаги тюнинга в одном месте) ---
+    // Цель: средний монстр успевает пройти ~1 полный круг по кольцу (16 клеток),
+    // прежде чем его добьют. Первый круг «бесплатный» (это и есть зрелищная погоня);
+    // за каждый СЛЕДУЮЩИЙ круг монстр кусает ядро (−1 ❤️) — слабая оборона теряет базу.
+    // Цифры подобраны симуляцией боя (см. tools/sim): средняя оборона ⇒ ~1 круг.
+    const START_HP = 25;            // запас прочности ядра
+    const HP_REGEN_PER_WAVE = 5;    // реген ядра за каждую отражённую волну
+    const LAP_FREE = 1;             // сколько кругов проходят без урона по ядру
+
+    // Боевые характеристики юнитов: cd — перезарядка (мс), range — радиус (клетки),
+    // dmg — урон за уровень, bspeed — скорость снаряда (px/мс), splash — радиус сплеша,
+    // splashFactor — доля урона по области, slowMs/slowFactor — заморозка цели.
+    const UNIT_DEF = {
+        TOWER:    { cd: 2000, range: 3.4, dmg: 22, bspeed: 0.45 },                              // дальнобойный бурст
+        ARCHER:   { cd: 700,  range: 2.3, dmg: 9,  bspeed: 0.30 },                              // частый, слабый
+        DEFENDER: { cd: 500,  range: 1.7, dmg: 12, bspeed: 0.50 },                              // ближний бой
+        MAGE:     { cd: 1600, range: 2.7, dmg: 14, bspeed: 0.34, splash: 1.3, splashFactor: 0.6 }, // точечный сплеш
+        FROST:    { cd: 900,  range: 2.4, dmg: 6,  bspeed: 0.32, slowMs: 1100, slowFactor: 0.5 },  // замедляет монстров
+        BOMB:     { cd: 2600, range: 2.6, dmg: 20, bspeed: 0.30, splash: 1.9, splashFactor: 0.85 } // тяжёлый AoE
+    };
+
+    // Характеристики монстров (база на 1-й волне). hp множится на hpMultiplier волны,
+    // speed — клетки за кадр (60fps): круг ≈ 16/(speed·60) секунд.
+    const ENEMY_DEF = {
+        slime: { emoji: '👾', hp: 270, speed: 0.020 }, // средний: ~13 c/круг
+        orc:   { emoji: '👹', hp: 580, speed: 0.013 }, // танк: медленный и живучий
+        ghost: { emoji: '💀', hp: 180, speed: 0.028 }  // быстрый и хрупкий
+    };
+
+    // --- КОНФИГ ПОКЕРНОЙ МЕХАНИКИ ---
+    const HANDS_PER_WAVE = 3;    // сколько «рук» (нажатий «Взять») даётся на подготовку
+    const REROLLS_PER_HAND = 2;  // сколько рероллов доступно в одной руке
+
+    // Названия покерных комбинаций по сигнатуре групп одинаковых фишек
+    const HAND_NAMES = {
+        '5':         'Пятёрка',
+        '4,1':       'Каре',
+        '3,2':       'Фулл-хаус',
+        '3,1,1':     'Тройка',
+        '2,2,1':     'Две пары',
+        '2,1,1,1':   'Пара',
+        '1,1,1,1,1': 'Разнобой'
+    };
+
+    /* STREAMING_CHUNK: Road Layout... */
+    // --- ПЛАНИРОВКА ДОРОГИ ---
+    // База остаётся квадратом 3x3 (строки 2..4, столбцы 2..4), ядро в центре
+    const ROAD_CORE = { r: 3, c: 3 };
+
+    // Кольцо бежевой дороги ВОКРУГ базы 3x3 (замкнутый цикл по часовой стрелке,
+    // вход сверху по центру в точке (1,3))
+    const RING_PATH = [
+        { r: 1, c: 3 }, { r: 1, c: 4 }, { r: 1, c: 5 },
+        { r: 2, c: 5 }, { r: 3, c: 5 }, { r: 4, c: 5 },
+        { r: 5, c: 5 }, { r: 5, c: 4 }, { r: 5, c: 3 },
+        { r: 5, c: 2 }, { r: 5, c: 1 },
+        { r: 4, c: 1 }, { r: 3, c: 1 }, { r: 2, c: 1 },
+        { r: 1, c: 1 }, { r: 1, c: 2 }
+    ];
+
+    // Неровная подъездная дорога с верхнего края к входу в кольцо (1,3)
+    const ACCESS_PATH = [
+        { r: 0, c: 5 }, { r: 0, c: 4 }, { r: 0, c: 3 }
+    ];
+
+    // Все плитки дороги (для отрисовки сетки)
+    const ROAD_CELLS = [...ACCESS_PATH, ...RING_PATH];
+    const ROAD_SET = new Set(ROAD_CELLS.map(p => `${p.r},${p.c}`));
+
+    // Игровое состояние
+    let baseHp = START_HP;
+    let handsLeft = HANDS_PER_WAVE; // сколько «рук» осталось в фазе подготовки
+    let currentWave = 1;
+    let battleElapsed = 0; // время с начала волны (мс) — для постепенного выхода монстров
+    let gamePhase = 'SPIN'; // 'SPIN', 'DEFENSE', 'BATTLE_ACTIVE', 'GAMEOVER'
+    let gridData = Array(7).fill(null).map(() => Array(7).fill(null));
+    
+    let enemies = [];
+    let bullets = [];
+    let damageTexts = [];
+    let cellAttackFlashes = [];
+
+    // --- СОСТОЯНИЕ ПОКЕРНОЙ МЕХАНИКИ ---
+    let pokerChips = ['🏰', '🏹', '🛡️', '🔮', '❄️']; // текущие 5 фишек (перебрасываются при старте)
+    let pokerReroll = [false, false, false, false, false]; // фишки, отмеченные на замену (кликнутые)
+    let rerollsLeft = REROLLS_PER_HAND; // осталось рероллов в текущей руке
+    let pokerBusy = false; // блокировка ввода на время анимаций
+
+    const canvas = document.getElementById('effects-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Настройка размеров Canvas
+    function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setTimeout(resizeCanvas, 150);
+
+    /* STREAMING_CHUNK: Initializing Grid Structure... */
+    // --- ИНИЦИАЛИЗАЦИЯ ИГРОВОГО ПОЛЯ ---
+    function initGrid() {
+        const gridEl = document.getElementById('battle-grid');
+        gridEl.innerHTML = '';
+        
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                let status = 'locked';
+                let type = 'EMPTY';
+                const key = `${r},${c}`;
+
+                if (r === ROAD_CORE.r && c === ROAD_CORE.c) {
+                    // Ядро базы в центре
+                    status = 'unlocked';
+                    type = 'CORE';
+                } else if (ROAD_SET.has(key)) {
+                    // Бежевые плитки дороги (не застраиваются)
+                    status = 'road';
+                } else if (r >= 2 && r <= 4 && c >= 2 && c <= 4) {
+                    // База — квадрат 3x3 (зона застройки)
+                    status = 'unlocked';
+                }
+
+                gridData[r][c] = {
+                    type: type,
+                    status: status,
+                    level: 1,
+                    defenderHp: 0,
+                    maxDefenderHp: 40,
+                    lastAttackTime: 0
+                };
+
+                const cell = document.createElement('div');
+                cell.id = `cell-${r}-${c}`;
+                // Классы генерируются динамически в updateGridUI
+                gridEl.appendChild(cell);
+            }
+        }
+        updateGridUI();
+    }
+
+    /* STREAMING_CHUNK: Updating Grid UI... */
+    // Обновление картинок, стилей и замков на сетке
+    function updateGridUI() {
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                const cellObj = gridData[r][c];
+                const cellEl = document.getElementById(`cell-${r}-${c}`);
+                
+                // Сбрасываем старые классы и применяем нужные стили
+                cellEl.className = `grid-cell rounded flex flex-col justify-center items-center font-bold relative cell-${cellObj.status}`;
+
+                // Курсор grab для перетаскиваемых юнитов
+                if (cellObj.type !== 'EMPTY' && cellObj.type !== 'CORE' &&
+                    cellObj.status === 'unlocked' &&
+                    (gamePhase === 'SPIN' || gamePhase === 'DEFENSE')) {
+                    cellEl.style.cursor = 'grab';
+                } else {
+                    cellEl.style.cursor = '';
+                }
+                
+                if (cellObj.type === 'CORE') {
+                    cellEl.classList.add('cell-core');
+                    cellEl.innerHTML = '<span class="text-xl">🏯</span>';
+                } else if (cellObj.type !== 'EMPTY') {
+                    let symb = Object.keys(SYMBOL_MAP).find(k => SYMBOL_MAP[k].type === cellObj.type);
+                    let stars = '★'.repeat(cellObj.level);
+
+                    cellEl.innerHTML = `
+                        <span class="text-xl transform -translate-y-1">${symb}</span>
+                        <span class="absolute top-1 right-1 text-[8px] text-yellow-400 font-extrabold tracking-tighter">${stars}</span>
+                    `;
+                } else {
+                    // Отрисовка пустоты
+                    if (cellObj.status === 'locked') {
+                        cellEl.innerHTML = '';
+                    } else {
+                        cellEl.innerHTML = '';
+                    }
+                }
+            }
+        }
+    }
+
+    /* STREAMING_CHUNK: Poker Chips Engine... */
+    // --- ПОКЕРНЫЙ ДВИЖОК (5 фишек, фиксация, реролл, «Взять») ---
+    function randSym() { return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]; }
+    function chipEl(i) { return document.getElementById(`chip-${i}`); }
+
+    // Отрисовка всех фишек по текущему состоянию
+    function renderChips() {
+        for (let i = 0; i < 5; i++) {
+            const el = chipEl(i);
+            el.textContent = pokerChips[i];
+            el.classList.toggle('marked-reroll', pokerReroll[i]);
+        }
+    }
+
+    function clearMatchedChips() {
+        for (let i = 0; i < 5; i++) chipEl(i).classList.remove('matched');
+    }
+
+    // Анимация «прокрутки» указанных фишек со сменой граней, затем фиксация финала
+    function rollChips(indices, onDone) {
+        if (indices.length === 0) { if (onDone) onDone(); return; }
+        indices.forEach(i => chipEl(i).classList.add('rolling'));
+        let ticks = 0;
+        const maxTicks = 8;
+        const timer = setInterval(() => {
+            indices.forEach(i => { chipEl(i).textContent = randSym(); });
+            playSound('spin_tick');
+            ticks++;
+            if (ticks >= maxTicks) {
+                clearInterval(timer);
+                indices.forEach(i => {
+                    chipEl(i).classList.remove('rolling');
+                    chipEl(i).textContent = pokerChips[i];
+                });
+                playSound('spin_stop');
+                if (onDone) onDone();
+            }
+        }, 70);
+    }
+
+    // Раздать новую руку: 5 свежих фишек, сброс фиксаций и счётчика рероллов
+    function dealNewHand() {
+        if (gamePhase !== 'SPIN') return;
+        pokerBusy = true;
+        setPokerControls(false);
+        clearMatchedChips();
+        for (let i = 0; i < 5; i++) { pokerChips[i] = randSym(); pokerReroll[i] = false; }
+        rerollsLeft = REROLLS_PER_HAND;
+        renderChips();
+        updatePokerHeader();
+        document.getElementById('hand-name').textContent = '';
+        rollChips([0, 1, 2, 3, 4], () => {
+            pokerBusy = false;
+            updateHandUI();
+        });
+    }
+
+    // Клик по фишке отмечает её НА ЗАМЕНУ (инвертированная логика: кликаем лишние фишки)
+    function toggleReroll(i) {
+        if (pokerBusy || gamePhase !== 'SPIN') return;
+        pokerReroll[i] = !pokerReroll[i];
+        chipEl(i).classList.toggle('marked-reroll', pokerReroll[i]);
+        playSound('spin_stop');
+    }
+
+    // Реролл: заменяет отмеченные фишки. Если ничего не отмечено — перебрасываются все пять.
+    function reroll() {
+        if (pokerBusy || gamePhase !== 'SPIN' || rerollsLeft <= 0) return;
+        let toRoll = [];
+        for (let i = 0; i < 5; i++) if (pokerReroll[i]) toRoll.push(i);
+        if (toRoll.length === 0) toRoll = [0, 1, 2, 3, 4]; // ничего не отмечено → реролл всей руки
+        rerollsLeft--;
+        toRoll.forEach(i => { pokerChips[i] = randSym(); });
+        for (let i = 0; i < 5; i++) { pokerReroll[i] = false; chipEl(i).classList.remove('marked-reroll'); }
+        pokerBusy = true;
+        setPokerControls(false);
+        clearMatchedChips();
+        document.getElementById('hand-name').textContent = '';
+        updatePokerHeader();
+        rollChips(toRoll, () => {
+            pokerBusy = false;
+            updateHandUI();
+        });
+    }
+
+    // Подсветка лучшей комбинации + название руки + состояние кнопок
+    function updateHandUI() {
+        const ev = evaluateHand(pokerChips);
+        clearMatchedChips();
+        ev.matchedIdx.forEach(i => chipEl(i).classList.add('matched'));
+        document.getElementById('hand-name').innerHTML =
+            `<span style="color:${ev.color}">${ev.name}</span>${ev.short ? ' · <span class="text-gray-300 font-normal">' + ev.short + '</span>' : ''}`;
+        setPokerControls(true);
+        updatePokerHeader();
+    }
+
+    // Доступность кнопок «Реролл» / «Взять»
+    function setPokerControls(enabled) {
+        const rb = document.getElementById('reroll-btn');
+        const tb = document.getElementById('take-btn');
+        rb.disabled = !enabled || rerollsLeft <= 0;
+        tb.disabled = !enabled;
+        rb.textContent = `🎲 Реролл (${rerollsLeft})`;
+    }
+
+    function updatePokerHeader() {
+        const handNo = Math.min(HANDS_PER_WAVE, HANDS_PER_WAVE - handsLeft + 1);
+        document.getElementById('spins-counter').innerText =
+            `Рука ${handNo}/${HANDS_PER_WAVE} · Реролл: ${rerollsLeft}`;
+    }
+
+    /* STREAMING_CHUNK: Poker Hand Evaluation... */
+    // --- ОЦЕНКА ПОКЕРНОЙ РУКИ ---
+    // Возвращает { name, short, color, rewards[], matchedIdx[] }
+    function evaluateHand(chips) {
+        // Группируем индексы фишек по символу
+        const bySym = {};
+        chips.forEach((s, i) => { (bySym[s] = bySym[s] || []).push(i); });
+
+        // Группы, отсортированные по размеру (по убыванию)
+        const groups = Object.keys(bySym)
+            .map(sym => ({ sym, idx: bySym[sym], n: bySym[sym].length }))
+            .sort((a, b) => b.n - a.n);
+
+        const sig = groups.map(g => g.n).join(',');
+        const name = HAND_NAMES[sig] || 'Разнобой';
+
+        const rewards = [];
+        const matchedIdx = [];
+
+        // Юнит из группы одинаковых фишек (уровень задаём явно по силе руки)
+        function unit(g, level) {
+            g.idx.forEach(i => matchedIdx.push(i));
+            return { type: 'unit', sym: g.sym, level, srcIdx: g.idx, color: SYMBOL_MAP[g.sym].color };
+        }
+        // Бонус-эффекты сложных комбинаций (srcIdx — откуда летит иконка)
+        const expand  = (count, src) => rewards.push({ type: 'expand',  count, sym: '🔓', srcIdx: src, color: EXPAND_COLOR });
+        const upgrade = (count, src) => rewards.push({ type: 'upgrade', count, sym: '⭐', srcIdx: src, color: UPGRADE_COLOR });
+        const buffAll = (src)        => rewards.push({ type: 'buffAll', levels: 1, srcIdx: src, color: BUFF_COLOR });
+
+        // Чем сложнее комбинация — тем мощнее юнит И тем больше бонусов 🔓/⭐/💪
+        if (sig === '5') {                       // Пятёрка — джекпот
+            rewards.push(unit(groups[0], 5));
+            buffAll(groups[0].idx);
+            expand(2, groups[0].idx);
+        } else if (sig === '4,1') {              // Каре
+            rewards.push(unit(groups[0], 4));
+            expand(1, groups[0].idx);
+            upgrade(1, groups[0].idx);
+        } else if (sig === '3,2') {              // Фулл-хаус — элита
+            rewards.push(unit(groups[0], 3));
+            rewards.push(unit(groups[1], 2));
+            buffAll(groups[0].idx.concat(groups[1].idx));
+            upgrade(1, groups[0].idx);
+        } else if (sig === '3,1,1') {            // Тройка
+            rewards.push(unit(groups[0], 3));
+            expand(1, groups[0].idx);
+        } else if (sig === '2,2,1') {            // Две пары
+            rewards.push(unit(groups[0], 2));
+            rewards.push(unit(groups[1], 2));
+            upgrade(1, groups[0].idx.concat(groups[1].idx));
+        } else if (sig === '2,1,1,1') {          // Пара — базовая награда
+            rewards.push(unit(groups[0], 2));
+        } else {                                 // Разнобой — утешение: +1 клетка
+            expand(1, [groups[0].idx[0]]);
+        }
+
+        const short = describeRewards(rewards);
+        const color = sig === '5' ? '#fde047'
+                    : (sig === '3,2' || sig === '4,1') ? '#f59e0b'
+                    : '#34d399';
+        return { name, short, color, rewards, matchedIdx };
+    }
+
+    // Короткое описание наград для подписи под фишками
+    function describeRewards(rewards) {
+        return rewards.map(rw => {
+            if (rw.type === 'unit')    return `${rw.sym} ур.${rw.level}`;
+            if (rw.type === 'expand')  return `🔓 +${rw.count} клетк.`;
+            if (rw.type === 'upgrade') return `⭐ апгрейд ×${rw.count}`;
+            if (rw.type === 'buffAll') return `💪 бафф гарнизона`;
+            return '';
+        }).filter(Boolean).join(' · ');
+    }
+
+    /* STREAMING_CHUNK: Grid Reward Helpers... */
+    // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ПОЛЯ ---
+    // Пустые клетки базы под застройку
+    function emptyBuildCells() {
+        const cells = [];
+        for (let r = 0; r < 7; r++)
+            for (let c = 0; c < 7; c++) {
+                if (r === 3 && c === 3) continue;
+                if (gridData[r][c].status === 'unlocked' && gridData[r][c].type === 'EMPTY') cells.push({ r, c });
+            }
+        return cells;
+    }
+
+    // Клетки с боевыми юнитами (башни/лучники/защитники)
+    function unitCells() {
+        const cells = [];
+        for (let r = 0; r < 7; r++)
+            for (let c = 0; c < 7; c++)
+                if (gridData[r][c].status === 'unlocked' &&
+                    ['TOWER', 'ARCHER', 'DEFENDER'].includes(gridData[r][c].type)) cells.push({ r, c });
+        return cells;
+    }
+
+    function setUnit(r, c, type, level) {
+        const cell = gridData[r][c];
+        cell.type = type;
+        cell.level = Math.min(level, 5);
+        if (type === 'DEFENDER') {
+            cell.maxDefenderHp = 40 + (cell.level - 1) * 20;
+            cell.defenderHp = cell.maxDefenderHp;
+        }
+        cell.lastAttackTime = 0;
+    }
+
+    function bumpUnit(r, c, levels) {
+        const cell = gridData[r][c];
+        cell.level = Math.min(cell.level + levels, 5);
+        if (cell.type === 'DEFENDER') {
+            cell.maxDefenderHp = 40 + (cell.level - 1) * 20;
+            cell.defenderHp = cell.maxDefenderHp;
+        }
+    }
+
+    // Размещает юнита на свободной клетке. Если база заполнена — усиливает
+    // существующего юнита того же типа (или любого). Возвращает { r, c, color } или null.
+    function placeUnit(sym, level) {
+        const info = SYMBOL_MAP[sym];
+        const empties = emptyBuildCells();
+        if (empties.length > 0) {
+            const t = empties[Math.floor(Math.random() * empties.length)];
+            setUnit(t.r, t.c, info.type, level);
+            return { r: t.r, c: t.c, color: info.color };
+        }
+        const sameType = unitCells().filter(p => gridData[p.r][p.c].type === info.type);
+        const pool = sameType.length ? sameType : unitCells();
+        if (pool.length) {
+            const t = pool[Math.floor(Math.random() * pool.length)];
+            bumpUnit(t.r, t.c, Math.max(1, level - 1));
+            return { r: t.r, c: t.c, color: info.color };
+        }
+        return null;
+    }
+
+    // Разблокирует одну клетку, граничащую с базой/дорогой. Возвращает { r, c, color } или null.
+    function expandOne() {
+        const grows = (rr, cc) => {
+            const s = gridData[rr][cc].status;
+            return s === 'unlocked' || s === 'road';
+        };
+        const candidates = [];
+        for (let r = 0; r < 7; r++)
+            for (let c = 0; c < 7; c++) {
+                if (gridData[r][c].status !== 'locked') continue;
+                if ((r > 0 && grows(r - 1, c)) || (r < 6 && grows(r + 1, c)) ||
+                    (c > 0 && grows(r, c - 1)) || (c < 6 && grows(r, c + 1)))
+                    candidates.push({ r, c });
+            }
+        if (!candidates.length) return null;
+        const t = candidates[Math.floor(Math.random() * candidates.length)];
+        gridData[t.r][t.c].status = 'unlocked';
+        return { r: t.r, c: t.c, color: '#a855f7' };
+    }
+
+    // Анимация полёта одной иконки от srcEl к ячейке поля (r, c)
+    function flyIconToCell(symbol, srcEl, targetR, targetC, onLand) {
+        const targetCellEl = document.getElementById(`cell-${targetR}-${targetC}`);
+        if (!targetCellEl || !srcEl) { onLand(); return; }
+
+        const srcRect = srcEl.getBoundingClientRect();
+        const dstRect = targetCellEl.getBoundingClientRect();
+
+        const flyer = document.createElement('div');
+        flyer.style.cssText = `
+            position: fixed;
+            left: ${srcRect.left + srcRect.width / 2}px;
+            top: ${srcRect.top + srcRect.height / 2}px;
+            transform: translate(-50%, -50%) scale(1.6);
+            font-size: 1.7rem;
+            z-index: 10000;
+            pointer-events: none;
+            filter: drop-shadow(0 0 14px rgba(255, 220, 80, 0.95));
+            transition: left 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                        top  0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.48s ease,
+                        opacity  0.48s ease;
+        `;
+        flyer.textContent = symbol;
+        document.body.appendChild(flyer);
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            flyer.style.left      = `${dstRect.left + dstRect.width / 2}px`;
+            flyer.style.top       = `${dstRect.top  + dstRect.height / 2}px`;
+            flyer.style.transform = 'translate(-50%, -50%) scale(0.7)';
+            flyer.style.opacity   = '0.4';
+        }));
+
+        setTimeout(() => { flyer.remove(); onLand(); }, 520);
+    }
+
+    // Анимация слияния: несколько иконок летят в одну точку, затем объединённая летит на поле
+    function mergeAndFlyToCell(symbol, srcElements, mergePointEl, targetR, targetC, onComplete) {
+        const FLY_TO_MERGE = 350; // полёт к точке слияния
+        const FLY_TO_CELL  = 480; // полёт на поле
+
+        const mergeRect = mergePointEl.getBoundingClientRect();
+        const targetCellEl = document.getElementById(`cell-${targetR}-${targetC}`);
+        const targetRect = targetCellEl.getBoundingClientRect();
+
+        // Запускаем полёты всех иконок в точку слияния одновременно
+        srcElements.forEach((srcEl, idx) => {
+            if (!srcEl) return;
+
+            const srcRect = srcEl.getBoundingClientRect();
+            const mergeFlyer = document.createElement('div');
+            mergeFlyer.style.cssText = `
+                position: fixed;
+                left: ${srcRect.left + srcRect.width / 2}px;
+                top: ${srcRect.top + srcRect.height / 2}px;
+                transform: translate(-50%, -50%) scale(1.4);
+                font-size: 1.5rem;
+                z-index: 9999;
+                pointer-events: none;
+                opacity: 1;
+                transition: left ${FLY_TO_MERGE}ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                            top ${FLY_TO_MERGE}ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                            transform ${FLY_TO_MERGE}ms ease-in,
+                            opacity ${FLY_TO_MERGE}ms ease-out;
+            `;
+            mergeFlyer.textContent = symbol;
+            document.body.appendChild(mergeFlyer);
+
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                mergeFlyer.style.left = `${mergeRect.left + mergeRect.width / 2}px`;
+                mergeFlyer.style.top  = `${mergeRect.top + mergeRect.height / 2}px`;
+                mergeFlyer.style.transform = 'translate(-50%, -50%) scale(0.5)';
+                mergeFlyer.style.opacity = '0.1';
+            }));
+
+            setTimeout(() => { mergeFlyer.remove(); }, FLY_TO_MERGE + 20);
+        });
+
+        // Через 50ms после завершения слияния, запускаем полёт объединённого элемента
+        setTimeout(() => {
+            const merged = document.createElement('div');
+            merged.style.cssText = `
+                position: fixed;
+                left: ${mergeRect.left + mergeRect.width / 2}px;
+                top: ${mergeRect.top + mergeRect.height / 2}px;
+                transform: translate(-50%, -50%) scale(1.8);
+                font-size: 1.9rem;
+                z-index: 10000;
+                pointer-events: none;
+                filter: drop-shadow(0 0 16px rgba(251, 191, 36, 1));
+                transition: left ${FLY_TO_CELL}ms cubic-bezier(0.22, 1, 0.36, 1),
+                            top ${FLY_TO_CELL}ms cubic-bezier(0.22, 1, 0.36, 1),
+                            transform ${FLY_TO_CELL}ms ease,
+                            opacity ${FLY_TO_CELL}ms ease;
+            `;
+            merged.textContent = symbol;
+            document.body.appendChild(merged);
+
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                merged.style.left      = `${targetRect.left + targetRect.width / 2}px`;
+                merged.style.top       = `${targetRect.top  + targetRect.height / 2}px`;
+                merged.style.transform = 'translate(-50%, -50%) scale(0.8)';
+                merged.style.opacity   = '0.5';
+            }));
+
+            setTimeout(() => { merged.remove(); onComplete(); }, FLY_TO_CELL + 20);
+        }, FLY_TO_MERGE + 50);
+    }
+
+    function randUnitSym() {
+        const units = ['🏰', '🏹', '🛡️', '🔮', '❄️', '💣'];
+        return units[Math.floor(Math.random() * units.length)];
+    }
+
+    /* STREAMING_CHUNK: Applying Poker Rewards... */
+    // Применяет награды комбинации к полю (сразу меняет gridData), затем анимирует
+    function applyPokerRewards(ev, onComplete) {
+        pokerBusy = true;
+        setPokerControls(false);
+        clearMatchedChips();
+
+        const anims = []; // { sym, srcIdx, dest:{r,c,color}, merge, flash }
+
+        ev.rewards.forEach(rw => {
+            if (rw.type === 'unit') {
+                const dest = placeUnit(rw.sym, rw.level);
+                if (dest) anims.push({ sym: rw.sym, srcIdx: rw.srcIdx, dest, merge: true });
+            } else if (rw.type === 'expand') {
+                for (let k = 0; k < rw.count; k++) {
+                    const dest = expandOne();
+                    if (dest) {
+                        anims.push({ sym: '🔓', srcIdx: rw.srcIdx, dest, merge: false });
+                    } else {
+                        // Некуда расширяться — конвертируем в юнита
+                        const d2 = placeUnit(randUnitSym(), 2);
+                        if (d2) anims.push({ sym: '🔓', srcIdx: rw.srcIdx, dest: d2, merge: false });
+                    }
+                }
+            } else if (rw.type === 'upgrade') {
+                for (let k = 0; k < rw.count; k++) {
+                    const units = unitCells();
+                    if (units.length) {
+                        const t = units[Math.floor(Math.random() * units.length)];
+                        bumpUnit(t.r, t.c, 1);
+                        anims.push({ sym: '⭐', srcIdx: rw.srcIdx, dest: { r: t.r, c: t.c, color: '#eab308' }, merge: false });
+                    } else {
+                        // Усиливать некого — даём юнита
+                        const d2 = placeUnit(randUnitSym(), 2);
+                        if (d2) anims.push({ sym: '⭐', srcIdx: rw.srcIdx, dest: d2, merge: false });
+                    }
+                }
+            } else if (rw.type === 'buffAll') {
+                unitCells().forEach(t => {
+                    bumpUnit(t.r, t.c, rw.levels);
+                    anims.push({ sym: '💪', srcIdx: rw.srcIdx, dest: { r: t.r, c: t.c, color: '#fde047' }, merge: false, flash: true });
+                });
+            }
+        });
+
+        document.getElementById('action-log').innerHTML =
+            `<span class="font-bold" style="color:${ev.color}">${ev.name}!</span> ` +
+            `<span class="text-green-300">${ev.short || 'награда зачислена'}</span>`;
+
+        runRewardAnims(anims, onComplete);
+    }
+
+    // Последовательно проигрывает анимации наград, затем вызывает onComplete
+    function runRewardAnims(anims, onComplete) {
+        if (anims.length === 0) {
+            updateGridUI();
+            setTimeout(onComplete, 150);
+            return;
+        }
+        const STAGGER = 380;
+        const slotsPanel = document.getElementById('slots-panel');
+        let maxDuration = 0;
+
+        anims.forEach((a, i) => {
+            const delayMs = i * STAGGER;
+            const duration = a.merge ? (350 + 480 + 50) : 540;
+            maxDuration = Math.max(maxDuration, delayMs + duration);
+
+            setTimeout(() => {
+                if (a.flash) {
+                    createFlashEffect(a.dest.r, a.dest.c, a.dest.color);
+                    updateGridUI();
+                    return;
+                }
+                const srcEls = (a.srcIdx || []).map(idx => chipEl(idx)).filter(Boolean);
+                if (a.merge && srcEls.length > 1) {
+                    playSound('win');
+                    mergeAndFlyToCell(a.sym, srcEls, slotsPanel, a.dest.r, a.dest.c, () => {
+                        createFlashEffect(a.dest.r, a.dest.c, a.dest.color);
+                        updateGridUI();
+                    });
+                } else {
+                    playSound(a.merge ? 'win' : 'spin_stop');
+                    flyIconToCell(a.sym, srcEls[0] || slotsPanel, a.dest.r, a.dest.c, () => {
+                        createFlashEffect(a.dest.r, a.dest.c, a.dest.color);
+                        updateGridUI();
+                    });
+                }
+            }, delayMs);
+        });
+
+        setTimeout(() => { updateGridUI(); onComplete(); }, maxDuration + 250);
+    }
+
+    // Нажатие «Взять» — применить текущую комбинацию и перейти к следующей руке/волне
+    function takeHand() {
+        if (pokerBusy || gamePhase !== 'SPIN') return;
+        const ev = evaluateHand(pokerChips);
+        applyPokerRewards(ev, () => {
+            handsLeft--;
+            if (handsLeft <= 0) {
+                switchToDefensePhase();
+            } else {
+                dealNewHand();
+            }
+        });
+    }
+
+    function createFlashEffect(r, c, color) {
+        cellAttackFlashes.push({
+            r: r,
+            c: c,
+            color: color,
+            alpha: 1.0
+        });
+    }
+
+    /* STREAMING_CHUNK: Transitioning to Defense Phase... */
+    // --- ПЕРЕХОД К ФАЗЕ ЗАЩИТЫ БАЗЫ ---
+    function switchToDefensePhase() {
+        gamePhase = 'DEFENSE';
+        document.getElementById('game-phase').innerText = `Фаза защиты!`;
+        document.getElementById('spins-counter').innerText = `Волна ${currentWave} готова к атаке`;
+        document.getElementById('action-log').innerHTML = `<span class="text-red-500 font-extrabold uppercase">Орда начинает марш! Замки скрыты. Защити ядро!</span>`;
+        
+        // Скрываем замки, обновляем отображение сетки
+        updateGridUI();
+
+        document.getElementById('slots-panel').classList.add('hidden');
+        document.getElementById('defense-panel').classList.remove('hidden');
+        document.getElementById('start-wave-btn').disabled = false;
+    }
+
+    // Старт боевой симуляции
+    function startBattle() {
+        if (gamePhase !== 'DEFENSE') return;
+        gamePhase = 'BATTLE_ACTIVE';
+        document.getElementById('start-wave-btn').disabled = true;
+        document.getElementById('action-log').innerText = `Враги выходят на дорогу!`;
+        
+        // Переинициализируем размеры Canvas на случай изменения макета
+        resizeCanvas();
+
+        spawnWave();
+        
+        // СБРОС ТАЙМЕРА КАДРА (Важное исправление бага!)
+        lastTime = 0; 
+        
+        // Запуск плавного бесконечного цикла отрисовки
+        requestAnimationFrame(gameLoop);
+    }
+
+    /* STREAMING_CHUNK: Spawning Enemies... */
+    function spawnWave() {
+        enemies = [];
+        bullets = [];
+        damageTexts = [];
+        cellAttackFlashes = [];
+        battleElapsed = 0;
+
+        let count = 4 + currentWave * 4;
+        let hpMultiplier = 1 + (currentWave - 1) * 0.45;
+        let spawnInterval = 650; // мс между выходом монстров на дорогу
+
+        for (let idx = 0; idx < count; idx++) {
+            // Состав орды: 35% орки-танки, иначе 20% быстрые призраки, иначе слаймы
+            let kind = 'slime';
+            if (Math.random() < 0.35) kind = 'orc';
+            else if (Math.random() < 0.2) kind = 'ghost';
+            const def = ENEMY_DEF[kind];
+            const hp = def.hp * hpMultiplier;
+
+            // Каждый монстр получает полный кольцевой маршрут и будет
+            // бесконечно ходить по кругу вокруг базы.
+            let path = ACCESS_PATH.concat(RING_PATH);
+
+            enemies.push({
+                x: path[0].c,
+                y: path[0].r,
+                path: path,
+                wp: 1,             // индекс следующей путевой точки
+                emoji: def.emoji,
+                hp: hp,
+                maxHp: hp,
+                speed: def.speed,
+                active: false,     // уже вышел на дорогу
+                spawnAt: idx * spawnInterval,
+                laps: 0,           // сколько полных кругов прошёл (для урона по ядру)
+                slowT: 0,          // остаток времени заморозки (мс)
+                slowF: 1           // множитель скорости во время заморозки
+            });
+        }
+    }
+
+    /* STREAMING_CHUNK: Main Game Loop... */
+    // --- ОСНОВНОЙ КРЯК-ЦИКЛ ИГРЫ (ОТРИСОВКА И ЛОГИКА) ---
+    let lastTime = 0;
+    function gameLoop(timestamp) {
+        if (gamePhase !== 'BATTLE_ACTIVE') return;
+
+        if (!lastTime) lastTime = timestamp;
+        let dt = timestamp - lastTime;
+        lastTime = timestamp;
+
+        // Предотвращаем гигантские скачки времени при сворачивании окна
+        if (dt > 100) dt = 16.66; 
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        updateGameLogic(dt);
+        drawEffects();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Цвет вспышек/снарядов по типу боевого юнита
+    function vfxColor(type) {
+        return type === 'TOWER'    ? '#f59e0b'
+             : type === 'MAGE'     ? '#e879f9'
+             : type === 'DEFENDER' ? '#60a5fa'
+             : type === 'FROST'    ? '#38bdf8'
+             : type === 'BOMB'     ? '#fb923c'
+             : '#34d399'; // ARCHER
+    }
+
+    // Монстр прошёл лишний круг и кусает ядро базы
+    function damageCore() {
+        if (gamePhase !== 'BATTLE_ACTIVE') return;
+        baseHp--;
+        playSound('core_damage');
+        document.getElementById('hp-text').innerText = Math.max(0, baseHp);
+        createFlashEffect(ROAD_CORE.r, ROAD_CORE.c, '#ff0000');
+        const cs = canvas.width / 7;
+        damageTexts.push({
+            x: (ROAD_CORE.c + 0.5) * cs + (Math.random() - 0.5) * 22,
+            y: (ROAD_CORE.r + 0.5) * cs - 12,
+            text: '-1 ❤️',
+            color: '#f87171',
+            alpha: 1
+        });
+        if (baseHp <= 0) endGame();
+    }
+
+    /* STREAMING_CHUNK: Game Logic Updates... */
+    function updateGameLogic(dt) {
+        battleElapsed += dt;
+
+        // Конвертер ячеек сетки в точные экранные координаты Canvas
+        function cellToCanvas(r, c) {
+            let cellSize = canvas.width / 7;
+            return {
+                x: (c + 0.5) * cellSize,
+                y: (r + 0.5) * cellSize
+            };
+        }
+
+        // 1. ВЫХОД НА ДОРОГУ, ДВИЖЕНИЕ ПО НЕЙ И АТАКА БАЗЫ
+        enemies.forEach((enemy) => {
+            // Постепенный выход монстров на дорогу
+            if (!enemy.active) {
+                if (battleElapsed >= enemy.spawnAt) enemy.active = true;
+                else return;
+            }
+            if (enemy.hp <= 0) return;
+
+            // Заморозка от Мороза: пока тикает таймер — двигаемся медленнее
+            const effSpeed = enemy.slowT > 0 ? enemy.speed * enemy.slowF : enemy.speed;
+            if (enemy.slowT > 0) enemy.slowT -= dt;
+
+            // Движение по дороге к следующей путевой точке (по кольцу)
+            let wpTarget = enemy.path[enemy.wp];
+            let dx = wpTarget.c - enemy.x;
+            let dy = wpTarget.r - enemy.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+
+            if (dist < 0.08) {
+                if (enemy.wp >= enemy.path.length - 1) {
+                    // Конец кольца — возвращаемся к первой точке RING_PATH (зацикливание)
+                    enemy.wp = ACCESS_PATH.length;
+                    enemy.x = RING_PATH[0].c;
+                    enemy.y = RING_PATH[0].r;
+                    enemy.laps++;
+                    // Первый круг бесплатный; каждый следующий — укус по ядру
+                    if (enemy.laps > LAP_FREE) damageCore();
+                } else {
+                    enemy.wp++;
+                }
+            } else {
+                enemy.x += (dx / dist) * effSpeed * (dt / 16.66);
+                enemy.y += (dy / dist) * effSpeed * (dt / 16.66);
+            }
+        });
+
+        // Отсеиваем побежденных врагов
+        enemies = enemies.filter(e => e.hp > 0);
+
+        // 2. ДЕЙСТВИЯ ОБОРОННЫХ СТРУКТУР (Атака)
+        let now = performance.now();
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                let cell = gridData[r][c];
+                const st = UNIT_DEF[cell.type];
+                if (!st) continue; // не боевой юнит (пусто / ядро / усиление)
+
+                let cooldown = st.cd;
+                let range = st.range;
+                let damage = st.dmg * cell.level;
+
+                if (!cell.lastAttackTime) cell.lastAttackTime = 0;
+
+                if (now - cell.lastAttackTime >= cooldown) {
+                    let target = null;
+                    let minDist = 999;
+
+                    enemies.forEach(enemy => {
+                        if (!enemy.active || enemy.hp <= 0) return;
+                        let edx = enemy.x - c;
+                        let edy = enemy.y - r;
+                        let dist = Math.sqrt(edx*edx + edy*edy);
+
+                        if (dist <= range && dist < minDist) {
+                            target = enemy;
+                            minDist = dist;
+                        }
+                    });
+
+                    if (target) {
+                        cell.lastAttackTime = now;
+                        let startPos = cellToCanvas(r, c);
+                        
+                        bullets.push({
+                            startX: startPos.x,
+                            startY: startPos.y,
+                            x: startPos.x,
+                            y: startPos.y,
+                            targetRef: target,
+                            speed: st.bspeed,
+                            type: cell.type,
+                            damage: damage,
+                            splash: st.splash || 0,
+                            splashF: st.splashFactor || 0.6,
+                            slowMs: st.slowMs || 0,
+                            slowF: st.slowFactor || 1
+                        });
+
+                        const laser = cell.type === 'TOWER' || cell.type === 'MAGE' || cell.type === 'BOMB';
+                        playSound(laser ? 'shoot_laser' : 'shoot_arrow');
+                    }
+                }
+            }
+        }
+
+        // 3. ПЕРЕМЕЩЕНИЕ СНАРЯДОВ НА ЭКРАНЕ
+        bullets.forEach((bullet, bIdx) => {
+            if (bullet.targetRef.hp <= 0) {
+                bullets.splice(bIdx, 1);
+                return;
+            }
+
+            let targetPos = cellToCanvas(bullet.targetRef.y, bullet.targetRef.x);
+            let dx = targetPos.x - bullet.x;
+            let dy = targetPos.y - bullet.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+
+            if (dist < 15) {
+                // Прямое попадание
+                bullet.targetRef.hp -= bullet.damage;
+                if (bullet.slowMs) { bullet.targetRef.slowT = bullet.slowMs; bullet.targetRef.slowF = bullet.slowF; }
+                playSound('explosion');
+                const col = vfxColor(bullet.type);
+                createFlashEffect(Math.round(bullet.targetRef.y), Math.round(bullet.targetRef.x), col);
+
+                damageTexts.push({
+                    x: targetPos.x + (Math.random() - 0.5) * 10,
+                    y: targetPos.y - 12,
+                    text: `-${Math.round(bullet.damage)}`,
+                    color: col,
+                    alpha: 1
+                });
+
+                // Сплеш по области (маг/бомба) + заморозка соседей, если снаряд морозит
+                if (bullet.splash) {
+                    const tx = bullet.targetRef.x, ty = bullet.targetRef.y;
+                    enemies.forEach(e => {
+                        if (e === bullet.targetRef || e.hp <= 0 || !e.active) return;
+                        if (Math.hypot(e.x - tx, e.y - ty) <= bullet.splash) {
+                            e.hp -= bullet.damage * bullet.splashF;
+                            if (bullet.slowMs) { e.slowT = bullet.slowMs; e.slowF = bullet.slowF; }
+                            createFlashEffect(Math.round(e.y), Math.round(e.x), col);
+                        }
+                    });
+                }
+
+                bullets.splice(bIdx, 1);
+            } else {
+                bullet.x += (dx / dist) * bullet.speed * dt;
+                bullet.y += (dy / dist) * bullet.speed * dt;
+            }
+        });
+
+        // Проверка завершения битвы (Победа ворот волны)
+        if (enemies.length === 0 && bullets.length === 0 && gamePhase === 'BATTLE_ACTIVE') {
+            endWaveSuccess();
+        }
+    }
+
+    /* STREAMING_CHUNK: Drawing VFX on Canvas... */
+    // Отрисовка всех эффектов на Canvas
+    function drawEffects() {
+        const cellSize = canvas.width / 7;
+
+        // 1. Отрисовка вспышек на клетках боя
+        cellAttackFlashes.forEach((flash, fIdx) => {
+            let cx = (flash.c + 0.5) * cellSize;
+            let cy = (flash.r + 0.5) * cellSize;
+
+            ctx.save();
+            ctx.globalAlpha = flash.alpha * 0.45;
+            ctx.fillStyle = flash.color;
+            ctx.beginPath();
+            ctx.arc(cx, cy, cellSize * 0.65, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            flash.alpha -= 0.06;
+            if (flash.alpha <= 0) {
+                cellAttackFlashes.splice(fIdx, 1);
+            }
+        });
+
+        // 2. Отрисовка врагов
+        enemies.forEach(enemy => {
+            if (!enemy.active) return;
+            let cx = (enemy.x + 0.5) * cellSize;
+            let cy = (enemy.y + 0.5) * cellSize;
+
+            const frozen = enemy.slowT > 0;
+            if (frozen) {
+                // Ледяная аура у замороженных монстров
+                ctx.save();
+                ctx.globalAlpha = 0.35;
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(cx, cy, cellSize * 0.42, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            ctx.shadowColor = frozen ? '#38bdf8' : 'black';
+            ctx.shadowBlur = frozen ? 8 : 4;
+
+            ctx.font = `${cellSize * 0.55}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(enemy.emoji, cx, cy);
+
+            ctx.shadowBlur = 0;
+
+            // Индикатор здоровья монстра
+            let hpBarW = cellSize * 0.7;
+            let hpBarH = 4;
+            let hpPercent = enemy.hp / enemy.maxHp;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(cx - hpBarW/2, cy - cellSize*0.35, hpBarW, hpBarH);
+
+            ctx.fillStyle = enemy.hp > enemy.maxHp * 0.4 ? '#22c55e' : '#ef4444';
+            ctx.fillRect(cx - hpBarW/2, cy - cellSize*0.35, hpBarW * hpPercent, hpBarH);
+        });
+
+        // 3. Отрисовка летящих стрел и лазеров
+        bullets.forEach(bullet => {
+            const col = vfxColor(bullet.type);
+            const radius = bullet.type === 'BOMB' ? 8
+                         : bullet.type === 'MAGE' ? 7
+                         : bullet.type === 'TOWER' ? 6
+                         : bullet.type === 'FROST' ? 5
+                         : bullet.type === 'DEFENDER' ? 4 : 3;
+            const bigGlow = bullet.type === 'TOWER' || bullet.type === 'MAGE' || bullet.type === 'BOMB';
+            ctx.save();
+            ctx.shadowColor = col;
+            ctx.shadowBlur = bigGlow ? 10 : 4;
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        // 4. Отрисовка текста урона
+        damageTexts.forEach((dmg, dIdx) => {
+            ctx.save();
+            ctx.globalAlpha = dmg.alpha;
+            ctx.fillStyle = dmg.color;
+            ctx.font = 'bold 12px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText(dmg.text, dmg.x, dmg.y);
+            ctx.restore();
+
+            dmg.y -= 0.65;
+            dmg.alpha -= 0.025;
+            if (dmg.alpha <= 0) {
+                damageTexts.splice(dIdx, 1);
+            }
+        });
+    }
+
+    // Успешная зачистка волны
+    function endWaveSuccess() {
+        gamePhase = 'SPIN';
+        currentWave++;
+        handsLeft = HANDS_PER_WAVE;
+        document.getElementById('wave-num').innerText = currentWave;
+        document.getElementById('game-phase').innerText = `Подготовка: Покер`;
+        // Реген ядра за отражённую волну
+        baseHp = Math.min(START_HP, baseHp + HP_REGEN_PER_WAVE);
+        document.getElementById('hp-text').innerText = baseHp;
+
+        document.getElementById('action-log').innerHTML = `<span class="text-green-400 font-bold">Волна отражена! Ядро +${HP_REGEN_PER_WAVE} ❤️. Усиливай гарнизон!</span>`;
+
+        // Показываем замки обратно на заблокированных ячейках
+        updateGridUI();
+
+        document.getElementById('defense-panel').classList.add('hidden');
+        document.getElementById('slots-panel').classList.remove('hidden');
+        document.getElementById('start-wave-btn').disabled = false;
+
+        dealNewHand();
+    }
+
+    // Поражение
+    function endGame() {
+        if (gamePhase === 'GAMEOVER') return;
+        gamePhase = 'GAMEOVER';
+        document.getElementById('slots-panel').classList.add('hidden');
+        document.getElementById('defense-panel').classList.add('hidden');
+        document.getElementById('restart-panel').classList.remove('hidden');
+
+        const title = document.getElementById('game-result-title');
+        const desc = document.getElementById('game-result-desc');
+
+        title.innerText = 'База Пала!';
+        title.style.color = '#ef4444';
+        desc.innerText = `Монстры прорвали каменный двор на ${currentWave}-й волне. Попробуйте укрепиться сильнее!`;
+    }
+
+    function restartGame() {
+        baseHp = START_HP;
+        handsLeft = HANDS_PER_WAVE;
+        currentWave = 1;
+        gamePhase = 'SPIN';
+        enemies = [];
+        bullets = [];
+        damageTexts = [];
+
+        document.getElementById('hp-text').innerText = baseHp;
+        document.getElementById('wave-num').innerText = currentWave;
+        document.getElementById('game-phase').innerText = `Подготовка: Покер`;
+        document.getElementById('action-log').innerText = `Поля очищены. Собери комбинацию из 5 фишек!`;
+
+        document.getElementById('restart-panel').classList.add('hidden');
+        document.getElementById('slots-panel').classList.remove('hidden');
+
+        initGrid();
+        dealNewHand();
+    }
+
+    /* =============================================
+       DRAG & MERGE MECHANICS
+       ============================================= */
+    let dragState = { active: false, fromR: -1, fromC: -1, ghostEl: null };
+
+    function getCellFromPoint(clientX, clientY) {
+        const gridEl = document.getElementById('battle-grid');
+        const rect = gridEl.getBoundingClientRect();
+        const cellW = rect.width / 7;
+        const cellH = rect.height / 7;
+        const c = Math.floor((clientX - rect.left) / cellW);
+        const r = Math.floor((clientY - rect.top) / cellH);
+        if (r >= 0 && r < 7 && c >= 0 && c < 7) return { r, c };
+        return null;
+    }
+
+    function startDrag(r, c, clientX, clientY) {
+        if (gamePhase !== 'SPIN' && gamePhase !== 'DEFENSE') return;
+        const cell = gridData[r][c];
+        if (cell.type === 'EMPTY' || cell.type === 'CORE' || cell.status !== 'unlocked') return;
+
+        const symb = Object.keys(SYMBOL_MAP).find(k => SYMBOL_MAP[k].type === cell.type);
+        dragState.active = true;
+        dragState.fromR = r;
+        dragState.fromC = c;
+
+        const ghost = document.createElement('div');
+        ghost.id = 'drag-ghost';
+        ghost.innerHTML = `<div>${symb}</div><div style="font-size:0.55rem;color:#fbbf24;letter-spacing:2px">${'★'.repeat(cell.level)}</div>`;
+        ghost.style.left = clientX + 'px';
+        ghost.style.top = clientY + 'px';
+        document.body.appendChild(ghost);
+        dragState.ghostEl = ghost;
+
+        document.getElementById(`cell-${r}-${c}`).style.opacity = '0.3';
+        highlightDropTargets(r, c);
+    }
+
+    function updateDrag(clientX, clientY) {
+        if (!dragState.active || !dragState.ghostEl) return;
+        dragState.ghostEl.style.left = clientX + 'px';
+        dragState.ghostEl.style.top = clientY + 'px';
+    }
+
+    function endDrag(clientX, clientY) {
+        if (!dragState.active) return;
+
+        clearDragHighlights();
+        const srcEl = document.getElementById(`cell-${dragState.fromR}-${dragState.fromC}`);
+        if (srcEl) srcEl.style.opacity = '';
+        if (dragState.ghostEl) { dragState.ghostEl.remove(); dragState.ghostEl = null; }
+
+        const target = getCellFromPoint(clientX, clientY);
+        if (target) {
+            const { r, c } = target;
+            const fromR = dragState.fromR;
+            const fromC = dragState.fromC;
+            const dstCell = gridData[r][c];
+            const srcCell = gridData[fromR][fromC];
+            const isCore = (r === 3 && c === 3);
+
+            if (!(fromR === r && fromC === c) && dstCell.status === 'unlocked' && !isCore) {
+                if (dstCell.type === 'EMPTY') {
+                    moveUnit(fromR, fromC, r, c);
+                } else if (dstCell.type === srcCell.type) {
+                    mergeUnits(fromR, fromC, r, c);
+                }
+            }
+        }
+
+        dragState.active = false;
+        dragState.fromR = -1;
+        dragState.fromC = -1;
+    }
+
+    function moveUnit(fromR, fromC, toR, toC) {
+        const src = gridData[fromR][fromC];
+        const dst = gridData[toR][toC];
+
+        dst.type = src.type;
+        dst.level = src.level;
+        dst.defenderHp = src.defenderHp;
+        dst.maxDefenderHp = src.maxDefenderHp;
+        dst.lastAttackTime = 0;
+
+        src.type = 'EMPTY';
+        src.level = 1;
+        src.defenderHp = 0;
+        src.maxDefenderHp = 40;
+        src.lastAttackTime = 0;
+
+        createFlashEffect(toR, toC, '#7dd3fc');
+        updateGridUI();
+        playSound('spin_stop');
+        document.getElementById('action-log').innerHTML = `<span class="text-sky-400">Юнит перемещён на новую позицию.</span>`;
+    }
+
+    function mergeUnits(fromR, fromC, toR, toC) {
+        const src = gridData[fromR][fromC];
+        const dst = gridData[toR][toC];
+
+        const newLevel = Math.min(src.level + dst.level, 5);
+        dst.level = newLevel;
+
+        if (dst.type === 'DEFENDER') {
+            dst.maxDefenderHp = 40 + (newLevel - 1) * 20;
+            dst.defenderHp = dst.maxDefenderHp;
+        }
+
+        src.type = 'EMPTY';
+        src.level = 1;
+        src.defenderHp = 0;
+        src.maxDefenderHp = 40;
+        src.lastAttackTime = 0;
+
+        createFlashEffect(toR, toC, '#fbbf24');
+        createFlashEffect(toR, toC, '#ffffff');
+        updateGridUI();
+        playSound('win');
+
+        const symb = Object.keys(SYMBOL_MAP).find(k => SYMBOL_MAP[k].type === dst.type);
+        document.getElementById('action-log').innerHTML =
+            `<span class="text-yellow-400 font-bold">⚡ Слияние! ${symb} → Уровень ${newLevel}${'★'.repeat(newLevel)}!</span>`;
+    }
+
+    function highlightDropTargets(fromR, fromC) {
+        const srcType = gridData[fromR][fromC].type;
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                if (r === fromR && c === fromC) continue;
+                const cell = gridData[r][c];
+                if (cell.status !== 'unlocked' || (r === 3 && c === 3)) continue;
+                const el = document.getElementById(`cell-${r}-${c}`);
+                if (cell.type === 'EMPTY') {
+                    el.classList.add('drop-valid');
+                } else if (cell.type === srcType) {
+                    el.classList.add('drop-merge');
+                }
+            }
+        }
+    }
+
+    function clearDragHighlights() {
+        for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+                document.getElementById(`cell-${r}-${c}`).classList.remove('drop-valid', 'drop-merge');
+            }
+        }
+    }
+
+    // Drag events — mouse
+    document.getElementById('battle-grid').addEventListener('mousedown', (e) => {
+        const cellEl = e.target.closest('[id^="cell-"]');
+        if (!cellEl) return;
+        const parts = cellEl.id.split('-');
+        startDrag(parseInt(parts[1]), parseInt(parts[2]), e.clientX, e.clientY);
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => { updateDrag(e.clientX, e.clientY); });
+    document.addEventListener('mouseup',   (e) => { endDrag(e.clientX, e.clientY); });
+
+    // Drag events — touch
+    document.getElementById('battle-grid').addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const cellEl = e.target.closest('[id^="cell-"]');
+        if (!cellEl) return;
+        const parts = cellEl.id.split('-');
+        startDrag(parseInt(parts[1]), parseInt(parts[2]), touch.clientX, touch.clientY);
+        e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+        if (dragState.active) {
+            updateDrag(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    document.addEventListener('touchend', (e) => {
+        if (dragState.active) {
+            const t = e.changedTouches[0];
+            endDrag(t.clientX, t.clientY);
+        }
+    });
+
+    // --- НАЗНАЧЕНИЕ КНОПОК ---
+    document.getElementById('reroll-btn').addEventListener('click', reroll);
+    document.getElementById('take-btn').addEventListener('click', takeHand);
+    document.getElementById('start-wave-btn').addEventListener('click', startBattle);
+    document.getElementById('restart-btn').addEventListener('click', restartGame);
+
+    // Клик/тап по фишке — отметить её на замену для следующего рерола
+    for (let i = 0; i < 5; i++) {
+        chipEl(i).addEventListener('click', () => toggleReroll(i));
+    }
+
+    // Первоначальный старт
+    initGrid();
+    dealNewHand();
+</script>
+
+</body>
+</html>

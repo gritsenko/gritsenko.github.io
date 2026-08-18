@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Цветная Сортировка: Тона Кожи</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@600;800;900&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: radial-gradient(circle at center, #1f1a24 0%, #0d0b10 100%);
+            min-height: 100vh;
+            touch-action: manipulation;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        .font-game {
+            font-family: 'Fredoka', cursive;
+        }
+
+        /* --- Jelly Pudding Wobble Keyframes --- */
+        @keyframes jellyHorizontal {
+            0% { transform: scale(1.45, 0.65); }
+            22% { transform: scale(0.7, 1.3); }
+            45% { transform: scale(1.18, 0.85); }
+            68% { transform: scale(0.9, 1.08); }
+            85% { transform: scale(1.04, 0.96); }
+            100% { transform: scale(1, 1); }
+        }
+
+        @keyframes jellyVertical {
+            0% { transform: scale(0.65, 1.45); }
+            22% { transform: scale(1.3, 0.7); }
+            45% { transform: scale(0.85, 1.18); }
+            68% { transform: scale(1.08, 0.9); }
+            85% { transform: scale(0.96, 1.04); }
+            100% { transform: scale(1, 1); }
+        }
+
+        .animate-jelly-h {
+            animation: jellyHorizontal 0.65s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+            transform-origin: center center;
+        }
+
+        .animate-jelly-v {
+            animation: jellyVertical 0.65s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+            transform-origin: center center;
+        }
+
+        /* Neutral (#FFCC4D) */
+        .chip-neutral {
+            background: radial-gradient(circle at 35% 30%, #ffea9f 0%, #FFCC4D 45%, #b38310 85%, #593f00 100%);
+            box-shadow: 0 8px 20px rgba(255, 204, 77, 0.35), inset 0 -6px 8px rgba(0,0,0,0.4), inset 0 4px 8px rgba(255,255,255,0.85);
+        }
+        /* Светлый Type 1-2 (#FADCBC) */
+        .chip-skin1 {
+            background: radial-gradient(circle at 35% 30%, #ffffff 0%, #FADCBC 50%, #c2976b 85%, #664828 100%);
+            box-shadow: 0 8px 20px rgba(250, 220, 188, 0.35), inset 0 -6px 8px rgba(0,0,0,0.35), inset 0 4px 8px rgba(255,255,255,0.9);
+        }
+        /* Светло-средний Type 3 (#E0BB95) */
+        .chip-skin2 {
+            background: radial-gradient(circle at 35% 30%, #f2ded0 0%, #E0BB95 45%, #9d7348 85%, #4f3317 100%);
+            box-shadow: 0 8px 20px rgba(224, 187, 149, 0.35), inset 0 -6px 8px rgba(0,0,0,0.4), inset 0 4px 8px rgba(255,255,255,0.85);
+        }
+        /* Средний Type 4 (#BF8F68) */
+        .chip-skin3 {
+            background: radial-gradient(circle at 35% 30%, #dfb490 0%, #BF8F68 45%, #734b2a 85%, #3b220d 100%);
+            box-shadow: 0 8px 20px rgba(191, 143, 104, 0.35), inset 0 -6px 8px rgba(0,0,0,0.4), inset 0 4px 8px rgba(255,255,255,0.8);
+        }
+        /* Темно-средний Type 5 (#9B643D) */
+        .chip-skin4 {
+            background: radial-gradient(circle at 35% 30%, #be865c 0%, #9B643D 45%, #532e13 85%, #291203 100%);
+            box-shadow: 0 8px 20px rgba(155, 100, 61, 0.35), inset 0 -6px 8px rgba(0,0,0,0.45), inset 0 4px 8px rgba(255,255,255,0.7);
+        }
+        /* Темный Type 6 (#594539) */
+        .chip-skin5 {
+            background: radial-gradient(circle at 35% 30%, #836959 0%, #594539 45%, #281b14 85%, #0f0a07 100%);
+            box-shadow: 0 8px 20px rgba(89, 69, 57, 0.45), inset 0 -6px 8px rgba(0,0,0,0.6), inset 0 4px 8px rgba(255,255,255,0.6);
+        }
+
+        /* Glass Jars / Containers with custom glow borders */
+        .jar-glow {
+            border: 2.5px solid var(--jar-border-color, rgba(255,255,255,0.6));
+            box-shadow: 0 0 18px var(--jar-glow-color, rgba(255,255,255,0.3)), inset 0 0 10px var(--jar-glow-color, rgba(255,255,255,0.2));
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.05); filter: brightness(1.25); }
+        }
+
+        .ready-to-drop {
+            animation: pulseGlow 1.2s infinite ease-in-out;
+            cursor: pointer;
+        }
+
+        @keyframes dropAnim {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            50% { transform: translateY(50px) scale(0.6); opacity: 0.8; }
+            100% { transform: translateY(100px) scale(0.2); opacity: 0; }
+        }
+
+        .dropping-chip {
+            animation: dropAnim 0.35s ease-in forwards;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .cell-highlight-hint {
+            position: absolute;
+            z-index: 10;
+            pointer-events: none !important;
+            animation: pulseGlow 0.8s infinite alternate;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between p-3 sm:p-6 min-h-screen text-white select-none">
+
+    <!-- Top Header & Stats -->
+    <header class="w-full max-w-md flex flex-col gap-3">
+        <div class="flex items-center justify-between glass-panel rounded-2xl p-3 px-4 shadow-xl">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-700/60 flex items-center justify-center text-xl font-game shadow-inner border border-amber-500/30">
+                    <i class="fa-solid fa-layer-group text-amber-200"></i>
+                </div>
+                <div>
+                    <h1 class="font-game text-lg tracking-wide text-amber-100">ТОНА КОЖИ</h1>
+                    <p id="level-title" class="text-xs text-amber-200/80 font-semibold">Уровень 1</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold block leading-none">Ходы</span>
+                    <span id="move-counter" class="font-game text-xl text-white">0</span>
+                </div>
+                <button id="btn-sound" class="w-9 h-9 rounded-xl glass-panel hover:bg-white/20 active:scale-95 flex items-center justify-center text-amber-300 transition">
+                    <i class="fa-solid fa-volume-high"></i>
+                </button>
+                <button id="btn-restart" class="w-9 h-9 rounded-xl glass-panel hover:bg-white/20 active:scale-95 flex items-center justify-center text-amber-200 transition">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="glass-panel rounded-xl p-2.5 px-4 text-xs text-center text-amber-100 flex items-center justify-center gap-2 border-amber-500/20">
+            <i class="fa-solid fa-hand-pointer text-amber-400 text-sm animate-bounce"></i>
+            <span>Делайте **свайп** фишки в сторону пустой ячейки!</span>
+        </div>
+    </header>
+
+    <!-- Main Game Playfield Container -->
+    <main class="w-full max-w-md my-auto flex flex-col items-center justify-center gap-2 py-2">
+        
+        <!-- Sliding Board Container -->
+        <div class="relative glass-panel rounded-3xl p-3.5 shadow-2xl border-2 border-white/10 w-full aspect-[4/4.2] max-w-[380px] flex flex-col justify-between">
+            <div id="board-grid" class="relative w-full h-full grid gap-2.5">
+                <!-- JS dynamically renders cells & jelly tiles here -->
+            </div>
+        </div>
+
+        <!-- Connection Arrows Indicator -->
+        <div class="w-full max-w-[380px] grid grid-cols-4 px-3 gap-2 text-center my-0.5">
+            <div id="arrow-col-0" class="text-xs font-bold text-slate-600 transition-all duration-300"><i class="fa-solid fa-chevron-down text-base"></i></div>
+            <div id="arrow-col-1" class="text-xs font-bold text-slate-600 transition-all duration-300"><i class="fa-solid fa-chevron-down text-base"></i></div>
+            <div id="arrow-col-2" class="text-xs font-bold text-slate-600 transition-all duration-300"><i class="fa-solid fa-chevron-down text-base"></i></div>
+            <div id="arrow-col-3" class="text-xs font-bold text-slate-600 transition-all duration-300"><i class="fa-solid fa-chevron-down text-base"></i></div>
+        </div>
+
+        <!-- Bottom Jars / Containers -->
+        <div id="containers-bar" class="w-full max-w-[380px] grid grid-cols-4 gap-2.5 px-1">
+            <!-- JS dynamically injects color glass jars -->
+        </div>
+    </main>
+
+    <!-- Bottom Actions -->
+    <footer class="w-full max-w-md flex justify-between gap-3">
+        <button id="btn-undo" class="flex-1 glass-panel py-2.5 rounded-xl font-bold text-sm text-slate-300 hover:bg-white/15 active:scale-95 transition flex items-center justify-center gap-2 border-white/10">
+            <i class="fa-solid fa-arrow-rotate-left"></i>
+            <span>Отмена</span>
+        </button>
+        <button id="btn-hint" class="flex-1 glass-panel py-2.5 rounded-xl font-bold text-sm text-amber-300 hover:bg-white/15 active:scale-95 transition flex items-center justify-center gap-2 border-amber-500/20">
+            <i class="fa-solid fa-lightbulb"></i>
+            <span>Подсказка</span>
+        </button>
+    </footer>
+
+    <!-- Victory Modal Overlay -->
+    <div id="victory-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+        <div class="glass-panel max-w-sm w-full rounded-3xl p-6 text-center shadow-2xl border border-amber-500/30 transform transition-all scale-95 animate-bounce-short">
+            <div class="w-20 h-20 bg-amber-400/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-400/50 shadow-lg">
+                <i class="fa-solid fa-trophy text-4xl text-amber-300"></i>
+            </div>
+            <h2 class="font-game text-3xl text-amber-200 mb-1">ОТЛИЧНО!</h2>
+            <p class="text-slate-300 text-sm mb-4">Все оттенки кожи успешно отсортированы!</p>
+            
+            <div class="bg-black/40 rounded-2xl p-3 mb-6 flex justify-around">
+                <div>
+                    <span class="text-xs text-slate-400 block uppercase font-bold">Сделано ходов</span>
+                    <span id="final-moves" class="font-game text-2xl text-white">0</span>
+                </div>
+                <div class="border-r border-white/10"></div>
+                <div>
+                    <span class="text-xs text-slate-400 block uppercase font-bold">Оценка</span>
+                    <div class="text-amber-300 text-lg space-x-1 mt-1">
+                        <i class="fa-solid fa-star"></i>
+                        <i class="fa-solid fa-star"></i>
+                        <i class="fa-solid fa-star"></i>
+                    </div>
+                </div>
+            </div>
+
+            <button id="btn-next-level" class="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-extrabold py-3.5 rounded-2xl shadow-lg active:scale-95 transition font-game text-lg tracking-wider">
+                СЛЕДУЮЩИЙ УРОВЕНЬ <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+            }
+
+            playSlide() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(520, this.ctx.currentTime + 0.12);
+
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+
+            playDrop() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(587.33, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(293.66, this.ctx.currentTime + 0.25);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+
+            playWin() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.1);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.1 + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.1);
+                    osc.stop(this.ctx.currentTime + idx * 0.1 + 0.3);
+                });
+            }
+        }
+
+        const COLOR_CONFIG = {
+            neutral: { name: 'Нейтральный', hex: '#FFCC4D', chipClass: 'chip-neutral', emoji: '💛', centerColor: '#D9822B', dotColor: '#A65E19', darkDotColor: '#593009' },
+            skin1:   { name: 'Светлый',     hex: '#FADCBC', chipClass: 'chip-skin1',   emoji: '🏻', centerColor: '#E3A090', dotColor: '#B86E60', darkDotColor: '#69352A' },
+            skin2:   { name: 'Св-средний', hex: '#E0BB95', chipClass: 'chip-skin2',   emoji: '🏼', centerColor: '#B86F5D', dotColor: '#8A4A3B', darkDotColor: '#4A2016' },
+            skin3:   { name: 'Средний',    hex: '#BF8F68', chipClass: 'chip-skin3',   emoji: '🏽', centerColor: '#994F40', dotColor: '#6E3225', darkDotColor: '#3B130B' },
+            skin4:   { name: 'Тем-средний',hex: '#9B643D', chipClass: 'chip-skin4',   emoji: '🏾', centerColor: '#6E3429', dotColor: '#4B1F16', darkDotColor: '#240B06' },
+            skin5:   { name: 'Темный',     hex: '#594539', chipClass: 'chip-skin5',   emoji: '🏿', centerColor: '#421D17', dotColor: '#2B100B', darkDotColor: '#120402' }
+        };
+
+        const LEVELS = [
+            {
+                id: 1,
+                title: 'Уровень 1: Основная гамма',
+                cols: 4,
+                rows: 4,
+                colors: ['neutral', 'skin1', 'skin2', 'skin3'],
+                chipsPerColor: 2,
+                containerCapacities: [2, 2, 2, 2]
+            },
+            {
+                id: 2,
+                title: 'Уровень 2: Оттенки Фицпатрика',
+                cols: 4,
+                rows: 4,
+                colors: ['skin1', 'skin2', 'skin3', 'skin4'],
+                chipsPerColor: 3,
+                containerCapacities: [3, 3, 3, 3]
+            },
+            {
+                id: 3,
+                title: 'Уровень 3: Полная палитра',
+                cols: 4,
+                rows: 5,
+                colors: ['skin2', 'skin3', 'skin4', 'skin5'],
+                chipsPerColor: 3,
+                containerCapacities: [3, 3, 3, 3]
+            }
+        ];
+
+        class ColorSlideGame {
+            constructor() {
+                this.sound = new SoundFX();
+                this.currentLevelIdx = 0;
+                this.moves = 0;
+                this.history = [];
+                
+                this.grid = [];
+                this.containers = [];
+                this.cols = 4;
+                this.rows = 4;
+
+                this.justMovedTile = null;
+
+                this.initUI();
+                this.loadLevel(0);
+            }
+
+            initUI() {
+                document.getElementById('btn-sound').addEventListener('click', () => {
+                    this.sound.enabled = !this.sound.enabled;
+                    const btn = document.getElementById('btn-sound');
+                    btn.innerHTML = this.sound.enabled ? 
+                        '<i class="fa-solid fa-volume-high"></i>' : 
+                        '<i class="fa-solid fa-volume-xmark text-slate-500"></i>';
+                });
+
+                document.getElementById('btn-restart').addEventListener('click', () => this.restartLevel());
+                document.getElementById('btn-undo').addEventListener('click', () => this.undoMove());
+                document.getElementById('btn-hint').addEventListener('click', () => this.showHint());
+                document.getElementById('btn-next-level').addEventListener('click', () => {
+                    document.getElementById('victory-modal').classList.add('hidden');
+                    const nextLvl = (this.currentLevelIdx + 1) % LEVELS.length;
+                    this.loadLevel(nextLvl);
+                });
+            }
+
+            loadLevel(levelIdx) {
+                this.currentLevelIdx = levelIdx;
+                const config = LEVELS[levelIdx] || LEVELS[0];
+                this.cols = config.cols;
+                this.rows = config.rows;
+                this.moves = 0;
+                this.history = [];
+                this.justMovedTile = null;
+                document.getElementById('move-counter').textContent = '0';
+                document.getElementById('level-title').textContent = config.title;
+
+                this.containers = config.colors.map((colorKey, idx) => ({
+                    color: colorKey,
+                    current: 0,
+                    max: config.containerCapacities[idx] || 3
+                }));
+
+                let chipList = [];
+                config.colors.forEach((colorKey) => {
+                    for (let i = 0; i < config.chipsPerColor; i++) {
+                        chipList.push({ id: Math.random().toString(36).substring(2, 9), color: colorKey });
+                    }
+                });
+
+                const totalSlots = this.rows * this.cols;
+                while (chipList.length < totalSlots - 1) {
+                    chipList.push(null);
+                }
+
+                chipList = this.shuffleArray(chipList);
+
+                this.grid = [];
+                let chipIdx = 0;
+                for (let r = 0; r < this.rows; r++) {
+                    const row = [];
+                    for (let c = 0; c < this.cols; c++) {
+                        if (r === 0 && c === 0) {
+                            row.push(null);
+                        } else {
+                            row.push(chipList[chipIdx++] || null);
+                        }
+                    }
+                    this.grid.push(row);
+                }
+
+                this.renderContainers();
+                this.renderBoard();
+                this.checkDropableStates();
+            }
+
+            shuffleArray(array) {
+                const arr = [...array];
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            }
+
+            restartLevel() {
+                this.loadLevel(this.currentLevelIdx);
+            }
+
+            getEmptyNeighbors(r, c) {
+                const neighbors = [];
+                const dirs = [
+                    { dr: -1, dc: 0, name: 'UP' },
+                    { dr: 1, dc: 0, name: 'DOWN' },
+                    { dr: 0, dc: -1, name: 'LEFT' },
+                    { dr: 0, dc: 1, name: 'RIGHT' }
+                ];
+                
+                dirs.forEach(d => {
+                    const nr = r + d.dr;
+                    const nc = c + d.dc;
+                    if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols) {
+                        if (this.grid[nr][nc] === null) {
+                            neighbors.push({ r: nr, c: nc, dir: d.name, dr: d.dr, dc: d.dc });
+                        }
+                    }
+                });
+                return neighbors;
+            }
+
+            moveTileTo(fromR, fromC, toR, toC) {
+                if (this.grid[toR][toC] !== null) return false;
+
+                this.saveState();
+
+                const dr = toR - fromR;
+                const dc = toC - fromC;
+                this.justMovedTile = { r: toR, c: toC, type: Math.abs(dc) > Math.abs(dr) ? 'h' : 'v' };
+
+                const chip = this.grid[fromR][fromC];
+                this.grid[toR][toC] = chip;
+                this.grid[fromR][fromC] = null;
+
+                this.moves++;
+                document.getElementById('move-counter').textContent = this.moves;
+
+                this.sound.playSlide();
+                this.renderBoard();
+                this.checkDropableStates();
+                return true;
+            }
+
+            saveState() {
+                const snapshot = {
+                    grid: JSON.parse(JSON.stringify(this.grid)),
+                    containers: JSON.parse(JSON.stringify(this.containers)),
+                    moves: this.moves
+                };
+                this.history.push(snapshot);
+                if (this.history.length > 20) this.history.shift();
+            }
+
+            undoMove() {
+                if (this.history.length === 0) return;
+                const prev = this.history.pop();
+                this.grid = prev.grid;
+                this.containers = prev.containers;
+                this.moves = prev.moves;
+                this.justMovedTile = null;
+                
+                document.getElementById('move-counter').textContent = this.moves;
+                this.renderContainers();
+                this.renderBoard();
+                this.checkDropableStates();
+            }
+
+            dropChip(col) {
+                const bottomRowIdx = this.rows - 1;
+                const chip = this.grid[bottomRowIdx][col];
+                const container = this.containers[col];
+
+                if (chip && container && chip.color === container.color && container.current < container.max) {
+                    this.saveState();
+
+                    const tileEl = document.getElementById(`tile-${bottomRowIdx}-${col}`);
+                    if (tileEl) {
+                        tileEl.classList.add('dropping-chip');
+                    }
+
+                    setTimeout(() => {
+                        container.current++;
+                        this.grid[bottomRowIdx][col] = null;
+
+                        this.sound.playDrop();
+                        this.renderContainers();
+                        this.renderBoard();
+                        this.checkDropableStates();
+                        this.checkVictory();
+                    }, 280);
+                }
+            }
+
+            checkDropableStates() {
+                const bottomRowIdx = this.rows - 1;
+
+                for (let c = 0; c < this.cols; c++) {
+                    const arrowEl = document.getElementById(`arrow-col-${c}`);
+                    const chip = this.grid[bottomRowIdx][c];
+                    const container = this.containers[c];
+
+                    const isMatch = chip && container && chip.color === container.color && container.current < container.max;
+
+                    if (arrowEl) {
+                        if (isMatch) {
+                            arrowEl.className = "text-amber-300 font-extrabold text-sm animate-bounce cursor-pointer";
+                            arrowEl.innerHTML = '<i class="fa-solid fa-circle-arrow-down text-lg"></i>';
+                            arrowEl.onclick = () => this.dropChip(c);
+                        } else {
+                            arrowEl.className = "text-xs font-bold text-slate-600";
+                            arrowEl.innerHTML = '<i class="fa-solid fa-chevron-down text-base"></i>';
+                            arrowEl.onclick = null;
+                        }
+                    }
+                }
+            }
+
+            highlightDirectionsForTile(r, c, emptyNeighbors, canDrop) {
+                this.clearDirectionHighlights();
+
+                emptyNeighbors.forEach(n => {
+                    const targetCell = document.getElementById(`cell-${n.r}-${n.c}`);
+                    if (targetCell) {
+                        const hint = document.createElement('div');
+                        hint.className = 'cell-highlight-hint inset-0 bg-amber-300/20 rounded-2xl border-2 border-amber-200/50 shadow-inner pointer-events-none';
+                        targetCell.appendChild(hint);
+                    }
+                });
+
+                if (canDrop) {
+                    const arrowEl = document.getElementById(`arrow-col-${c}`);
+                    if (arrowEl) {
+                        arrowEl.classList.add('scale-125', 'text-amber-200');
+                    }
+                }
+            }
+
+            clearDirectionHighlights() {
+                document.querySelectorAll('.cell-highlight-hint').forEach(el => el.remove());
+                for (let c = 0; c < this.cols; c++) {
+                    const arrowEl = document.getElementById(`arrow-col-${c}`);
+                    if (arrowEl) {
+                        arrowEl.classList.remove('scale-125', 'text-amber-200');
+                    }
+                }
+            }
+
+            renderContainers() {
+                const containerBar = document.getElementById('containers-bar');
+                containerBar.innerHTML = '';
+
+                this.containers.forEach((cont, idx) => {
+                    const cfg = COLOR_CONFIG[cont.color] || COLOR_CONFIG.neutral;
+                    const tube = document.createElement('div');
+                    
+                    tube.className = `glass-panel rounded-2xl jar-glow flex flex-col items-center justify-between h-28 relative overflow-hidden transition-all duration-300 cursor-pointer hover:scale-[1.03] p-0`;
+                    tube.style.setProperty('--jar-border-color', cfg.hex);
+                    tube.style.setProperty('--jar-glow-color', `${cfg.hex}88`);
+
+                    const fillPercent = (cont.current / cont.max) * 100;
+                    
+                    tube.innerHTML = `
+                        <div class="w-full h-5 z-10 flex items-center justify-center shadow-md" style="background-color: ${cfg.hex}"></div>
+                        <div class="absolute bottom-0 left-0 right-0 transition-all duration-500 rounded-b-xl" style="height: ${fillPercent}%; background-color: ${cfg.hex}33"></div>
+                        <div class="z-10 flex flex-col-reverse gap-1.5 my-auto items-center p-1">
+                            ${Array.from({ length: cont.max }).map((_, i) => `
+                                <div class="w-4 h-4 rounded-full transition-all duration-300 border border-white/60 ${i < cont.current ? cfg.chipClass : 'bg-black/50'}"></div>
+                            `).join('')}
+                        </div>
+                        <div class="z-10 text-[11px] font-game text-slate-200 mb-1.5 opacity-90">
+                            ${cont.current}/${cont.max}
+                        </div>
+                    `;
+
+                    tube.addEventListener('click', () => this.dropChip(idx));
+                    containerBar.appendChild(tube);
+                });
+            }
+
+            renderBoard() {
+                const gridBar = document.getElementById('board-grid');
+                gridBar.style.gridTemplateColumns = `repeat(${this.cols}, minmax(0, 1fr))`;
+                gridBar.style.gridTemplateRows = `repeat(${this.rows}, minmax(0, 1fr))`;
+                gridBar.innerHTML = '';
+
+                const bottomRowIdx = this.rows - 1;
+
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        const chip = this.grid[r][c];
+                        const cell = document.createElement('div');
+                        cell.id = `cell-${r}-${c}`;
+                        cell.className = 'w-full h-full rounded-2xl glass-panel flex items-center justify-center relative p-1.5 border border-white/10 transition-all';
+
+                        if (chip) {
+                            const cfg = COLOR_CONFIG[chip.color] || COLOR_CONFIG.neutral;
+                            const isBottom = (r === bottomRowIdx);
+                            const container = this.containers[c];
+                            const isReadyToDrop = isBottom && container && chip.color === container.color && container.current < container.max;
+                            const emptyNeighbors = this.getEmptyNeighbors(r, c);
+                            const canMove = emptyNeighbors.length > 0 || isReadyToDrop;
+
+                            let jellyClass = '';
+                            if (this.justMovedTile && this.justMovedTile.r === r && this.justMovedTile.c === c) {
+                                jellyClass = this.justMovedTile.type === 'h' ? 'animate-jelly-h' : 'animate-jelly-v';
+                            }
+
+                            const tile = document.createElement('div');
+                            tile.id = `tile-${r}-${c}`;
+                            tile.className = `w-full h-full rounded-full flex items-center justify-center relative shadow-lg ${cfg.chipClass} ${jellyClass} ${
+                                isReadyToDrop 
+                                    ? 'ready-to-drop ring-4 ring-amber-300' 
+                                    : canMove 
+                                        ? 'cursor-grab active:cursor-grabbing hover:scale-[1.03]' 
+                                        : 'opacity-90'
+                            }`;
+
+                            tile.innerHTML = `
+                                <!-- Top-Left Curved Teardrop Glint -->
+                                <svg class="absolute top-[6%] left-[6%] w-[44%] h-[44%] pointer-events-none z-10" viewBox="0 0 50 50">
+                                    <path d="M 10 36 C 6 22 14 8 36 10 C 24 12 12 20 10 36 Z" fill="white" opacity="0.88"/>
+                                    <circle cx="39" cy="8" r="2.5" fill="white" opacity="0.6"/>
+                                </svg>
+
+                                <!-- Center Convex Color Dome -->
+                                <div class="w-[38%] h-[38%] rounded-full z-10 flex items-center justify-center transition-transform" 
+                                     style="background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.3) 0%, ${cfg.centerColor} 65%, rgba(0,0,0,0.15) 100%); 
+                                            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);">
+                                    <!-- Inner Convex Bead/Dot -->
+                                    <div class="w-[45%] h-[45%] rounded-full relative" 
+                                         style="background: radial-gradient(circle at 35% 30%, ${cfg.centerColor} 0%, rgba(0, 0, 0, 0.45) 100%); 
+                                                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);">
+                                    </div>
+                                </div>
+                            `;
+
+                            this.attachSwipeListeners(tile, r, c, isReadyToDrop);
+
+                            cell.appendChild(tile);
+                        } else {
+                            cell.className += ' bg-black/40 border-dashed border-2 border-white/10';
+                        }
+
+                        gridBar.appendChild(cell);
+                    }
+                }
+
+                this.justMovedTile = null;
+            }
+
+            attachSwipeListeners(tileEl, r, c, isReadyToDrop) {
+                let startX = 0, startY = 0;
+                let isPointerDown = false;
+                let activePointerId = null;
+
+                const emptyNeighbors = this.getEmptyNeighbors(r, c);
+                const bottomRowIdx = this.rows - 1;
+                const canDrop = isReadyToDrop && r === bottomRowIdx;
+                const cellEl = document.getElementById(`cell-${r}-${c}`);
+
+                const onPointerMove = (e) => {
+                    if (!isPointerDown) return;
+
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+
+                    const cellSize = cellEl ? cellEl.getBoundingClientRect().width : 70;
+                    const maxOffset = cellSize;
+
+                    let clampX = 0;
+                    let clampY = 0;
+
+                    const hasLeft = emptyNeighbors.some(n => n.dir === 'LEFT');
+                    const hasRight = emptyNeighbors.some(n => n.dir === 'RIGHT');
+                    const hasUp = emptyNeighbors.some(n => n.dir === 'UP');
+                    const hasDown = emptyNeighbors.some(n => n.dir === 'DOWN') || canDrop;
+
+                    if (dx < 0 && hasLeft) clampX = Math.max(dx, -maxOffset);
+                    if (dx > 0 && hasRight) clampX = Math.min(dx, maxOffset);
+                    if (dy < 0 && hasUp) clampY = Math.max(dy, -maxOffset);
+                    if (dy > 0 && hasDown) clampY = Math.min(dy, maxOffset);
+
+                    const distRatio = Math.min(Math.hypot(clampX, clampY) / maxOffset, 1);
+                    const scaleX = clampX !== 0 ? 1 + distRatio * 0.2 : 1 - distRatio * 0.15;
+                    const scaleY = clampY !== 0 ? 1 + distRatio * 0.2 : 1 - distRatio * 0.15;
+
+                    tileEl.style.transform = `translate(${clampX}px, ${clampY}px) scale(${scaleX}, ${scaleY})`;
+                };
+
+                const cleanup = () => {
+                    window.removeEventListener('pointermove', onPointerMove);
+                    window.removeEventListener('pointerup', onPointerUp);
+                    window.removeEventListener('pointercancel', onPointerCancel);
+                };
+
+                const onPointerUp = (e) => {
+                    if (!isPointerDown) return;
+                    isPointerDown = false;
+                    cleanup();
+
+                    try {
+                        if (activePointerId !== null) tileEl.releasePointerCapture(activePointerId);
+                    } catch (_) {}
+
+                    if (cellEl) cellEl.style.zIndex = '';
+                    tileEl.style.transition = 'transform 0.12s ease-out';
+                    tileEl.style.transform = '';
+                    tileEl.classList.remove('z-50');
+                    this.clearDirectionHighlights();
+
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    const distance = Math.hypot(dx, dy);
+
+                    const threshold = 18;
+
+                    if (distance < threshold) {
+                        if (canDrop) {
+                            this.dropChip(c);
+                        } else if (emptyNeighbors.length === 1) {
+                            const target = emptyNeighbors[0];
+                            this.moveTileTo(r, c, target.r, target.c);
+                        }
+                        return;
+                    }
+
+                    let primaryDir = null;
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        primaryDir = dx > 0 ? 'RIGHT' : 'LEFT';
+                    } else {
+                        primaryDir = dy > 0 ? 'DOWN' : 'UP';
+                    }
+
+                    if (primaryDir === 'DOWN' && canDrop) {
+                        this.dropChip(c);
+                        return;
+                    }
+
+                    const targetNeighbor = emptyNeighbors.find(n => n.dir === primaryDir);
+                    if (targetNeighbor) {
+                        this.moveTileTo(r, c, targetNeighbor.r, targetNeighbor.c);
+                    }
+                };
+
+                const onPointerCancel = () => {
+                    if (!isPointerDown) return;
+                    isPointerDown = false;
+                    cleanup();
+                    if (cellEl) cellEl.style.zIndex = '';
+                    tileEl.style.transition = 'transform 0.12s ease-out';
+                    tileEl.style.transform = '';
+                    tileEl.classList.remove('z-50');
+                    this.clearDirectionHighlights();
+                };
+
+                const onPointerDown = (e) => {
+                    if (e.button !== undefined && e.button !== 0) return;
+                    e.preventDefault();
+                    isPointerDown = true;
+                    activePointerId = e.pointerId;
+
+                    try {
+                        tileEl.setPointerCapture(e.pointerId);
+                    } catch (_) {}
+
+                    startX = e.clientX;
+                    startY = e.clientY;
+
+                    if (cellEl) cellEl.style.zIndex = '50';
+                    tileEl.style.transition = 'none';
+                    tileEl.classList.add('z-50');
+
+                    window.addEventListener('pointermove', onPointerMove);
+                    window.addEventListener('pointerup', onPointerUp);
+                    window.addEventListener('pointercancel', onPointerCancel);
+
+                    this.highlightDirectionsForTile(r, c, emptyNeighbors, canDrop);
+                };
+
+                tileEl.addEventListener('mouseenter', () => {
+                    if (!isPointerDown) this.highlightDirectionsForTile(r, c, emptyNeighbors, canDrop);
+                });
+                tileEl.addEventListener('mouseleave', () => {
+                    if (!isPointerDown) this.clearDirectionHighlights();
+                });
+
+                tileEl.addEventListener('pointerdown', onPointerDown);
+            }
+
+            showHint() {
+                for (let r = 0; r < this.rows; r++) {
+                    for (let c = 0; c < this.cols; c++) {
+                        const chip = this.grid[r][c];
+                        if (!chip) continue;
+                        const emptyNeighbors = this.getEmptyNeighbors(r, c);
+                        if (emptyNeighbors.length > 0) {
+                            const el = document.getElementById(`tile-${r}-${c}`);
+                            if (el) {
+                                el.classList.add('ring-4', 'ring-amber-300', 'scale-105');
+                                this.highlightDirectionsForTile(r, c, emptyNeighbors, false);
+                                setTimeout(() => {
+                                    el.classList.remove('ring-4', 'ring-amber-300', 'scale-105');
+                                    this.clearDirectionHighlights();
+                                }, 1200);
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            checkVictory() {
+                const allFull = this.containers.every(c => c.current >= c.max);
+                if (allFull) {
+                    this.sound.playWin();
+                    document.getElementById('final-moves').textContent = this.moves;
+                    document.getElementById('victory-modal').classList.remove('hidden');
+                }
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            window.game = new ColorSlideGame();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,898 @@
+/* =============================================================================
+   Цветная Сортировка — стили игры.
+   Без Tailwind и без внешних CDN: шрифты лежат рядом в ./fonts, иконки — inline SVG.
+   ============================================================================= */
+
+/* ----------------------------- Шрифты (self-hosted) ----------------------- */
+/* Variable-фонты, один файл на подмножество покрывает весь диапазон весов. */
+
+/* Fredoka: только latin — кириллического подмножества у него нет,
+   поэтому русский текст сознательно отдан Nunito. Fredoka — цифры и латиница. */
+@font-face {
+    font-family: 'Fredoka';
+    font-style: normal;
+    font-weight: 600 700;
+    font-display: swap;
+    src: url('fonts/fredoka-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                   U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                   U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Nunito';
+    font-style: normal;
+    font-weight: 600 900;
+    font-display: swap;
+    src: url('fonts/nunito-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                   U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                   U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Nunito';
+    font-style: normal;
+    font-weight: 600 900;
+    font-display: swap;
+    src: url('fonts/nunito-cyrillic.woff2') format('woff2');
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+/* ------------------------------- Токены ---------------------------------- */
+:root {
+    --bg-outer: #0d0b10;
+    --bg-inner: #1f1a24;
+
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.12);
+
+    --amber-100: #fef3c7;
+    --amber-200: #fde68a;
+    --amber-300: #fcd34d;
+    --amber-400: #fbbf24;
+    --amber-500: #f59e0b;
+    --yellow-300: #fde047;
+    --yellow-500: #eab308;
+
+    --ink-100: #f1f5f9;
+    --ink-300: #cbd5e1;
+    --ink-400: #94a3b8;
+    --ink-600: #475569;
+    --ink-950: #020617;
+
+    --r-sm: 8px;
+    --r-md: 16px;
+    --r-lg: 24px;
+
+    --cell-gap: 8px;
+    --board-pad: 10px;
+
+    /* Поле не выше 62% высоты экрана и всегда оставляет место под HUD,
+       стрелки и банки — иначе в лендскейпе бы вылезало за экран. */
+    --board-max-h: min(62dvh, calc(100dvh - 190px));
+
+    /* Проставляются из JS под текущий уровень */
+    --cols: 4;
+    --rows: 4;
+
+    --font-ui: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-game: 'Fredoka', 'Nunito', system-ui, sans-serif;
+
+    --move-ms: 180ms;
+}
+
+/* --------------------------- Mobile hardening ---------------------------- */
+/* Гасим всё, что браузер хочет сделать за нас: выделение, лупу, контекстное
+   меню, drag&drop картинок, тап-хайлайт, зум по double-tap. */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+html {
+    height: 100%;
+    overflow: hidden;
+    /* никакого pull-to-refresh и «резинки» */
+    overscroll-behavior: none;
+    touch-action: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background: var(--bg-outer);
+}
+
+body {
+    /* документ физически не может проскроллиться */
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    /* базовый отступ + вырез/скругления экрана (viewport-fit=cover) */
+    padding: calc(8px + env(safe-area-inset-top))
+             calc(8px + env(safe-area-inset-right))
+             calc(8px + env(safe-area-inset-bottom))
+             calc(8px + env(safe-area-inset-left));
+
+    font-family: var(--font-ui);
+    font-weight: 700;
+    color: #fff;
+    background: radial-gradient(circle at center, var(--bg-inner) 0%, var(--bg-outer) 100%);
+}
+
+/* Декор не должен ловить тачи и мешать попаданию по фишке */
+svg {
+    display: block;
+    pointer-events: none;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    touch-action: none;
+}
+
+/* ------------------------------- Каркас ---------------------------------- */
+.game {
+    width: 100%;
+    max-width: 384px;
+    height: 100%;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Поле, стрелки и банки живут в одной колонке одинаковой ширины,
+   чтобы столбцы гарантированно совпадали. */
+.field {
+    width: min(100%, calc(var(--board-max-h) * var(--cols) / var(--rows)));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* --------------------------------- HUD ----------------------------------- */
+.hud {
+    width: min(100%, calc(var(--board-max-h) * var(--cols) / var(--rows)));
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 2px;
+}
+
+.hud__info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.hud__level {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--ink-400);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hud__moves {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--ink-300);
+}
+
+.hud__moves b {
+    font-family: var(--font-game);
+    font-size: 16px;
+    color: var(--amber-200);
+}
+
+.btn-undo {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--ink-100);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.12s;
+}
+
+.btn-undo svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+.btn-undo:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.btn-undo.is-pressed:not(:disabled) {
+    transform: scale(0.94);
+}
+
+/* -------------------------------- Поле ----------------------------------- */
+.board {
+    position: relative;
+    width: 100%;
+    /* пропорция под сетку уровня — клетки остаются почти квадратными */
+    aspect-ratio: var(--cols) / var(--rows);
+    padding: var(--board-pad);
+    border-radius: var(--r-lg);
+    background: var(--glass-bg);
+    /* единственный blur в игре: 16-20 размытий (по одному на клетку)
+       роняли fps на мобильных GPU */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+.board__grid {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+    gap: var(--cell-gap);
+}
+
+.cell {
+    position: relative;
+    border-radius: var(--r-md);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cell.is-empty {
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* Подсветка доступного направления при захвате фишки */
+.cell__hint {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(252, 211, 77, 0.2);
+    border: 2px solid rgba(253, 230, 138, 0.5);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    animation: pulseGlow 0.8s infinite alternate;
+}
+
+/* ------------------------------- Фишки ----------------------------------- */
+/* Слой абсолютно позиционированных фишек поверх сетки. Фишки создаются один
+   раз на уровень и двигаются только transform'ом — без пересборки DOM. */
+.board__tiles {
+    position: absolute;
+    inset: var(--board-pad);
+    pointer-events: none;
+}
+
+.tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: auto;
+    touch-action: none;
+    will-change: transform;
+    transition: transform var(--move-ms) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.tile.is-dragging {
+    transition: none;
+    z-index: 30;
+}
+
+.tile.is-flying {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    transition: none;
+}
+
+.tile__body {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    /* Обводка «готова к сбросу» — отдельный слой внутри box-shadow палитры.
+       Через переменную, потому что box-shadow из другого правила не
+       дописывается, а заменяет весь список: обводка съедала объём шара. */
+    --ring: 0 0 0 0 rgba(252, 211, 77, 0);
+    transition: box-shadow 0.2s ease-out;
+}
+
+/* Свет отдельным слоем поверх тела шара: он общий для всех оттенков, поэтому
+   в палитре остаётся только сферическая растяжка цвета. Мягкое пятно даёт
+   объём, а резкий блик-каплю рисует .tile__glint сверху. */
+.tile__body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle farthest-side at 34% 27%,
+                rgba(255, 255, 255, 0.5) 0%,
+                rgba(255, 255, 255, 0.34) 10%,
+                rgba(255, 255, 255, 0.2) 18%,
+                rgba(255, 255, 255, 0.09) 26%,
+                rgba(255, 255, 255, 0.03) 33%,
+                rgba(255, 255, 255, 0) 40%);
+}
+
+.tile__glint {
+    position: absolute;
+    top: 6%;
+    left: 6%;
+    width: 44%;
+    height: 44%;
+    z-index: 2;
+}
+
+.tile__dome {
+    width: 38%;
+    height: 38%;
+    border-radius: 50%;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 35% 35%,
+                rgba(255, 255, 255, 0.3) 0%, var(--dome) 65%, rgba(0, 0, 0, 0.15) 100%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.tile__bead {
+    width: 45%;
+    height: 45%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--dome) 0%, rgba(0, 0, 0, 0.45) 100%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Фишка готова к сбросу в банку под своим столбцом */
+.tile.is-ready {
+    z-index: 20;
+    /* Пульсация именно здесь: на .tile__body её animation вытеснял
+       jelly-h/jelly-v по специфичности и обрывал желе на 180-й мс. */
+    animation: pulseGlow 1.2s infinite ease-in-out;
+}
+
+.tile.is-ready .tile__body {
+    --ring: 0 0 0 4px rgba(252, 211, 77, 1);
+}
+
+.tile.is-stuck .tile__body {
+    opacity: 0.9;
+}
+
+/* Палитра фишек */
+.chip-neutral {
+    background: radial-gradient(circle closest-side at 50% 50%,
+                #ffcc4d 0%,
+                #fecb4d 20%,
+                #fbc94c 35%,
+                #f7c64a 50%,
+                #f2c149 62%,
+                #ecbd47 72%,
+                #e6b845 80%,
+                #dfb242 87%,
+                #d6ab3f 93%,
+                #cca33c 97%,
+                #c59d39 100%);
+    box-shadow:
+        var(--ring),
+        0 8px 20px rgba(255, 204, 77, 0.3),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.16),
+        inset 4px -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.chip-skin1 {
+    background: radial-gradient(circle closest-side at 50% 50%,
+                #fadcbc 0%,
+                #f9dbbb 20%,
+                #f6d9b9 35%,
+                #f2d5b6 50%,
+                #edd1b2 62%,
+                #e8ccae 72%,
+                #e2c6a9 80%,
+                #dac0a4 87%,
+                #d2b89d 93%,
+                #c8b096 97%,
+                #c1aa91 100%);
+    box-shadow:
+        var(--ring),
+        0 8px 20px rgba(250, 220, 188, 0.3),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.16),
+        inset 4px -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.chip-skin2 {
+    background: radial-gradient(circle closest-side at 50% 50%,
+                #e0bb95 0%,
+                #dfba94 20%,
+                #ddb893 35%,
+                #d9b590 50%,
+                #d5b18d 62%,
+                #cfad8a 72%,
+                #caa886 80%,
+                #c4a381 87%,
+                #bc9c7c 93%,
+                #b39576 97%,
+                #ad9072 100%);
+    box-shadow:
+        var(--ring),
+        0 8px 20px rgba(224, 187, 149, 0.3),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.16),
+        inset 4px -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.chip-skin3 {
+    background: radial-gradient(circle closest-side at 50% 50%,
+                #bf8f68 0%,
+                #be8e67 20%,
+                #bc8d66 35%,
+                #b98a65 50%,
+                #b58762 62%,
+                #b18460 72%,
+                #ac805d 80%,
+                #a67c5a 87%,
+                #a07756 93%,
+                #987152 97%,
+                #936d4f 100%);
+    box-shadow:
+        var(--ring),
+        0 8px 20px rgba(191, 143, 104, 0.3),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.16),
+        inset 4px -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.chip-skin4 {
+    background: radial-gradient(circle closest-side at 50% 50%,
+                #9b643d 0%,
+                #9a633d 20%,
+                #99623c 35%,
+                #96613b 50%,
+                #935e39 62%,
+                #8f5c38 72%,
+                #8b5936 80%,
+                #875634 87%,
+                #815332 93%,
+                #7b4f2f 97%,
+                #774c2d 100%);
+    box-shadow:
+        var(--ring),
+        0 8px 20px rgba(155, 100, 61, 0.3),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.16),
+        inset 4px -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.chip-skin5 {
+    background: radial-gradient(circle closest-side at 50% 50%,
+                #594539 0%,
+                #594539 20%,
+                #584438 35%,
+                #564337 50%,
+                #544136 62%,
+                #523f34 72%,
+                #4f3d32 80%,
+                #4d3b30 87%,
+                #49382e 93%,
+                #46352c 97%,
+                #43332a 100%);
+    box-shadow:
+        var(--ring),
+        0 8px 20px rgba(89, 69, 57, 0.3),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.16),
+        inset 4px -4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ------------------------------ Стрелки ---------------------------------- */
+.arrows {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: var(--cell-gap);
+    padding: 0 var(--board-pad);
+}
+
+.arrow {
+    /* тап-таргет 44px по гайдлайнам — иконка сама по себе слишком мелкая */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-600);
+    transition: color 0.3s, transform 0.2s;
+}
+
+.arrow svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.arrow.is-active {
+    color: var(--amber-300);
+    cursor: pointer;
+}
+
+.arrow.is-active svg {
+    width: 22px;
+    height: 22px;
+    animation: nudge 1s infinite;
+}
+
+.arrow.is-hinted {
+    color: var(--amber-200);
+    transform: scale(1.25);
+}
+
+/* -------------------------------- Банки ---------------------------------- */
+.jars {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: var(--cell-gap);
+    padding: 0 4px;
+}
+
+.jar {
+    position: relative;
+    height: 80px;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--glass-bg);
+    border: 2.5px solid var(--jar-color, rgba(255, 255, 255, 0.6));
+    box-shadow: 0 0 18px var(--jar-glow), inset 0 0 10px var(--jar-glow);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.jar.is-pressed {
+    transform: scale(0.96);
+}
+
+.jar__cap {
+    width: 100%;
+    height: 12px;
+    flex: none;
+    z-index: 2;
+    background: var(--jar-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.jar__fill {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 0;
+    background: var(--jar-fill);
+    transition: height 0.5s;
+}
+
+.jar__dots {
+    z-index: 2;
+    margin: auto 0;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 4px;
+    padding: 2px;
+}
+
+.jar__dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.5);
+    transition: background 0.3s;
+}
+
+.jar__label {
+    z-index: 2;
+    margin-bottom: 4px;
+    font-family: var(--font-game);
+    font-size: 10px;
+    color: var(--ink-100);
+    opacity: 0.9;
+}
+
+.jar__done {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px;
+    border-radius: inherit;
+    background: rgba(2, 6, 23, 0.85);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: thankYouPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.jar__thanks {
+    font-family: var(--font-game);
+    font-size: 9px;
+    font-weight: 700;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 999px;
+    color: var(--ink-950);
+    background: linear-gradient(to right, var(--amber-300), var(--yellow-300), var(--amber-400));
+    border: 1px solid var(--amber-200);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    transform: rotate(-3deg);
+    animation: softPulse 2s infinite;
+}
+
+.jar__face {
+    font-size: 24px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+    animation: floatSlow 1.8s ease-in-out infinite;
+}
+
+/* ------------------------------- Модалка --------------------------------- */
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(2, 6, 23, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overscroll-behavior: contain;
+}
+
+.modal__card {
+    width: 100%;
+    max-width: 384px;
+    padding: 24px;
+    text-align: center;
+    border-radius: var(--r-lg);
+    background: var(--glass-bg);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    animation: thankYouPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.modal__badge {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(251, 191, 36, 0.2);
+    border: 1px solid rgba(251, 191, 36, 0.5);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+.modal__badge svg {
+    width: 40px;
+    height: 40px;
+    fill: var(--amber-300);
+}
+
+.modal__title {
+    font-family: var(--font-game);
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--amber-200);
+    margin-bottom: 4px;
+}
+
+.modal__text {
+    font-size: 14px;
+    color: var(--ink-300);
+    margin-bottom: 16px;
+}
+
+.modal__stats {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 24px;
+    border-radius: var(--r-md);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.modal__stat-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--ink-400);
+}
+
+.modal__stat-value {
+    font-family: var(--font-game);
+    font-size: 24px;
+    color: #fff;
+}
+
+.modal__divider {
+    align-self: stretch;
+    border-right: 1px solid var(--glass-border);
+}
+
+.modal__stars {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+.modal__stars svg {
+    width: 18px;
+    height: 18px;
+    fill: var(--amber-300);
+}
+
+.btn-primary {
+    width: 100%;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--r-md);
+    font-family: var(--font-game);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--ink-950);
+    background: linear-gradient(to right, var(--amber-500), var(--yellow-500));
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: transform 0.12s, filter 0.2s;
+}
+
+.btn-primary svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+.btn-primary.is-pressed {
+    transform: scale(0.96);
+}
+
+/* ------------------------------ Анимации --------------------------------- */
+@keyframes jellyHorizontal {
+    0%   { transform: scale(1.45, 0.65); }
+    22%  { transform: scale(0.7, 1.3); }
+    45%  { transform: scale(1.18, 0.85); }
+    68%  { transform: scale(0.9, 1.08); }
+    85%  { transform: scale(1.04, 0.96); }
+    100% { transform: scale(1, 1); }
+}
+
+@keyframes jellyVertical {
+    0%   { transform: scale(0.65, 1.45); }
+    22%  { transform: scale(1.3, 0.7); }
+    45%  { transform: scale(0.85, 1.18); }
+    68%  { transform: scale(1.08, 0.9); }
+    85%  { transform: scale(0.96, 1.04); }
+    100% { transform: scale(1, 1); }
+}
+
+.jelly-h { animation: jellyHorizontal 0.65s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
+.jelly-v { animation: jellyVertical   0.65s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
+
+@keyframes pulseGlow {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.25); }
+}
+
+@keyframes nudge {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(4px); }
+}
+
+@keyframes thankYouPop {
+    0%   { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+    70%  { transform: scale(1.1) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes softPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.6; }
+}
+
+@keyframes floatSlow {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%      { transform: translateY(-3px) scale(1.08); }
+}
+
+/* Hover — только там, где есть настоящая мышь.
+   На тач-устройствах :hover эмулируется по тапу и «залипает». */
+@media (hover: hover) and (pointer: fine) {
+    .tile:not(.is-flying) .tile__body {
+        transition: filter 0.2s;
+    }
+    .tile:not(.is-flying):hover .tile__body {
+        filter: brightness(1.08);
+    }
+    .jar:hover {
+        transform: scale(1.03);
+    }
+    .btn-undo:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.1);
+    }
+    .btn-primary:hover {
+        filter: brightness(1.1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

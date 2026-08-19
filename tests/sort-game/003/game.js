@@ -180,8 +180,19 @@ const LEVELS = [
 
 /** Длительность переезда фишки между клетками. */
 const MOVE_MS = 180;
-/** Укороченный переезд при «Уменьшении движения» — не ноль. */
-const MOVE_MS_REDUCED = 90;
+/**
+ * Коэффициент «живости» при системном «Уменьшении движения».
+ *
+ * Настройка НЕ выключает анимацию. В этой игре сдвиг фишки — обратная связь
+ * (какая именно фишка поехала и куда), а не декор: убрать его целиком значит
+ * сделать игру менее понятной, а не более доступной. Поэтому длительность
+ * переезда остаётся полной, а ослабляется только упругость качания.
+ * Гасится отдельно лишь НЕПРЕРЫВНОЕ движение (покачивание стрелки и эмодзи) —
+ * именно оно и вызывает дискомфорт.
+ *
+ * Поставь 1, чтобы игнорировать системную настройку полностью.
+ */
+const REDUCED_MOTION_SCALE = 0.6;
 const DROP_MS = 520;
 const JELLY_MS = 650;
 
@@ -254,6 +265,9 @@ class ColorSlideGame {
 
         this.arrows = [];
         this.jars = [];
+
+        /** Форсированный множитель анимации в обход системной настройки. */
+        this.motionOverride = null;
 
         /** id пальца, который сейчас тащит фишку; второй палец игнорируется */
         this.activePointer = null;
@@ -594,7 +608,7 @@ class ColorSlideGame {
         if (typeof t.el.animate !== 'function') return;
         if (fromX === x && fromY === y) return;
 
-        t.slide = t.el.animate([
+        const anim = t.el.animate([
             { transform: `translate3d(${fromX}px, ${fromY}px, 0)` },
             { transform: `translate3d(${x}px, ${y}px, 0)` }
         ], {
@@ -602,8 +616,12 @@ class ColorSlideGame {
             easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)',
             fill: 'none'
         });
-        t.slide.onfinish = () => { t.slide = null; };
-        t.slide.oncancel = () => { t.slide = null; };
+        t.slide = anim;
+
+        // та же защита от запоздавшего oncancel, что и у желе
+        const clear = () => { if (t.slide === anim) t.slide = null; };
+        anim.onfinish = clear;
+        anim.oncancel = clear;
     }
 
     /**
@@ -612,7 +630,17 @@ class ColorSlideGame {
      * связь, а не украшение. Убирается только упругое качание.
      */
     moveDuration() {
-        return REDUCED_MOTION.matches ? MOVE_MS_REDUCED : MOVE_MS;
+        return MOVE_MS;
+    }
+
+    /**
+     * Множитель амплитуды качания: 1 — полное, 0 — без качания.
+     * motionOverride позволяет форсировать значение из консоли
+     * (`game.motionOverride = 1`) в обход системной настройки.
+     */
+    motionScale() {
+        if (this.motionOverride !== null) return this.motionOverride;
+        return REDUCED_MOTION.matches ? REDUCED_MOTION_SCALE : 1;
     }
 
     /** Мгновенно ставит фишку в позицию и запоминает её как текущую. */
@@ -641,8 +669,12 @@ class ColorSlideGame {
             t.jelly.cancel();
             t.jelly = null;
         }
-        if (REDUCED_MOTION.matches) return;
         if (typeof t.body.animate !== 'function') return;
+
+        // Ослабляем амплитуду вместо отключения: scale тянется к 1,
+        // качание становится мягче, но остаётся заметным.
+        const k = this.motionScale();
+        if (k <= 0) return;
 
         // easing задаётся НА КАДРАХ, а не в опциях: в CSS
         // animation-timing-function применяется к каждому интервалу между
@@ -650,20 +682,27 @@ class ColorSlideGame {
         // целиком — из-за этого кривая качания получалась совсем другой.
         const frames = (axis === 'h' ? JELLY_H : JELLY_V)
             .map(([sx, sy, offset]) => ({
-                transform: `scale(${sx}, ${sy})`,
+                transform: `scale(${1 + (sx - 1) * k}, ${1 + (sy - 1) * k})`,
                 offset,
                 easing: JELLY_EASING
             }));
 
-        t.jelly = t.body.animate(frames, {
+        const anim = t.body.animate(frames, {
             duration: JELLY_MS,
             // fill не нужен: последний кадр scale(1,1) совпадает с базовым
             // состоянием, поэтому inline-transform при перетаскивании
             // больше ничем не перебивается
             fill: 'none'
         });
-        t.jelly.onfinish = () => { t.jelly = null; };
-        t.jelly.oncancel = () => { t.jelly = null; };
+        t.jelly = anim;
+
+        // Сверяемся с identity: cancel() ставит oncancel в ОЧЕРЕДЬ, поэтому
+        // колбэк отменённой анимации срабатывает уже после того как в t.jelly
+        // записана новая. Без проверки он затирал ссылку на живую анимацию,
+        // и stopJelly() становился no-op.
+        const clear = () => { if (t.jelly === anim) t.jelly = null; };
+        anim.onfinish = clear;
+        anim.oncancel = clear;
     }
 
     /** Гасит недоигранное желе — например когда фишку схватили на полпути. */

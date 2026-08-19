@@ -153,7 +153,9 @@ setInterval(() => {
     const rows = [
         ['fps (rAF)', fps + (fps && fps < 20 ? ' — похоже на троттлинг' : '')],
         ['Уменьшение движения', matchMedia('(prefers-reduced-motion: reduce)').matches
-            ? '<b class="warn">ВКЛЮЧЕНО</b>' : 'выключено'],
+            ? '<b class="warn">ВКЛЮЧЕНО</b> — эта страница настройку игнорирует,'
+              + ' поэтому кружки едут независимо от неё'
+            : 'выключено'],
         ['element.animate()', typeof document.body.animate === 'function'
             ? '<b class="ok">есть</b>' : '<b class="bad">нет</b>'],
         ['getAnimations()', typeof document.getAnimations === 'function' ? 'есть' : 'нет'],

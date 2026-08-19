@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Диагностика анимаций</title>
+<style>
+    * { box-sizing: border-box; margin: 0; -webkit-user-select: none; user-select: none; }
+    body {
+        font: 15px/1.45 -apple-system, system-ui, sans-serif;
+        background: #101014; color: #f1f5f9;
+        padding: 14px calc(14px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
+    }
+    h1 { font-size: 17px; margin-bottom: 2px; }
+    .build { font-size: 12px; color: #fbbf24; margin-bottom: 14px; }
+
+    .test { margin-bottom: 12px; padding: 10px; border: 1px solid #2a2a33; border-radius: 10px; }
+    .test > h2 { font-size: 14px; margin-bottom: 8px; }
+    .test > h2 span { color: #94a3b8; font-weight: 400; }
+
+    /* Дорожка, по которой ездит квадрат */
+    .track { position: relative; height: 46px; border-radius: 8px; background: #1b1b22; overflow: hidden; }
+    .blurred { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); background: rgba(255,255,255,.05); }
+    .box {
+        position: absolute; top: 8px; left: 0;
+        width: 30px; height: 30px; border-radius: 50%;
+        background: linear-gradient(145deg, #fcd34d, #b45309);
+    }
+    .verdict { margin-top: 6px; font-size: 12px; color: #94a3b8; }
+    .verdict b { color: #f1f5f9; }
+
+    @keyframes slideCss { from { transform: translateX(0); } to { transform: translateX(var(--far)); } }
+    .css-anim { animation: slideCss 1.4s ease-in-out infinite alternate; }
+    .css-trans { transition: transform 1.2s ease-in-out; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+    td { padding: 3px 0; vertical-align: top; }
+    td:first-child { color: #94a3b8; padding-right: 10px; white-space: nowrap; }
+    .ok { color: #4ade80; } .bad { color: #f87171; } .warn { color: #fbbf24; }
+    .note { margin-top: 16px; padding: 10px; border-radius: 10px; background: #1a1a22; font-size: 13px; color: #cbd5e1; }
+</style>
+</head>
+<body>
+
+<h1>Диагностика анимаций</h1>
+<div class="build" id="build">сборка …</div>
+
+<div class="test">
+    <h2>1. Внутри blur-поддерева <span>— Web Animations</span></h2>
+    <div class="track blurred"><div class="box" id="b1"></div></div>
+    <div class="verdict" id="v1">…</div>
+</div>
+
+<div class="test">
+    <h2>2. Без blur <span>— Web Animations</span></h2>
+    <div class="track"><div class="box" id="b2"></div></div>
+    <div class="verdict" id="v2">…</div>
+</div>
+
+<div class="test">
+    <h2>3. Внутри blur-поддерева <span>— CSS animation</span></h2>
+    <div class="track blurred"><div class="box css-anim" id="b3"></div></div>
+    <div class="verdict" id="v3">…</div>
+</div>
+
+<div class="test">
+    <h2>4. Без blur <span>— CSS transition</span></h2>
+    <div class="track"><div class="box css-trans" id="b4"></div></div>
+    <div class="verdict" id="v4">…</div>
+</div>
+
+<div class="test">
+    <h2>Окружение</h2>
+    <table id="env"></table>
+</div>
+
+<div class="note">
+    <b>Что сказать в ответ:</b> какие из четырёх кружков реально <i>двигаются</i> глазами,
+    и что написано в строках «замер». Если кружок стоит, а замер показывает,
+    что он ездит — значит анимация идёт, но не рисуется.
+</div>
+
+<script>
+'use strict';
+
+document.getElementById('build').textContent =
+    'сборка diag-1 · ' + new Date().toISOString().slice(0, 16).replace('T', ' ');
+
+const FAR = () => Math.max(0, document.querySelector('.track').clientWidth - 30);
+
+/* --- 1 и 2: одинаковая WAAPI-анимация внутри blur и вне него --------------- */
+const waapi = [];
+[['b1', 1], ['b2', 2]].forEach(([id, n]) => {
+    const el = document.getElementById(id);
+    if (typeof el.animate !== 'function') {
+        document.getElementById('v' + n).innerHTML = '<b class="bad">element.animate() не поддерживается</b>';
+        return;
+    }
+    const a = el.animate(
+        [{ transform: 'translateX(0)' }, { transform: `translateX(${FAR()}px)` }],
+        { duration: 1400, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }
+    );
+    waapi.push({ el, n, a });
+});
+
+/* --- 3: CSS animation внутри blur ---------------------------------------- */
+document.getElementById('b3').style.setProperty('--far', FAR() + 'px');
+
+/* --- 4: CSS transition вне blur (гоняем туда-обратно) -------------------- */
+const b4 = document.getElementById('b4');
+let b4at = 0;
+setInterval(() => {
+    b4at = b4at ? 0 : FAR();
+    b4.style.transform = `translateX(${b4at}px)`;
+}, 1300);
+
+/* --- Замер: реально ли меняется позиция (анимация ИДЁТ) ------------------ */
+const watch = [1, 2, 3, 4].map((n) => ({
+    n, el: document.getElementById('b' + n), min: Infinity, max: -Infinity, frames: 0
+}));
+
+let rafCount = 0;
+let rafStart = performance.now();
+let fps = 0;
+
+function tick() {
+    rafCount++;
+    const now = performance.now();
+    if (now - rafStart >= 1000) {
+        fps = Math.round((rafCount * 1000) / (now - rafStart));
+        rafCount = 0;
+        rafStart = now;
+    }
+    watch.forEach((w) => {
+        const x = w.el.getBoundingClientRect().left;
+        if (x < w.min) w.min = x;
+        if (x > w.max) w.max = x;
+        w.frames++;
+    });
+    requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+setInterval(() => {
+    watch.forEach((w) => {
+        const travel = Math.round(w.max - w.min);
+        const box = document.getElementById('v' + w.n);
+        const cls = travel > 10 ? 'ok' : 'bad';
+        const word = travel > 10 ? 'позиция меняется' : 'позиция НЕ меняется';
+        box.innerHTML = `замер: <b class="${cls}">${word}</b>, размах ${travel}px`;
+    });
+
+    const rows = [
+        ['fps (rAF)', fps + (fps && fps < 20 ? ' — похоже на троттлинг' : '')],
+        ['Уменьшение движения', matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? '<b class="warn">ВКЛЮЧЕНО</b>' : 'выключено'],
+        ['element.animate()', typeof document.body.animate === 'function'
+            ? '<b class="ok">есть</b>' : '<b class="bad">нет</b>'],
+        ['getAnimations()', typeof document.getAnimations === 'function' ? 'есть' : 'нет'],
+        ['backdrop-filter', CSS.supports('backdrop-filter', 'blur(4px)')
+            || CSS.supports('-webkit-backdrop-filter', 'blur(4px)') ? 'поддерживается' : 'нет'],
+        ['экран', `${innerWidth}x${innerHeight} @${devicePixelRatio}`],
+        ['UA', navigator.userAgent]
+    ];
+    document.getElementById('env').innerHTML =
+        rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+}, 700);
+</script>
+</body>
+</html>

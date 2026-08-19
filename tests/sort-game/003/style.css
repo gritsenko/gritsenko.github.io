@@ -257,10 +257,13 @@ button {
     padding: var(--board-pad);
     border-radius: var(--r-lg);
     background: var(--glass-bg);
-    /* единственный blur в игре: 16-20 размытий (по одному на клетку)
-       роняли fps на мобильных GPU */
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    /* backdrop-filter здесь НЕЛЬЗЯ: элемент с ним создаёт backdrop root, а в
+       WebKit потомки такого поддерева не перерисовываются во время
+       композиторных анимаций — поддерево показывается устаревшим снимком.
+       Внутри .board живут все фишки, поэтому на iOS Safari переезд и желе
+       «работали», но не рисовались: фишка просто возникала в целевом слоте.
+       Полёт в банку выживал только потому, что фишка на время полёта
+       переносится в document.body и выходит из этого поддерева. */
     border: 2px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
 }
@@ -660,8 +663,8 @@ button {
     padding: 4px;
     border-radius: inherit;
     background: rgba(2, 6, 23, 0.85);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    /* без blur: под 85% непрозрачной подложкой он не виден, зато замораживал
+       анимации .jar__thanks и .jar__face внутри (см. комментарий у .board) */
     animation: thankYouPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
 
@@ -696,10 +699,24 @@ button {
     align-items: center;
     justify-content: center;
     padding: 16px;
+    overscroll-behavior: contain;
+}
+
+/* Размытие фона — отдельным слоем, а не на самом .modal: карточка внутри
+   анимируется (thankYouPop), а потомки backdrop-filter-поддерева в WebKit не
+   перерисовываются. Как ::before она СОСЕД размытого блока, не потомок. */
+.modal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
     background: rgba(2, 6, 23, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    overscroll-behavior: contain;
+}
+
+.modal__card {
+    position: relative;
+    z-index: 1;
 }
 
 .modal__card {

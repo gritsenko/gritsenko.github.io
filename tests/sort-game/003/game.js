@@ -178,8 +178,10 @@ const LEVELS = [
     }
 ];
 
-/** Должно совпадать с --move-ms в style.css. */
+/** Длительность переезда фишки между клетками. */
 const MOVE_MS = 180;
+/** Укороченный переезд при «Уменьшении движения» — не ноль. */
+const MOVE_MS_REDUCED = 90;
 const DROP_MS = 520;
 const JELLY_MS = 650;
 
@@ -525,7 +527,10 @@ class ColorSlideGame {
         this.dom.tilesLayer.appendChild(el);
 
         // t.jelly — текущая анимация желе этой фишки (Web Animations API)
-        const t = { chip, el, body, r, c, baseX: 0, baseY: 0, jelly: null };
+        // curX/curY — фактически применённый translate (с учётом смещения
+        // при перетаскивании); slide — текущая анимация переезда
+        const t = { chip, el, body, r, c, baseX: 0, baseY: 0,
+                    curX: 0, curY: 0, slide: null, jelly: null };
         this.tiles.set(chip.id, t);
         this.attachDrag(t);
         this.positionTile(t, false);
@@ -558,22 +563,67 @@ class ColorSlideGame {
         t.baseY = rect.y + (rect.h - size) / 2;
         t.el.style.width = `${size}px`;
         t.el.style.height = `${size}px`;
-        this.setTransform(t, t.baseX, t.baseY, !animate);
+
+        if (animate) this.slideTo(t, t.baseX, t.baseY);
+        else this.setTransform(t, t.baseX, t.baseY);
     }
 
     /**
-     * @param {boolean} instant — снять transition на один кадр.
-     *   Во время перетаскивания НЕ используется: там transition убран классом
-     *   .is-dragging, а форсированный reflow на каждый pointermove — это layout
-     *   thrashing 60 раз в секунду.
+     * Плавный переезд из текущей позиции в целевую — через Web Animations,
+     * а не через CSS-transition.
+     *
+     * CSS-путь отваливался целиком по двум независимым поводам:
+     * 1) при включённом «Уменьшении движения» transition-duration уходил в
+     *    0.01ms и фишка телепортировалась в слот;
+     * 2) `transition: transform var(--move-ms) ...` — var() внутри shorthand:
+     *    если браузер не подставит переменную, вся декларация становится
+     *    невалидной на этапе вычисления и откатывается к `all 0s`, то есть
+     *    снова мгновенный прыжок.
+     * animate() не зависит ни от того, ни от другого — и это ровно тот путь,
+     * которым уже работает анимация сброса в банку.
      */
-    setTransform(t, x, y, instant) {
-        if (instant) t.el.style.transition = 'none';
-        t.el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-        if (instant) {
-            void t.el.offsetWidth;
-            t.el.style.transition = '';
+    slideTo(t, x, y) {
+        const fromX = t.curX;
+        const fromY = t.curY;
+
+        // Итоговое положение выставляем сразу: анимация идёт с fill:'none',
+        // поэтому её обрыв (перехват пальцем) оставит фишку в цели, а не
+        // отбросит назад.
+        this.setTransform(t, x, y);
+
+        if (typeof t.el.animate !== 'function') return;
+        if (fromX === x && fromY === y) return;
+
+        t.slide = t.el.animate([
+            { transform: `translate3d(${fromX}px, ${fromY}px, 0)` },
+            { transform: `translate3d(${x}px, ${y}px, 0)` }
+        ], {
+            duration: this.moveDuration(),
+            easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)',
+            fill: 'none'
+        });
+        t.slide.onfinish = () => { t.slide = null; };
+        t.slide.oncancel = () => { t.slide = null; };
+    }
+
+    /**
+     * При «Уменьшении движения» переезд укорачивается, но НЕ выключается:
+     * игроку необходимо видеть, какая именно фишка сдвинулась — это обратная
+     * связь, а не украшение. Убирается только упругое качание.
+     */
+    moveDuration() {
+        return REDUCED_MOTION.matches ? MOVE_MS_REDUCED : MOVE_MS;
+    }
+
+    /** Мгновенно ставит фишку в позицию и запоминает её как текущую. */
+    setTransform(t, x, y) {
+        if (t.slide) {
+            t.slide.cancel();
+            t.slide = null;
         }
+        t.curX = x;
+        t.curY = y;
+        t.el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
     }
 
     /**
@@ -908,14 +958,18 @@ class ColorSlideGame {
             t.el.classList.remove('is-dragging');
             t.body.style.transform = '';
             this.clearHints();
-            this.setTransform(t, t.baseX, t.baseY, false);
 
             if (dir === 'DOWN' && dropAllowed) {
                 this.dropChip(t.c);
                 return true;
             }
             const target = neighbors.find((n) => n.dir === dir);
-            if (target) return this.moveTileTo(t.r, t.c, target.r, target.c);
+            // Позицию НЕ сбрасываем заранее: переезд стартует из точки, где
+            // палец отпустил фишку, поэтому жест переходит в ход непрерывно.
+            if (target && this.moveTileTo(t.r, t.c, target.r, target.c)) return true;
+
+            // Ход не состоялся — плавно возвращаем фишку на место.
+            this.slideTo(t, t.baseX, t.baseY);
             return false;
         };
 
@@ -947,7 +1001,7 @@ class ColorSlideGame {
             const ratio = Math.min(Math.hypot(cx, cy) / size, 1);
             const sx = cx !== 0 ? 1 + ratio * 0.2 : 1 - ratio * 0.15;
             const sy = cy !== 0 ? 1 + ratio * 0.2 : 1 - ratio * 0.15;
-            this.setTransform(t, t.baseX + cx, t.baseY + cy, false);
+            this.setTransform(t, t.baseX + cx, t.baseY + cy);
             t.body.style.transform = `scale(${sx}, ${sy})`;
         };
 

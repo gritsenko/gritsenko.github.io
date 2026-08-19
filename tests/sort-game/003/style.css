@@ -79,7 +79,6 @@
     --font-ui: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --font-game: 'Fredoka', 'Nunito', system-ui, sans-serif;
 
-    --move-ms: 180ms;
 }
 
 /* --------------------------- Mobile hardening ---------------------------- */
@@ -316,11 +315,12 @@ button {
     pointer-events: auto;
     touch-action: none;
     will-change: transform;
-    transition: transform var(--move-ms) cubic-bezier(0.22, 0.61, 0.36, 1);
+    /* Переезд анимирует game.js через Web Animations. CSS-transition здесь был
+       уязвим сразу с двух сторон: его глушило «Уменьшение движения», и var()
+       внутри shorthand мог обнулить всю декларацию до `all 0s`. */
 }
 
 .tile.is-dragging {
-    transition: none;
     z-index: 30;
 }
 
@@ -328,7 +328,6 @@ button {
     position: fixed;
     z-index: 9999;
     pointer-events: none;
-    transition: none;
 }
 
 .tile__body {
@@ -887,7 +886,9 @@ button {
         animation: none;
     }
 
-    .tile,
+    /* .tile здесь сознательно НЕТ: длительность переезда задаёт JS
+       (MOVE_MS_REDUCED), потому что полностью убранное перемещение делает
+       непонятным, какая фишка сдвинулась. */
     .jar__fill {
         transition-duration: 0.01ms;
     }

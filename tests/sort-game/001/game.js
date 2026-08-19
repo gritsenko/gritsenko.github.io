@@ -181,6 +181,25 @@ const LEVELS = [
 /** Должно совпадать с --move-ms в style.css. */
 const MOVE_MS = 180;
 const DROP_MS = 520;
+const JELLY_MS = 650;
+
+/**
+ * Кадры желе как [scaleX, scaleY, offset]. Offset'ы обязательны: animate()
+ * по умолчанию раскладывает кадры равномерно, а у исходных @keyframes ритм
+ * был неравномерный (0/22/45/68/85/100%) — без них качание теряет характер.
+ */
+const JELLY_H = [
+    [1.45, 0.65, 0], [0.7, 1.3, 0.22], [1.18, 0.85, 0.45],
+    [0.9, 1.08, 0.68], [1.04, 0.96, 0.85], [1, 1, 1]
+];
+const JELLY_V = [
+    [0.65, 1.45, 0], [1.3, 0.7, 0.22], [0.85, 1.18, 0.45],
+    [1.08, 0.9, 0.68], [0.96, 1.04, 0.85], [1, 1, 1]
+];
+const JELLY_EASING = 'cubic-bezier(0.25, 0.1, 0.25, 1)';
+
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
+
 const TAP_SLOP = 18;
 const HISTORY_LIMIT = 20;
 
@@ -502,16 +521,11 @@ class ColorSlideGame {
             </svg>
             <div class="tile__dome"><div class="tile__bead"></div></div>`;
 
-        // «желейная» анимация одноразовая — снимаем класс, иначе fill:both
-        // навсегда перебьёт inline-transform при перетаскивании
-        body.addEventListener('animationend', (e) => {
-            if (e.target === body) body.classList.remove('jelly-h', 'jelly-v');
-        });
-
         el.appendChild(body);
         this.dom.tilesLayer.appendChild(el);
 
-        const t = { chip, el, body, r, c, baseX: 0, baseY: 0 };
+        // t.jelly — текущая анимация желе этой фишки (Web Animations API)
+        const t = { chip, el, body, r, c, baseX: 0, baseY: 0, jelly: null };
         this.tiles.set(chip.id, t);
         this.attachDrag(t);
         this.positionTile(t, false);
@@ -562,10 +576,51 @@ class ColorSlideGame {
         }
     }
 
+    /**
+     * Желе через Web Animations API, а не через CSS-класс.
+     *
+     * До рефакторинга DOM пересобирался на каждый ход, поэтому класс jelly-*
+     * всегда попадал на свежий элемент. Теперь фишка живёт весь уровень, и
+     * КАЖДЫЙ повторный запуск зависел от трюка remove -> void offsetWidth ->
+     * add. В WebKit этот трюк ненадёжен: Safari не всегда сбрасывает состояние
+     * анимации при форсированном reflow в том же тике, и желе просто не
+     * проигрывалось. cancel() + animate() перезапускает детерминированно.
+     */
     playJelly(t, axis) {
-        t.body.classList.remove('jelly-h', 'jelly-v');
-        void t.body.offsetWidth; // перезапуск анимации
-        t.body.classList.add(axis === 'h' ? 'jelly-h' : 'jelly-v');
+        if (t.jelly) {
+            t.jelly.cancel();
+            t.jelly = null;
+        }
+        if (REDUCED_MOTION.matches) return;
+        if (typeof t.body.animate !== 'function') return;
+
+        // easing задаётся НА КАДРАХ, а не в опциях: в CSS
+        // animation-timing-function применяется к каждому интервалу между
+        // кадрами, а опция easing у animate() ремапит время всей итерации
+        // целиком — из-за этого кривая качания получалась совсем другой.
+        const frames = (axis === 'h' ? JELLY_H : JELLY_V)
+            .map(([sx, sy, offset]) => ({
+                transform: `scale(${sx}, ${sy})`,
+                offset,
+                easing: JELLY_EASING
+            }));
+
+        t.jelly = t.body.animate(frames, {
+            duration: JELLY_MS,
+            // fill не нужен: последний кадр scale(1,1) совпадает с базовым
+            // состоянием, поэтому inline-transform при перетаскивании
+            // больше ничем не перебивается
+            fill: 'none'
+        });
+        t.jelly.onfinish = () => { t.jelly = null; };
+        t.jelly.oncancel = () => { t.jelly = null; };
+    }
+
+    /** Гасит недоигранное желе — например когда фишку схватили на полпути. */
+    stopJelly(t) {
+        if (!t.jelly) return;
+        t.jelly.cancel();
+        t.jelly = null;
     }
 
     /* -------------------------------- Правила ----------------------------- */
@@ -648,6 +703,7 @@ class ColorSlideGame {
         if (!t || !this.canDrop(t)) return;
 
         this.isDropping = true;
+        this.stopJelly(t); // недоигранное желе не должно трястись в полёте
         this.saveState();
         this.refreshStates();
         this.updateHud();
@@ -943,9 +999,9 @@ class ColorSlideGame {
             } catch (_) { /* не критично */ }
 
             // Желе живёт 650 мс, а хватать фишку можно уже через MOVE_MS.
-            // CSS-анимация сильнее inline-стиля, поэтому недоигранное желе
-            // глушило бы squash при перетаскивании — снимаем его.
-            t.body.classList.remove('jelly-h', 'jelly-v');
+            // Анимация сильнее inline-стиля, поэтому недоигранное желе
+            // глушило бы squash при перетаскивании — гасим его.
+            this.stopJelly(t);
 
             t.el.classList.add('is-dragging');
             window.addEventListener('pointermove', onMove, { passive: false });

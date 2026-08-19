@@ -339,9 +339,10 @@ button {
     display: flex;
     align-items: center;
     justify-content: center;
-    transform: translateZ(0);
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
+    /* Никаких translateZ/backface-visibility здесь: этот transform всё равно
+       перетирается анимацией желе и inline-скейлом при перетаскивании, а связка
+       backface-visibility:hidden + translate3d у родителя роняла анимацию
+       ребёнка в iOS Safari. Слой продвигает .tile через will-change. */
     /* Обводка «готова к сбросу» — отдельный слой внутри box-shadow палитры.
        Через переменную, потому что box-shadow из другого правила не
        дописывается, а заменяет весь список: обводка съедала объём шара. */
@@ -401,7 +402,7 @@ button {
 .tile.is-ready {
     z-index: 20;
     /* Пульсация именно здесь: на .tile__body её animation вытеснял
-       jelly-h/jelly-v по специфичности и обрывал желе на 180-й мс. */
+       анимацию желе по специфичности и обрывал её на 180-й мс. */
     animation: pulseGlow 1.2s infinite ease-in-out;
 }
 
@@ -820,26 +821,9 @@ button {
 }
 
 /* ------------------------------ Анимации --------------------------------- */
-@keyframes jellyHorizontal {
-    0%   { transform: scale(1.45, 0.65); }
-    22%  { transform: scale(0.7, 1.3); }
-    45%  { transform: scale(1.18, 0.85); }
-    68%  { transform: scale(0.9, 1.08); }
-    85%  { transform: scale(1.04, 0.96); }
-    100% { transform: scale(1, 1); }
-}
+/* Желе живёт в game.js через Web Animations API: CSS-класс требовал
+   перезапуска через reflow, а в WebKit этот трюк ненадёжен. */
 
-@keyframes jellyVertical {
-    0%   { transform: scale(0.65, 1.45); }
-    22%  { transform: scale(1.3, 0.7); }
-    45%  { transform: scale(0.85, 1.18); }
-    68%  { transform: scale(1.08, 0.9); }
-    85%  { transform: scale(0.96, 1.04); }
-    100% { transform: scale(1, 1); }
-}
-
-.jelly-h { animation: jellyHorizontal 0.65s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
-.jelly-v { animation: jellyVertical   0.65s cubic-bezier(0.25, 0.1, 0.25, 1) both; }
 
 @keyframes pulseGlow {
     0%, 100% { filter: brightness(1); }
@@ -871,7 +855,9 @@ button {
    На тач-устройствах :hover эмулируется по тапу и «залипает». */
 @media (hover: hover) and (pointer: fine) {
     .tile:not(.is-flying) .tile__body {
-        transition: filter 0.2s;
+        /* box-shadow обязателен в списке: transition — не аддитивное свойство,
+           и без него обводка «готова к сбросу» появлялась бы рывком */
+        transition: box-shadow 0.2s ease-out, filter 0.2s;
     }
     .tile:not(.is-flying):hover .tile__body {
         filter: brightness(1.08);
@@ -888,11 +874,26 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+    /* Точечно, а не блантом по *. Прежнее правило с
+       `animation-duration: 0.01ms !important` на всех селекторах гасило в том
+       числе желе, поэтому на iOS с включённым «Уменьшением движения» игра
+       выглядела сломанной, хотя анимация сброса (Web Animations) продолжала
+       работать. Желе теперь отключается явно в JS через REDUCED_MOTION. */
+    .tile.is-ready,
+    .arrow.is-active svg,
+    .cell__hint,
+    .jar__thanks,
+    .jar__face {
+        animation: none;
+    }
+
+    .tile,
+    .jar__fill {
+        transition-duration: 0.01ms;
+    }
+
+    .modal__card,
+    .jar__done {
+        animation-duration: 0.01ms;
     }
 }

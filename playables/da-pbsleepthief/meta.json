@@ -1,0 +1,20 @@
+{
+  "title": "DA_PbSleepThief",
+  "slug": "da-pbsleepthief",
+  "project": {
+    "name": "Days After",
+    "shortName": "DA",
+    "appStore": "https://apps.apple.com/app/id1498731586",
+    "googlePlay": "https://play.google.com/store/apps/details?id=games.alternativa.projectv.test"
+  },
+  "tags": [],
+  "details": "",
+  "created": "2026-03-07",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "fc13061f-d78f-433a-8f97-71ec12f999a4",
+  "creativeId": 20
+}

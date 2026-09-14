@@ -1,0 +1,23 @@
+{
+  "title": "Zombie Shooter Playable",
+  "slug": "zombie-shooter-playable",
+  "project": {
+    "name": "Days After",
+    "shortName": "DA",
+    "appStore": "https://apps.apple.com/app/id1498731586",
+    "googlePlay": "https://play.google.com/store/apps/details?id=games.alternativa.projectv.test"
+  },
+  "tags": [
+    "threejs",
+    "3d"
+  ],
+  "details": "",
+  "created": "2025-12-23",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "cd59dcc9-56f4-45e5-87f5-2ecf091aaf29",
+  "creativeId": 8
+}

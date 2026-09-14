@@ -1,0 +1,20 @@
+{
+  "title": "CastleBuilder",
+  "slug": "castlebuilder",
+  "project": {
+    "name": "Hustle Castle",
+    "shortName": "HC",
+    "appStore": "https://apps.apple.com/us/app/id1154402178",
+    "googlePlay": "https://play.google.com/store/apps/details?id=com.my.hc.rpg.kingdom.simulator"
+  },
+  "tags": [],
+  "details": "",
+  "created": "2025-12-23",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "fd7436ed-c84b-407e-b6b9-92eb26ffd2fb",
+  "creativeId": 7
+}

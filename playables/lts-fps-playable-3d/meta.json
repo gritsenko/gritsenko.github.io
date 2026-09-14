@@ -1,0 +1,17 @@
+{
+  "title": "LTS Fps playable 3d",
+  "slug": "lts-fps-playable-3d",
+  "project": null,
+  "tags": [
+    "threejs"
+  ],
+  "details": "",
+  "created": "2026-01-06",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "0d328a0b-44aa-4403-8d1e-c88ee4b715f1",
+  "creativeId": 13
+}

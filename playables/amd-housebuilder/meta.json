@@ -1,0 +1,15 @@
+{
+  "title": "AMD_HouseBuilder",
+  "slug": "amd-housebuilder",
+  "project": null,
+  "tags": [],
+  "details": "",
+  "created": "2026-08-15",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": true,
+  "contentType": "application/x-zip-compressed",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "497e3945-cd0a-4066-8b39-3a6707878c1a",
+  "creativeId": 29
+}

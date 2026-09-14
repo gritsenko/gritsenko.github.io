@@ -1,0 +1,24 @@
+{
+  "title": "HC Match Three drinks",
+  "slug": "hc-match-three-drinks",
+  "project": {
+    "name": "Hustle Castle",
+    "shortName": "HC",
+    "appStore": "https://apps.apple.com/us/app/id1154402178",
+    "googlePlay": "https://play.google.com/store/apps/details?id=com.my.hc.rpg.kingdom.simulator"
+  },
+  "tags": [
+    "pixijs",
+    "dragon",
+    "bones"
+  ],
+  "details": "",
+  "created": "2025-12-30",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "e9e2cc07-2f3b-4207-8365-7272ed703553",
+  "creativeId": 10
+}

@@ -1,0 +1,19 @@
+{
+  "title": "ZC_ChemicalSuit",
+  "slug": "zc-chemicalsuit",
+  "project": null,
+  "tags": [
+    "2d",
+    "Construct",
+    "3"
+  ],
+  "details": "",
+  "created": "2025-12-23",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "8742deeb-7f65-414d-bd9d-07e4d60c4a80",
+  "creativeId": 4
+}

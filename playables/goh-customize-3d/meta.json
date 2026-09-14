@@ -1,0 +1,23 @@
+{
+  "title": "GoH_Customize_3d",
+  "slug": "goh-customize-3d",
+  "project": {
+    "name": "Guild Of Heroes",
+    "shortName": "GoH",
+    "appStore": "",
+    "googlePlay": "https://play.google.com/store/apps/details?id=com.goplaytoday.guildofheroes"
+  },
+  "tags": [
+    "3d",
+    "Threejs"
+  ],
+  "details": "Customize hero cloth and face",
+  "created": "2025-12-23",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "6e81660d-5c73-45af-945a-f2994f8117a9",
+  "creativeId": 1
+}

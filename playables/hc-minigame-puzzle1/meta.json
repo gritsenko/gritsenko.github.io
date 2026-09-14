@@ -1,0 +1,22 @@
+{
+  "title": "HC_MiniGame_Puzzle1",
+  "slug": "hc-minigame-puzzle1",
+  "project": {
+    "name": "Hustle Castle",
+    "shortName": "HC",
+    "appStore": "https://apps.apple.com/us/app/id1154402178",
+    "googlePlay": "https://play.google.com/store/apps/details?id=com.my.hc.rpg.kingdom.simulator"
+  },
+  "tags": [
+    "construct3"
+  ],
+  "details": "",
+  "created": "2026-01-06",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "e10f80ea-e06f-4956-a62e-aa2946d81fc6",
+  "creativeId": 15
+}

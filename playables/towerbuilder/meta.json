@@ -1,0 +1,24 @@
+{
+  "title": "TowerBuilder",
+  "slug": "towerbuilder",
+  "project": {
+    "name": "Hustle Castle",
+    "shortName": "HC",
+    "appStore": "https://apps.apple.com/us/app/id1154402178",
+    "googlePlay": "https://play.google.com/store/apps/details?id=com.my.hc.rpg.kingdom.simulator"
+  },
+  "tags": [
+    "2d",
+    "construct",
+    "3"
+  ],
+  "details": "",
+  "created": "2025-12-23",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "5e21e517-1840-4160-8402-f99418b0edb7",
+  "creativeId": 3
+}

@@ -1,0 +1,17 @@
+{
+  "title": "HC Runner",
+  "slug": "hc-runner",
+  "project": null,
+  "tags": [
+    "construct3"
+  ],
+  "details": "",
+  "created": "2026-01-06",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "ceee2a8b-34c7-439a-b742-901de05984d7",
+  "creativeId": 16
+}

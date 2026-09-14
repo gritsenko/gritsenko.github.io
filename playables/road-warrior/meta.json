@@ -1,0 +1,17 @@
+{
+  "title": "Road Warrior",
+  "slug": "road-warrior",
+  "project": null,
+  "tags": [
+    "prototype"
+  ],
+  "details": "",
+  "created": "2025-12-30",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "0c48f89b-9c8a-4fd3-becd-6b13a508f208",
+  "creativeId": 9
+}

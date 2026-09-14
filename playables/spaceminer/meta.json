@@ -1,0 +1,15 @@
+{
+  "title": "SpaceMiner",
+  "slug": "spaceminer",
+  "project": null,
+  "tags": [],
+  "details": "",
+  "created": "2025-12-23",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "f7baf058-308e-4fbf-85ad-f83622574af0",
+  "creativeId": 2
+}

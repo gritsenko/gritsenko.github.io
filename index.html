@@ -72,6 +72,9 @@
             <a class="nav-link" href="#applications">Applications</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link" href="#playables">Playables</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link" href="#research">Research</a>
           </li>
           <li class="nav-item">
@@ -315,8 +318,187 @@
         </div>
       </div>
 
+      <div class="col-md-4">
+        <div class="card mb-4">
+          <a href="https://txt2sfx.github.io" target="_blank">
+            <img src="https://txt2sfx.github.io/og.png" class="card-img-top" alt="txt2sfx">
+          </a>
+          <div class="card-body">
+            <h5 class="card-title">txt2sfx</h5>
+            <p class="card-text">Text-to-SFX playground — generate game-ready sound effects straight from text prompts in the browser.</p>
+            <a href="https://txt2sfx.github.io" class="btn btn-primary" target="_blank">Open</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card mb-4">
+          <a href="https://gritsenko.biz/vibeicons/" target="_blank">
+            <img src="https://gritsenko.biz/vibeicons/cover.jpg" class="card-img-top" alt="VibeIcons">
+          </a>
+          <div class="card-body">
+            <h5 class="card-title">VibeIcons</h5>
+            <p class="card-text">Browser-based icon manager — organize, search and manage your icon collections in one place.</p>
+            <a href="https://gritsenko.biz/vibeicons/" class="btn btn-primary" target="_blank">Open</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card mb-4">
+          <a href="https://github.com/gritsenko/AssetsBoss" target="_blank">
+            <img src="https://opengraph.githubassets.com/1/gritsenko/AssetsBoss" class="card-img-top" alt="AssetsBoss">
+          </a>
+          <div class="card-body">
+            <h5 class="card-title">AssetsBoss</h5>
+            <p class="card-text">Lightweight browser for local game assets: pluggable source folders, SQLite full-text search, thumbnail cache and audio preview.</p>
+            <a href="https://github.com/gritsenko/AssetsBoss" class="btn btn-primary" target="_blank">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+
     </div>
   </section>
+
+  <!-- ===== Playables (auto-populated from playables/catalog.js) ===== -->
+  <section id="playables" class="container py-5">
+    <div class="d-flex align-items-center flex-wrap mb-2">
+      <h2 class="mb-0 mr-3">Playables</h2>
+      <a href="/playables/" class="btn btn-sm btn-outline-secondary ml-auto" target="_blank" rel="noopener">Full gallery ↗</a>
+    </div>
+    <p class="mb-4">Playable ad prototypes — click any card to run it in a phone simulator.</p>
+
+    <div class="plq-controls mb-4">
+      <input id="plq-q" class="plq-search" type="search" placeholder="Search by name, project, tag…" autocomplete="off">
+      <div id="plq-chips" class="plq-chips"></div>
+    </div>
+
+    <div id="plq-grid" class="row"></div>
+    <p id="plq-empty" class="text-muted" style="display:none">No playables match.</p>
+  </section>
+
+  <div class="plq-overlay" id="plq-overlay" aria-hidden="true">
+    <button class="plq-close" id="plq-close" aria-label="Close">✕</button>
+    <div class="plq-stage" id="plq-stage"></div>
+    <div class="plq-info" id="plq-info"></div>
+  </div>
+
+  <style>
+    #playables .plq-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    #playables .plq-search{flex:1 1 240px;min-width:200px;border:1px solid #ced4da;border-radius:10px;padding:8px 12px;font-size:14px}
+    #playables .plq-chips{display:flex;flex-wrap:wrap;gap:6px}
+    #playables .plq-chip{padding:5px 11px;border-radius:999px;border:1px solid #ced4da;background:#fff;color:#495057;cursor:pointer;font-size:12.5px;user-select:none;transition:.15s}
+    #playables .plq-chip:hover{border-color:#adb5bd}
+    #playables .plq-chip.on{background:#007bff;border-color:#007bff;color:#fff}
+    #playables .plq-card{border:1px solid #e6e8eb;border-radius:14px;overflow:hidden;cursor:pointer;background:#fff;height:100%;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
+    #playables .plq-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.10)}
+    #playables .plq-thumb{position:relative;aspect-ratio:16/10;background:#f1f3f5 center/cover no-repeat;overflow:hidden}
+    #playables .plq-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    #playables .plq-badge{position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(0,0,0,.6);color:#fff}
+    #playables .plq-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;background:rgba(0,0,0,.28);transition:.15s}
+    #playables .plq-card:hover .plq-ov{opacity:1}
+    #playables .plq-ov i{width:46px;height:46px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center}
+    #playables .plq-ov i::after{content:"";border-style:solid;border-width:8px 0 8px 13px;border-color:transparent transparent transparent #111;margin-left:3px}
+    #playables .plq-body{padding:10px 12px 12px}
+    #playables .plq-title{font-weight:600;font-size:14px;line-height:1.25}
+    #playables .plq-proj{color:#6c757d;font-size:12.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #playables .plq-tags{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
+    #playables .plq-tags b{font-weight:500;font-size:11px;color:#6c757d;background:#f1f3f5;border:1px solid #e6e8eb;padding:1px 7px;border-radius:6px}
+
+    .plq-overlay{position:fixed;inset:0;z-index:1080;background:rgba(4,6,10,.72);display:none;padding:24px;overflow:auto}
+    .plq-overlay.on{display:flex;align-items:safe center;justify-content:center;gap:34px;flex-wrap:wrap}
+    .plq-stage{display:flex;flex-direction:column;align-items:center;gap:14px}
+    .plq-phone{position:relative;height:min(820px,86vh);aspect-ratio:400/860;background:#05070a;border-radius:44px;padding:30px 12px;box-shadow:0 0 0 2px #2a2f38,0 30px 80px rgba(0,0,0,.6)}
+    .plq-phone::before{content:"";position:absolute;top:12px;left:50%;transform:translateX(-50%);width:78px;height:8px;background:#20242b;border-radius:999px;z-index:3}
+    .plq-screen{width:100%;height:100%;border-radius:24px;overflow:hidden;background:#000;position:relative}
+    .plq-screen iframe{width:100%;height:100%;border:0;display:block;background:#fff}
+    .plq-btns{display:flex;gap:10px}
+    .plq-btns button,.plq-btns a{background:#14171c;border:1px solid #272c35;color:#e7eaee;border-radius:10px;padding:8px 13px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+    .plq-btns button:hover,.plq-btns a:hover{border-color:#3d4653}
+    .plq-info{width:320px;max-width:88vw;color:#e7eaee}
+    .plq-info h3{margin:0 0 6px;font-size:22px}
+    .plq-info .r{color:#9aa3af;font-size:13px;margin:10px 0}
+    .plq-info .r b{color:#e7eaee}
+    .plq-info .st{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+    .plq-info .st a{color:#5b8cff;text-decoration:none;font-size:13px;word-break:break-all}
+    .plq-info .tg{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .plq-info .tg b{font-weight:500;font-size:12px;color:#9aa3af;background:#1b1f26;border:1px solid #272c35;padding:3px 9px;border-radius:7px}
+    .plq-close{position:fixed;top:16px;right:18px;z-index:1090;width:40px;height:40px;border-radius:50%;background:#14171c;border:1px solid #272c35;color:#e7eaee;font-size:20px;cursor:pointer}
+    @media(max-width:720px){ .plq-info{order:-1;width:min(400px,90vw)} .plq-overlay{padding:16px} }
+  </style>
+
+  <script src="playables/catalog.js"></script>
+  <script>
+  (function(){
+    var BASE='playables/';
+    var DATA=(window.PLAYABLES||[]).slice();
+    var grid=document.getElementById('plq-grid'), chipsEl=document.getElementById('plq-chips'),
+        qEl=document.getElementById('plq-q'), emptyEl=document.getElementById('plq-empty');
+    if(!grid) return;
+    var activeTag=null, query='';
+
+    var tc={}; DATA.forEach(function(p){(p.tags||[]).forEach(function(t){tc[t]=(tc[t]||0)+1;});});
+    Object.keys(tc).sort(function(a,b){return tc[b]-tc[a]||a.localeCompare(b);}).forEach(function(t){
+      var c=document.createElement('div'); c.className='plq-chip'; c.textContent=t;
+      c.onclick=function(){ activeTag=activeTag===t?null:t;
+        [].forEach.call(chipsEl.children,function(x){x.classList.toggle('on',x.textContent===activeTag);}); render(); };
+      chipsEl.appendChild(c);
+    });
+
+    function esc(s){return (s||'').replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m];});}
+    function match(p){
+      if(activeTag&&(p.tags||[]).indexOf(activeTag)<0) return false;
+      if(query){var h=(p.title+' '+((p.project&&p.project.name)||'')+' '+(p.tags||[]).join(' ')+' '+(p.details||'')).toLowerCase(); if(h.indexOf(query)<0) return false;}
+      return true;
+    }
+    function render(){
+      var list=DATA.filter(match); grid.innerHTML=''; emptyEl.style.display=list.length?'none':'block';
+      list.forEach(function(p){
+        var col=document.createElement('div'); col.className='col-6 col-md-4 col-lg-3 mb-4';
+        var proj=p.project&&p.project.name?p.project.name:'';
+        var thumb=p.thumb?'<img loading="lazy" src="'+encodeURI(BASE+p.thumb)+'" alt="">':'';
+        col.innerHTML='<div class="plq-card"><div class="plq-thumb">'+thumb+
+          '<span class="plq-badge">'+(p.type==='zip'?'ZIP':'HTML')+'</span>'+
+          '<span class="plq-ov"><i></i></span></div>'+
+          '<div class="plq-body"><div class="plq-title">'+esc(p.title)+'</div>'+
+          (proj?'<div class="plq-proj">'+esc(proj)+'</div>':'')+
+          ((p.tags&&p.tags.length)?'<div class="plq-tags">'+p.tags.map(function(t){return '<b>'+esc(t)+'</b>';}).join('')+'</div>':'')+
+          '</div></div>';
+        col.querySelector('.plq-card').onclick=function(){ open(p); };
+        grid.appendChild(col);
+      });
+    }
+
+    var overlay=document.getElementById('plq-overlay'), stage=document.getElementById('plq-stage'), info=document.getElementById('plq-info');
+    function open(p){
+      var url=encodeURI(BASE+p.url);
+      var screen = p.type==='zip'
+        ? '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#9aa3af;background:#0f1216;text-align:center;padding:24px"><div style="font-size:13px">ZIP playable</div><a href="'+url+'" download style="background:#007bff;color:#fff;text-decoration:none;padding:11px 20px;border-radius:12px;font-weight:600">Download ZIP</a></div>'
+        : '<iframe src="'+url+'" allow="autoplay; fullscreen; accelerometer; gyroscope"></iframe>';
+      stage.innerHTML='<div class="plq-phone"><div class="plq-screen">'+screen+'</div></div>'+
+        '<div class="plq-btns">'+(p.type!=='zip'?'<button id="plq-reload">↻ Reload</button>':'')+
+        '<a href="'+url+'" target="_blank" rel="noopener">↗ Open in new tab</a></div>';
+      var pr=p.project||{}, st='';
+      if(pr.appStore) st+='<a href="'+esc(pr.appStore)+'" target="_blank" rel="noopener">App Store ↗</a>';
+      if(pr.googlePlay) st+='<a href="'+esc(pr.googlePlay)+'" target="_blank" rel="noopener">Google Play ↗</a>';
+      info.innerHTML='<h3>'+esc(p.title)+'</h3>'+
+        (pr.name?'<div class="r"><b>Project:</b> '+esc(pr.name)+(pr.shortName?' ('+esc(pr.shortName)+')':'')+'</div>':'')+
+        (p.details?'<div class="r">'+esc(p.details)+'</div>':'')+
+        (p.created?'<div class="r"><b>Created:</b> '+esc(p.created)+'</div>':'')+
+        ((p.tags&&p.tags.length)?'<div class="tg">'+p.tags.map(function(t){return '<b>'+esc(t)+'</b>';}).join('')+'</div>':'')+
+        (st?'<div class="st">'+st+'</div>':'');
+      var rl=document.getElementById('plq-reload'); if(rl) rl.onclick=function(){var f=stage.querySelector('iframe'); if(f) f.src=f.src;};
+      overlay.classList.add('on'); document.body.style.overflow='hidden';
+    }
+    function close(){ overlay.classList.remove('on'); stage.innerHTML=''; info.innerHTML=''; document.body.style.overflow=''; }
+    document.getElementById('plq-close').onclick=close;
+    overlay.onclick=function(e){ if(e.target===overlay) close(); };
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape') close(); });
+    qEl.addEventListener('input',function(){ query=qEl.value.trim().toLowerCase(); render(); });
+    render();
+  })();
+  </script>
+  <!-- ===== /Playables ===== -->
 
   <section id="research" class="container py-5">
     <h2>Research</h2>

@@ -1,0 +1,17 @@
+{
+  "title": "Mashroom Wars 2 (3d)",
+  "slug": "mashroom-wars-2-3d",
+  "project": null,
+  "tags": [
+    "pixijs"
+  ],
+  "details": "",
+  "created": "2026-01-06",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "cfb76b91-ec80-42d1-9a90-fc5ddd88cc41",
+  "creativeId": 14
+}

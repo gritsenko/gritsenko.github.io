@@ -1,0 +1,18 @@
+{
+  "title": "War Robots Playable",
+  "slug": "war-robots-playable",
+  "project": null,
+  "tags": [
+    "3d",
+    "threejs"
+  ],
+  "details": "",
+  "created": "2025-12-23",
+  "playable": "index.html",
+  "playableType": "html",
+  "fromZip": false,
+  "contentType": "text/html",
+  "screenshot": "screenshot.jpg",
+  "sourceGuid": "f38fa41f-89ce-48f6-815b-d88bba359d27",
+  "creativeId": 5
+}
